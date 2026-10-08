@@ -14,9 +14,10 @@ Ein Projektglossar `GLOSSARY.md` und Architekturentscheidungen unter `docs/adr/`
 
 Die Skills liegen in `.agents/skills/`; vor ihrer Verwendung die jeweilige `SKILL.md` lesen. Das Testportfolio steht in [.agents/skills/TESTPORTFOLIO.md](.agents/skills/TESTPORTFOLIO.md).
 
+- Vor der ersten Implementierungsänderung den Ankerpunkt nach dem globalen `agent-review` festhalten und im Ticket oder Auftrag mitgeben; User-Vorgaben haben Vorrang.
 - Große, unklare Vorhaben nach ausdrücklichem Auftrag mit `wayfinder` planen; dieser nutzt `grilling` und `domain-modeling`.
 - Offene Verhaltens- oder UI-Fragen mit `prototype`, Architektur- und Schnittstellenfragen mit `codebase-design` unterstützen.
 - Vor einer größeren Umsetzung die Entscheidungen mit `to-spec` zusammenführen und mit `to-tickets` in überprüfbare Aufgaben samt Abhängigkeiten aufteilen.
-- Nach Freigabe der Planung die gesamte Spec mit `implement-spec` umsetzen; vereinbarte Testbereiche mit `tdd` prüfen und den Abschlussreview mit `code-review` durchführen.
-- Einzelne freigegebene Aufgaben anhand der Spec und Akzeptanzkriterien implementieren, relevante Projektprüfungen ausführen und bestätigte Review-Befunde beheben.
+- Nach Freigabe der Planung die gesamte Spec mit `implement-spec` umsetzen; vereinbarte Testbereiche mit `tdd` prüfen und den Abschlussreview mit dem globalen `agent-review` durchführen.
+- Einzelne freigegebene Aufgaben anhand der Spec und Akzeptanzkriterien implementieren, relevante Projektprüfungen ausführen und mit dem globalen `agent-review` prüfen; bestätigte Befunde beheben.
 - Schwierige Fehler mit `diagnosing-bugs` untersuchen. `retro` nach einem Durchlauf auf ausdrücklichen Auftrag verwenden.

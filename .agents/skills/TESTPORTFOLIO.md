@@ -9,7 +9,7 @@ Dieses Portfolio gilt für die lokale Testumgebung des Projekts AI-Benchmark Map
 | Planung | [wayfinder](wayfinder/SKILL.md), [grilling](grilling/SKILL.md), [domain-modeling](domain-modeling/SKILL.md) |
 | Übergabe zur Umsetzung | [to-spec](to-spec/SKILL.md), [to-tickets](to-tickets/SKILL.md) |
 | Implementierung | [implement-spec](implement-spec/SKILL.md), [tdd](tdd/SKILL.md) |
-| Review und Auswertung | [code-review](code-review/SKILL.md), [retro](retro/SKILL.md) |
+| Review und Auswertung | [agent-review](/home/bene/.agents/MCP-skills-control/optional-skills/agent-review/SKILL.md) (global), [retro](retro/SKILL.md) |
 | Gezielte Unterstützung | [prototype](prototype/SKILL.md), [codebase-design](codebase-design/SKILL.md), [diagnosing-bugs](diagnosing-bugs/SKILL.md) |
 | Orientierung und Einrichtung | [ask-matt](ask-matt/SKILL.md), [setup-matt-pocock-skills](setup-matt-pocock-skills/SKILL.md) |
 
@@ -18,11 +18,11 @@ Dieses Portfolio gilt für die lokale Testumgebung des Projekts AI-Benchmark Map
 - [research](research/SKILL.md): Wayfinder verwendet ihn zur Bearbeitung von Recherche-Tickets.
 - [writing-for-agents](writing-for-agents/SKILL.md): Retro verwendet ihn als Referenz für Verbesserungen an Agent-Dokumenten.
 
-Diese beiden Skills unterstützen die bestätigte Auswahl und sind keine zusätzlichen Pflichtschritte. Insgesamt sind 16 Skill-Verzeichnisse vorhanden. Der einfache `implement`-Skill bleibt ausgeschlossen; seine Ablaufregeln sollen in der Projekt-`AGENTS.md` festgehalten werden.
+Diese beiden Skills unterstützen die bestätigte Auswahl und sind keine zusätzlichen Pflichtschritte. Insgesamt sind 15 lokale Skill-Verzeichnisse vorhanden; `agent-review` wird aus dem globalen Setup verwendet. Die ursprüngliche `code-review`-Version bleibt als Vergleichsquelle unter `.agents/skill-variants/code-review-original/` erhalten und gehört nicht zum aktiven Portfolio. Der einfache `implement`-Skill bleibt ausgeschlossen; seine Ablaufregeln sollen in der Projekt-`AGENTS.md` festgehalten werden.
 
 ## Geplanter Ablauf
 
-Grobe Idee → Wayfinder → bei Bedarf Prototype und Codebase Design → Spec → Tickets → Implementierung → Code Review → Retro.
+Grobe Idee → Wayfinder → bei Bedarf Prototype und Codebase Design → Spec → Tickets → Implementierung → Agent Review (Konformität + Logik) → Retro.
 
 Die Auswahl ist keine Pflichtpipeline: Jeder Skill wird bei einer passenden Aufgabe eingesetzt. Diagnosing Bugs unterstützt bei schwierigen Fehlern.
 
