@@ -28,7 +28,7 @@ Die Auswahl ist keine Pflichtpipeline: Jeder Skill wird bei einer passenden Aufg
 
 ## Tracker
 
-Der gewählte Tracker ist [GitHub Issues für Bene77-w/Benchmark-Mapping](https://github.com/Bene77-w/Benchmark-Mapping/issues). Das Projekt ist über den SSH-Remote `origin` mit diesem Repository verbunden. Die projektspezifische Tracker-Konfiguration durch `setup-matt-pocock-skills` steht noch aus.
+Der gewählte Tracker ist [GitHub Issues für Bene77-w/Benchmark-Mapping](https://github.com/Bene77-w/Benchmark-Mapping/issues). Das Projekt ist über den SSH-Remote `origin` mit diesem Repository verbunden. Die projektspezifische Tracker-Konfiguration steht in `docs/agents/issue-tracker.md`; die lokale `AGENTS.md` beschreibt den Arbeitsablauf.
 
 ## Auswertung
 
