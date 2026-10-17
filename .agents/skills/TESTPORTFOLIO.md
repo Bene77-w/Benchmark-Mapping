@@ -13,6 +13,8 @@ Dieses Portfolio gilt für die lokale Testumgebung des Projekts AI-Benchmark Map
 | Gezielte Unterstützung | [prototype](prototype/SKILL.md), [codebase-design](codebase-design/SKILL.md), [diagnosing-bugs](diagnosing-bugs/SKILL.md) |
 | Orientierung und Einrichtung | [ask-matt](ask-matt/SKILL.md), [setup-matt-pocock-skills](setup-matt-pocock-skills/SKILL.md) |
 
+`ask-matt` diente nur der Einrichtung der Skills und gehört zu keinem Arbeitsablauf; seine Verweise auf hier nicht installierte Skills (z. B. `/grill-with-docs`, `/implement`, `/handoff`) sind daher ohne Bedeutung. Die heruntergeladenen Skills werden möglichst unverändert gelassen, damit ihr Zusammenspiel erhalten bleibt.
+
 ## Benötigte Hilfsskills
 
 - [research](research/SKILL.md): Wayfinder verwendet ihn zur Bearbeitung von Recherche-Tickets.
