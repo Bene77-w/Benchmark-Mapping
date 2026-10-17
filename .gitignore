@@ -10,3 +10,5 @@ __pycache__/
 .agents/skills/.agents/
 .agents/skills/.codex/
 .agents/skills/.aws/
+# Lokale Regelkopie von agent-review (sync-rules.sh)
+.agent-review-regeln.md

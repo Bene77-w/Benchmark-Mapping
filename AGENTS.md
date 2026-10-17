@@ -18,6 +18,6 @@ Die Skills liegen in `.agents/skills/`; Claude Code findet sie über den Symlink
 - Große, unklare Vorhaben nach ausdrücklichem Auftrag mit `wayfinder` planen; dieser nutzt `grilling` und `domain-modeling`.
 - Offene Verhaltens- oder UI-Fragen mit `prototype`, Architektur- und Schnittstellenfragen mit `codebase-design` unterstützen.
 - Vor einer größeren Umsetzung die Entscheidungen mit `to-spec` zusammenführen und mit `to-tickets` in überprüfbare Aufgaben samt Abhängigkeiten aufteilen.
-- Nach Freigabe der Planung die gesamte Spec mit `implement-spec` umsetzen; vereinbarte Testbereiche mit `tdd` prüfen und den Abschlussreview mit dem globalen `agent-review` durchführen.
-- Einzelne freigegebene Aufgaben anhand der Spec und Akzeptanzkriterien implementieren, relevante Projektprüfungen ausführen und mit dem globalen `agent-review` prüfen; bestätigte Befunde beheben.
+- Nach Freigabe der Planung die gesamte Spec mit `implement-spec` umsetzen; vereinbarte Testbereiche mit `tdd` prüfen und den Abschlussreview mit dem globalen `agent-review` als Structured Review mit der Spec durchführen.
+- Einzelne freigegebene Aufgaben anhand der Spec und Akzeptanzkriterien implementieren, relevante Projektprüfungen ausführen und mit dem globalen `agent-review` als Structured Review mit der Spec prüfen; bestätigte Befunde beheben.
 - Schwierige Fehler mit `diagnosing-bugs` untersuchen. `retro` nach einem Durchlauf auf ausdrücklichen Auftrag verwenden.
