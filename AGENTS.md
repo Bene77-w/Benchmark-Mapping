@@ -12,7 +12,7 @@ Ein Projektglossar `GLOSSARY.md` und Architekturentscheidungen unter `docs/adr/`
 
 ## Arbeitsablauf
 
-Die Skills liegen in `.agents/skills/`; vor ihrer Verwendung die jeweilige `SKILL.md` lesen. Das Testportfolio steht in [.agents/skills/TESTPORTFOLIO.md](.agents/skills/TESTPORTFOLIO.md).
+Die Skills liegen in `.agents/skills/`; Claude Code findet sie über den Symlink `.claude/skills`. Vor ihrer Verwendung die jeweilige `SKILL.md` lesen. Das Testportfolio steht in [.agents/skills/TESTPORTFOLIO.md](.agents/skills/TESTPORTFOLIO.md).
 
 - Vor der ersten Implementierungsänderung den Ankerpunkt nach dem globalen `agent-review` festhalten und im Ticket oder Auftrag mitgeben; User-Vorgaben haben Vorrang.
 - Große, unklare Vorhaben nach ausdrücklichem Auftrag mit `wayfinder` planen; dieser nutzt `grilling` und `domain-modeling`.
