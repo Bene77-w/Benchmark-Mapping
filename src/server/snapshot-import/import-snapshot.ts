@@ -1,4 +1,10 @@
-import type { SnapshotUnit } from "@/server/snapshot/model";
+import {
+  SNAPSHOT_FORMAT,
+  type Snapshot,
+  type SnapshotContent,
+  type SnapshotUnit,
+} from "@/server/snapshot/model";
+import { withContentHash } from "@/server/snapshot/snapshot-file";
 import { applyCleanups, type CleanupRule } from "./cleanup-register";
 import { readCorpus, type SourceUnit } from "./corpus";
 import { readTaxonomy } from "./taxonomy";
@@ -8,16 +14,24 @@ export interface ImportOptions {
   sourceRoot: string;
   /** Bereinigungsregister; wird in seiner Reihenfolge angewendet. */
   register: readonly CleanupRule[];
+  /** Fachliche Version des Snapshots, Standard `snapshot-v1`. */
+  version?: string;
 }
 
-export async function importSnapshot(options: ImportOptions) {
+/**
+ * Einmaliger Import aus dem Congress Tracker: Units und Taxonomie lesen, Bereinigungsregister anwenden,
+ * Snapshot mit Content-Hash bilden. Gleiche Quelle und gleiches Register ergeben denselben Hash.
+ */
+export async function importSnapshot(options: ImportOptions): Promise<Snapshot> {
   const corpus = await readCorpus(options.sourceRoot);
   const taxonomy = await readTaxonomy(options.sourceRoot);
   const cleaned = applyCleanups(corpus.units.map(toSnapshotUnit), options.register);
   const units = withParentContext(cleaned.units);
-  return {
+  const content: SnapshotContent = {
+    format: SNAPSHOT_FORMAT,
+    version: options.version ?? "snapshot-v1",
     source: {
-      system: "congress_tracker" as const,
+      system: "congress_tracker",
       corpusManifestSha256: corpus.manifestSha256,
       taxonomySnapshotId: taxonomy.snapshotId,
       taxonomyContentHash: taxonomy.contentHash,
@@ -27,6 +41,7 @@ export async function importSnapshot(options: ImportOptions) {
     industries: taxonomy.industries,
     cleanups: cleaned.cleanups,
   };
+  return withContentHash(content);
 }
 
 function toSnapshotUnit(unit: SourceUnit): SnapshotUnit {

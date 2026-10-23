@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
+import { snapshotSchema } from "@/server/snapshot/model";
 import { importSnapshot } from "./import-snapshot";
 
 // Ausschnitt des Congress Trackers: drei unverändert kopierte Korpusdateien und die freigegebene Taxonomie.
@@ -169,5 +170,22 @@ describe("importSnapshot", () => {
         }),
       ).rejects.toThrow(/senate--unbekannt/);
     });
+  });
+
+  test("ist reproduzierbar: gleiche Quelle und gleiches Register ergeben denselben Content-Hash", async () => {
+    const first = await importSnapshot({ sourceRoot: FIXTURE_ROOT, register: [] });
+    const second = await importSnapshot({ sourceRoot: await copyFixture(), register: [] });
+    const cleaned = await importSnapshot({
+      sourceRoot: FIXTURE_ROOT,
+      register: [
+        { unitId: "joint--taxation", kind: "zu_kurzer_text", action: "name_only", reason: "Testfall" },
+      ],
+    });
+
+    expect(first.version).toBe("snapshot-v1");
+    expect(first.contentHash).toMatch(/^[0-9a-f]{64}$/);
+    expect(second.contentHash).toBe(first.contentHash);
+    expect(cleaned.contentHash).not.toBe(first.contentHash);
+    expect(() => snapshotSchema.parse(first)).not.toThrow();
   });
 });
