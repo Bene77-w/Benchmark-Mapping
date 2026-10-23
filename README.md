@@ -59,4 +59,11 @@ pnpm check       # Biome, Typecheck, Vitest
 pnpm test:e2e    # Playwright gegen Dev-Server und eigenen Worker; Datenbank muss laufen
 ```
 
+Vor dem ersten `pnpm test:e2e` den Browser für Playwright installieren (einmal je Rechner bzw. nach einem Playwright-Update):
+
+```sh
+pnpm exec playwright install chromium              # nur der Browser
+pnpm exec playwright install --with-deps chromium  # Linux: zusätzlich die Systembibliotheken (braucht sudo)
+```
+
 Vitest-Tests mit Datenbank laufen gegen eine In-Memory-PGlite (`src/server/db/test-database.ts`) und brauchen kein Docker.
