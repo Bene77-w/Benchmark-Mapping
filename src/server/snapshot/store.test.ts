@@ -3,7 +3,7 @@ import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
 import type { Snapshot } from "./model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "./snapshot-file";
-import { getCurrentSnapshot, loadSnapshot, searchIndustries, searchUnits } from "./store";
+import { getCurrentSnapshot, getSnapshotContent, loadSnapshot, searchIndustries, searchUnits } from "./store";
 
 let snapshot: Snapshot;
 beforeAll(async () => {
@@ -66,6 +66,22 @@ describe("Snapshot in der Datenbank", () => {
       parentCommitteeName: "Committee on Finance",
       cleanups: [],
     });
+  });
+
+  test("liefert Units, Industries und Quelle eines geladenen Snapshots so wie in der Datei", async () => {
+    const db = await createTestDatabase();
+    const { snapshotId } = await loadSnapshot(db, snapshot);
+
+    const content = await getSnapshotContent(db, snapshotId);
+
+    const byUnitId = (a: { unitId: string }, b: { unitId: string }) => (a.unitId < b.unitId ? -1 : 1);
+    const byIndustryId = (a: { industryId: string }, b: { industryId: string }) =>
+      a.industryId < b.industryId ? -1 : 1;
+    expect(content?.contentHash).toBe(snapshot.contentHash);
+    expect(content?.source).toEqual(snapshot.source);
+    expect(content?.units.toSorted(byUnitId)).toEqual(snapshot.units.toSorted(byUnitId));
+    expect(content?.industries.toSorted(byIndustryId)).toEqual(snapshot.industries.toSorted(byIndustryId));
+    expect(await getSnapshotContent(db, snapshotId + 1)).toBeNull();
   });
 
   test("findet Industries über Name, Sektor und Beschreibung", async () => {
