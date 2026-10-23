@@ -71,11 +71,15 @@ export async function buildBenchmarkPrompt(
   options: PromptOptions = {},
 ): Promise<BenchmarkPrompt> {
   const version = options.version ?? PROMPT_VERSION;
-  const directory = path.join(options.promptRoot ?? PROMPT_ROOT, version);
+  // Die Prompt-Dateien werden zur Laufzeit gelesen (lokale App); turbopackIgnore verhindert, dass der Build
+  // deshalb das ganze Projekt in die Server-Ausgabe aufnimmt.
+  const directory = path.join(/*turbopackIgnore: true*/ options.promptRoot ?? PROMPT_ROOT, version);
   const briefFile = BRIEF_FILE[`${request.runKind}/${request.mode}`];
   if (briefFile === null) throw new Error("Vorschlagsläufe laufen immer im Modus mit Websuche");
   const [contract, brief] = await Promise.all(
-    ["contract.md", briefFile].map((file) => readFile(path.join(directory, file), "utf8")),
+    ["contract.md", briefFile].map((file) =>
+      readFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ directory, file), "utf8"),
+    ),
   );
   const systemPrompt = [contract.trim(), brief.trim()].join("\n\n");
 

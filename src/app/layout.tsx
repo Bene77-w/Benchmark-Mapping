@@ -19,6 +19,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/snapshot" className="text-muted-foreground hover:text-foreground">
               Snapshot
             </Link>
+            <Link href="/prompt" className="text-muted-foreground hover:text-foreground">
+              Prompt
+            </Link>
           </nav>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
