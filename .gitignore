@@ -12,3 +12,13 @@ __pycache__/
 .agents/skills/.aws/
 # Lokale Regelkopie von agent-review (sync-rules.sh)
 .agent-review-regeln.md
+# Node / Next.js
+/node_modules
+/.next/
+/out/
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+# Playwright
+/test-results/
+/playwright-report/
