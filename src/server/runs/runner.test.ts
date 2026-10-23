@@ -1,4 +1,4 @@
-import { appendFile, cp, mkdtemp } from "node:fs/promises";
+import { appendFile, cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
@@ -145,6 +145,46 @@ describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
     expect((await getRun(db, runId))?.status).toBe("completed");
   });
 
+  test("eine schemakonforme Antwort für eine andere Unit gilt als Schemaverstoß und wird nicht als Antwort gespeichert", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await mkdtemp(path.join(tmpdir(), "fake-harness-"));
+    await mkdir(path.join(root, "falsche-unit"));
+    const otherUnitAnswer = {
+      unit_id: "house--agriculture--livestock-dairy-and-poultry",
+      decision: "no_mapping",
+      no_mapping_reason: "Keine Industry.",
+      broad_scope_exception: false,
+      broad_scope_reason: null,
+      assignments: [],
+      sources: [],
+      label_uncertain: false,
+      uncertainty_note: null,
+    };
+    await writeFile(
+      path.join(root, "falsche-unit", "house--ethics.json"),
+      JSON.stringify({ response: otherUnitAnswer }),
+    );
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "falsche-unit" },
+      unitIds: ["house--ethics"],
+    });
+
+    await processNextRun(db, { adapters: { fake: createFakeAdapter({ root }) } });
+
+    const run = await getRun(db, runId);
+    expect(run?.progress).toMatchObject({ done: 0, failed: 1 });
+    expect(run?.units[0]).toMatchObject({
+      unitId: "house--ethics",
+      status: "failed",
+      answer: null,
+      error: {
+        kind: "schema_violation",
+        message: expect.stringContaining("house--agriculture--livestock-dairy-and-poultry"),
+      },
+      rawResponse: expect.stringContaining("house--agriculture--livestock-dairy-and-poultry"),
+    });
+  });
+
   test("lehnt Parallelität außerhalb 1–5, leere Unit-Listen und unbekannte Units ab", async () => {
     const db = await databaseWithSnapshot();
     const request = { configuration: fakeConfiguration, unitIds: ["house--ethics"] };
@@ -249,7 +289,7 @@ function gatedAdapter() {
       };
       const rawResponse = JSON.stringify(answer);
       return {
-        outcome: parseAnswerText(rawResponse),
+        outcome: parseAnswerText(rawResponse, task.unitId),
         rawResponse,
         log: "",
         tokens: null,

@@ -6,7 +6,8 @@ import { z } from "zod";
  * Strikt wie im Submapper: jedes Feld ist required, Zusatzfelder sind unzulässig, nicht zutreffende Felder
  * sind `null` statt weggelassen. Das Schema prüft nur die Form; Regeln des Benchmark-Prompts (Anzahl,
  * wörtliche Evidence, `Recherche` je Modus, Widerspruch decision/assignments, bekannte industry_id) prüft
- * die Bewertung als Regelverstöße.
+ * die Bewertung als Regelverstöße. Dass `unit_id` die angefragte Unit ist, prüft `parseAnswerText`
+ * (Harness-Adapter) als Schemaverstoß.
  */
 export const OUTPUT_SCHEMA_VERSION = "unit-answer-v1";
 

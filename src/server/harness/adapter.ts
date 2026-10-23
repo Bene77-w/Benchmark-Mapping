@@ -93,10 +93,11 @@ export interface HarnessAdapter {
 export type AdapterRegistry = Partial<Record<Harness, HarnessAdapter>>;
 
 /**
- * Prüft einen Antworttext gegen das Ausgabeschema: kein JSON → `invalid_json`, nicht schemakonform →
- * `schema_violation`. Gemeinsame Prüfung für alle Adapter.
+ * Prüft einen Antworttext gegen das Ausgabeschema: kein JSON → `invalid_json`, nicht schemakonform oder
+ * `unit_id` ungleich der angefragten Unit → `schema_violation` (beides Format-Fehler). Gemeinsame Prüfung
+ * für alle Adapter; sie übergeben die `unitId` ihrer Aufgabe.
  */
-export function parseAnswerText(text: string): HarnessOutcome {
+export function parseAnswerText(text: string, expectedUnitId: string): HarnessOutcome {
   let json: unknown;
   try {
     json = JSON.parse(text);
@@ -110,6 +111,12 @@ export function parseAnswerText(text: string): HarnessOutcome {
       message: `Antwort verletzt das Ausgabeschema: ${parsed.error.issues
         .map((issue) => `${issue.path.join(".") || "(Wurzel)"}: ${issue.message}`)
         .join("; ")}`,
+    };
+  }
+  if (parsed.data.unit_id !== expectedUnitId) {
+    return {
+      kind: "schema_violation",
+      message: `Antwort verletzt das Ausgabeschema: unit_id ist ${JSON.stringify(parsed.data.unit_id)}, angefragt war ${JSON.stringify(expectedUnitId)}`,
     };
   }
   return { kind: "answer", answer: parsed.data };
