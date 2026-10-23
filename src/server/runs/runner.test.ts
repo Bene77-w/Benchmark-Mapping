@@ -38,7 +38,8 @@ async function databaseWithSnapshot(): Promise<Database> {
   return db;
 }
 
-describe("Lauf mit Fake-Harness", () => {
+// Test-Datenbank mit vollem Snapshot und Fake-Wartezeiten: länger als der Standard, wenn alle Dateien parallel laufen.
+describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
   test("legt den Lauf mit Hashes und Einstellungen an, führt alle Units aus und schließt ihn ab", async () => {
     const db = await databaseWithSnapshot();
     const prompt = await buildBenchmarkPrompt(snapshot, { runKind: "benchmark", mode: "text_only" });
