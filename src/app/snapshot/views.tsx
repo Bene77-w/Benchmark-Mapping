@@ -17,6 +17,7 @@ const CLEANUP_LABEL: Record<CleanupKind, string> = {
   silbentrennung: "Silbentrennung",
   zu_kurzer_text: "Zu kurzer Text",
   artefakt: "Artefakt",
+  markdown: "Markdown-Rest",
 };
 
 export function UnitList({ units }: { units: UnitView[] }) {
