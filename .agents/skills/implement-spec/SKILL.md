@@ -31,10 +31,12 @@ Communication to and from subagents should be sparse. Communicate primarily thro
 
 5. Once an **implementer subagent** completes, merge its work to the integration branch with a **merger subagent**.
 
-6. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
+6. If the merge completes the **foundation**, hold the frontier and run an **interim review** first. The foundation is the set of tickets most of the remaining graph is blocked by: typically the first slices of a first version, which fix the data model, the core interfaces and the conventions every later ticket copies. Call the global `agent-review` as Structured Review with the recorded integration-branch anchor, the current integration-branch tip as end state, and the spec, scoped to the foundation tickets. Fix the substantiated findings in a single **implementer subagent** and merge them before any ticket that builds on the foundation starts. Errors found here are fixed once; found at the end, they are fixed in every ticket that copied them.
 
-7. Once all tickets are complete, call the global `agent-review` skill on the integration branch. Use Structured Review and pass the recorded integration-branch anchor, the fixed review end state, and the spec. It reviews conformance and code logic in separate subagents. Fix the substantiated findings in a single **implementer subagent**.
+7. If this changes the **frontier** of available tickets, kick off more **implementer subagents** to work on the new tickets. This allows for maximum concurrency.
 
-8. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.
+8. Once all tickets are complete, call the global `agent-review` skill on the integration branch. Use Structured Review and pass the recorded integration-branch anchor, the fixed review end state, and the spec. It reviews conformance and code logic in separate subagents; for a first version or a large scope it adds the extra reviewers its own rules define. Fix the substantiated findings in a single **implementer subagent**.
 
-9. Clean up all **implementer subagent** worktrees.
+9. If a draft PR exists, mark it ready for review. Otherwise, resolve each ticket the way the issue tracker closes work, and report the integration branch.
+
+10. Clean up all **implementer subagent** worktrees.
