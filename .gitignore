@@ -22,3 +22,5 @@ next-env.d.ts
 # Playwright
 /test-results/
 /playwright-report/
+# Worktrees der Agents (Claude Code)
+.claude/worktrees/
