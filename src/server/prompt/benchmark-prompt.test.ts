@@ -192,49 +192,89 @@ describe("Prompt-Hash", () => {
     expect(new Set(hashes).size).toBe(3);
   });
 
-  test("ändert sich bei jeder Textänderung in Vertrag, Brief oder Daten", async () => {
+  test("hängt nicht von den Daten ab; der Unit-Hash folgt dem exakt gesendeten Text", async () => {
     const request: PromptRequest = { runKind: "benchmark", mode: "text_only" };
     const original = await buildBenchmarkPrompt(snapshot, request);
 
-    const root = await mkdtemp(path.join(tmpdir(), "prompts-"));
-    await cp(PROMPT_ROOT, root, { recursive: true });
-    const contractFile = path.join(root, PROMPT_VERSION, "contract.md");
-    await writeFile(
-      contractFile,
-      (await readFile(contractFile, "utf8")).replace("Null Zuordnungen", "Keine"),
-    );
-    const changedContract = await buildBenchmarkPrompt(snapshot, request, { promptRoot: root });
-    expect(changedContract.promptHash).not.toBe(original.promptHash);
-
-    const otherBrief = path.join(root, PROMPT_VERSION, "brief-web.md");
-    await writeFile(otherBrief, `${await readFile(otherBrief, "utf8")}.`);
-    expect((await buildBenchmarkPrompt(snapshot, request, { promptRoot: root })).promptHash).toBe(
-      changedContract.promptHash,
-    );
-
-    const changedData = await buildBenchmarkPrompt(
+    const renamed = await buildBenchmarkPrompt(
       {
         ...snapshot,
-        units: snapshot.units.map((candidate) =>
-          candidate.unitId === "joint--taxation"
-            ? { ...candidate, unitName: "Joint Committee on Tax" }
-            : candidate,
-        ),
+        units: snapshot.units
+          .filter((candidate) => candidate.unitId !== "house--ethics")
+          .map((candidate) =>
+            candidate.unitId === "joint--taxation"
+              ? { ...candidate, unitName: "Joint Committee on Tax" }
+              : candidate,
+          ),
       },
       request,
     );
-    expect(changedData.promptHash).not.toBe(original.promptHash);
-    expect(changedData.forUnit("joint--taxation").unitPromptHash).not.toBe(
+    expect(renamed.promptHash).toBe(original.promptHash);
+    expect(renamed.forUnit("joint--taxation").unitPromptHash).not.toBe(
       original.forUnit("joint--taxation").unitPromptHash,
     );
-    expect(changedData.forUnit("house--rules").unitPromptHash).toBe(
+    expect(renamed.forUnit("house--rules").unitPromptHash).toBe(
+      original.forUnit("house--rules").unitPromptHash,
+    );
+
+    const otherTaxonomy = await buildBenchmarkPrompt(
+      {
+        ...snapshot,
+        industries: snapshot.industries.map((industry, index) =>
+          index === 0 ? { ...industry, description: `${industry.description} Geändert.` } : industry,
+        ),
+        source: { ...snapshot.source, taxonomySnapshotId: "tax-anders" },
+      },
+      request,
+    );
+    expect(otherTaxonomy.promptHash).toBe(original.promptHash);
+    expect(otherTaxonomy.forUnit("house--rules").unitPromptHash).not.toBe(
       original.forUnit("house--rules").unitPromptHash,
     );
   });
 
-  test("ist für prompt-v1 auf dem eingecheckten Snapshot eingefroren", async () => {
-    // Ändert sich ein Wert, hat sich ein gesendeter Text geändert: dann prompt-v2 anlegen statt prompt-v1 ändern
-    // (oder bewusst einen neuen Snapshot einchecken und die Werte hier nachziehen).
+  test("ändert sich bei jeder Textänderung in Vertrag, Brief oder Vorlage des User-Prompts", async () => {
+    const request: PromptRequest = { runKind: "benchmark", mode: "text_only" };
+    const original = await buildBenchmarkPrompt(snapshot, request);
+    const root = await mkdtemp(path.join(tmpdir(), "prompts-"));
+    await cp(PROMPT_ROOT, root, { recursive: true });
+    const edit = async (file: string, change: (text: string) => string) => {
+      const filePath = path.join(root, PROMPT_VERSION, file);
+      const before = await readFile(filePath, "utf8");
+      const after = change(before);
+      expect(after, `Änderung an ${file}`).not.toBe(before);
+      await writeFile(filePath, after);
+      return buildBenchmarkPrompt(snapshot, request, { promptRoot: root });
+    };
+
+    const changedContract = await edit("contract.md", (text) => text.replace("Null Zuordnungen", "Keine"));
+    expect(changedContract.promptHash).not.toBe(original.promptHash);
+
+    const otherBrief = await edit("brief-web.md", (text) => `${text}.`);
+    expect(otherBrief.promptHash).toBe(changedContract.promptHash);
+
+    const changedBrief = await edit("brief-text-only.md", (text) => `${text}.`);
+    expect(changedBrief.promptHash).not.toBe(changedContract.promptHash);
+
+    const changedTemplate = await edit("user-prompt.json", (text) => text.replace('"Kammer: ', '"Kammer ->'));
+    expect(changedTemplate.promptHash).not.toBe(changedBrief.promptHash);
+    expect(changedTemplate.forUnit("house--rules").userPrompt).toContain("\nKammer ->house\n");
+  });
+
+  test("lehnt eine Vorlage mit unbekanntem Platzhalter ab", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "prompts-"));
+    await cp(PROMPT_ROOT, root, { recursive: true });
+    const file = path.join(root, PROMPT_VERSION, "user-prompt.json");
+    await writeFile(file, (await readFile(file, "utf8")).replace("{chamber}", "{kammer}"));
+
+    await expect(
+      buildBenchmarkPrompt(snapshot, { runKind: "benchmark", mode: "text_only" }, { promptRoot: root }),
+    ).rejects.toThrow(/\{kammer\}/);
+  });
+
+  test("ist für prompt-v1 eingefroren", async () => {
+    // Ändert sich ein Wert, hat sich ein fester Anweisungstext (Vertrag, Brief, Vorlage, Ausgabeschema) geändert:
+    // dann prompt-v2 anlegen statt prompt-v1 ändern. Ein neuer Snapshot ändert diese Werte nicht.
     const hashes = Object.fromEntries(
       await Promise.all(
         REQUESTS.map(
@@ -247,9 +287,9 @@ describe("Prompt-Hash", () => {
       ),
     );
     expect(hashes).toEqual({
-      "benchmark/text_only": "07d6cb467d6a01aea188799b442d4b9cff7c193f050ae468534f8e485a5dbda6",
-      "benchmark/web": "998403db04ee4a3eaca67384b6a76235a27a0c983d08631d32b2dd07465e94a3",
-      "proposal/web": "260e9f2ce0252c60c946a1415733130e8f18abfca9dc1d6ec2eda4ed88335487",
+      "benchmark/text_only": "cd8875192bca29267d94977374a3ae785a7b83fd4f918b0fefdddcf46e429ca7",
+      "benchmark/web": "abda859b914e9e9c7ac07a21d178dce7b52b9d972c772adfde807a9ceb50f3b2",
+      "proposal/web": "601c9265ddb7e236fdbbaa66bc0eddfb6eaf2c13000068ccf6e951f9a9772b1a",
     });
   });
 });

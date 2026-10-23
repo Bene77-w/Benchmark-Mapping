@@ -1,4 +1,4 @@
-import { appendFile, cp, mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
@@ -240,13 +240,21 @@ describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
     expect(run?.progress).toMatchObject({ pending: 1 });
   });
 
-  test("ein Lauf, dessen Benchmark-Prompt sich seit dem Anlegen geändert hat, wird nicht ausgeführt", async () => {
+  test.each([
+    ["Vertrag", "contract.md", (text: string) => `${text}\nZusatzregel.\n`],
+    [
+      "Vorlage des User-Prompts",
+      "user-prompt.json",
+      (text: string) => text.replace('"Kammer: ', '"Kammer -> '),
+    ],
+  ])("ein Lauf, dessen Benchmark-Prompt (%s) sich seit dem Anlegen geändert hat, wird nicht ausgeführt", async (_name, file, change) => {
     const db = await databaseWithSnapshot();
     const changedRoot = await mkdtemp(path.join(tmpdir(), "prompts-"));
     await cp(path.join(PROMPT_ROOT, PROMPT_VERSION), path.join(changedRoot, PROMPT_VERSION), {
       recursive: true,
     });
-    await appendFile(path.join(changedRoot, PROMPT_VERSION, "contract.md"), "\nZusatzregel.\n");
+    const changedFile = path.join(changedRoot, PROMPT_VERSION, file);
+    await writeFile(changedFile, change(await readFile(changedFile, "utf8")));
     const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: ["house--ethics"] });
 
     await processNextRun(db, { adapters: { fake: createFakeAdapter() }, promptRoot: changedRoot });

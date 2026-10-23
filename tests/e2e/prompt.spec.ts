@@ -18,6 +18,16 @@ test("Prompt-Vorschau: System- und User-Prompt je Unit und Modus samt Hash", asy
   await expect(userPrompt).toContainText("## unit_id: senate--finance--health-care");
   await expect(userPrompt).toContainText("Zustaendigkeitstext: nicht vorhanden.");
   const textOnlyHash = await promptHash.textContent();
+  const unitHash = page.getByTestId("unit-prompt-hash");
+  const healthCareUnitHash = await unitHash.textContent();
+
+  // Der Prompt-Hash gilt für den ganzen Lauf, unabhängig von der Unit; der Unit-Hash nicht.
+  await page.getByLabel("Unit").selectOption("house--rules");
+  await page.getByRole("button", { name: "Anzeigen" }).click();
+  await expect(userPrompt).toContainText("## unit_id: house--rules");
+  await expect(promptHash).toHaveText(textOnlyHash ?? "");
+  await expect(unitHash).not.toHaveText(healthCareUnitHash ?? "");
+  await page.getByLabel("Unit").selectOption("senate--finance--health-care");
 
   await page.getByLabel("Lauf").selectOption("proposal/web");
   await page.getByRole("button", { name: "Anzeigen" }).click();

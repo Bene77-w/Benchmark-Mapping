@@ -3,11 +3,13 @@ import path from "node:path";
 import { hashCanonical } from "@/server/snapshot/hash";
 import type { Snapshot, SnapshotUnit } from "@/server/snapshot/model";
 import { type JsonSchema, OUTPUT_SCHEMA_VERSION, outputJsonSchema } from "./output-schema";
-import { renderUserPrompt, type TaxonomyInfo } from "./render";
+import { renderUserPrompt, type TaxonomyInfo, userPromptTemplateSchema } from "./render";
 
 /**
  * Benchmark-Prompt: der versionierte Modellvertrag samt Brief, den jedes Modell eines Laufs unverändert
- * erhält. Die Texte liegen unter `data/prompts/<version>/`; System-Prompt = Vertrag + Brief.
+ * erhält. Die Texte liegen unter `data/prompts/<version>/`: Vertrag, Briefs und die Vorlage des User-Prompts
+ * (`user-prompt.json`). System-Prompt = Vertrag + Brief; der User-Prompt rendert Taxonomie und Unit des
+ * Snapshots nach der Vorlage.
  */
 export const PROMPT_VERSION = "prompt-v1";
 export const PROMPT_ROOT = "data/prompts";
@@ -45,9 +47,10 @@ export interface BenchmarkPrompt {
   /** SHA-256 über das kanonische Ausgabeschema. */
   outputSchemaHash: string;
   /**
-   * Benchmark-Prompt-Hash des Laufs: SHA-256 über Version, System-Prompt, Ausgabeschema und die User-Prompts
-   * aller Units des Snapshots, also über alles, was ein Modell in diesem Lauf zu sehen bekommen kann.
-   * Gleicher Hash ⇔ gleiche gesendete Texte; jede Text-, Renderer- oder Datenänderung ändert ihn.
+   * Benchmark-Prompt-Hash des Laufs: SHA-256 über die festen Anweisungstexte – Version, System-Prompt
+   * (Vertrag + Brief bzw. Gold-Brief), Vorlage des User-Prompts und Ausgabeschema. Jede Textänderung daran
+   * ändert ihn; die Daten (Units, Taxonomie) deckt der Snapshot-Hash ab. Gleicher Prompt-Hash und gleicher
+   * Snapshot-Hash ⇔ gleiche gesendete Texte.
    */
   promptHash: string;
   /** Prompt für eine Unit des Snapshots; eine unbekannte unit_id ist ein Fehler. */
@@ -59,6 +62,9 @@ export interface PromptOptions {
   promptRoot?: string;
   version?: string;
 }
+
+/** Vorlage, nach der Taxonomie und Unit in den User-Prompt gerendert werden. */
+const USER_PROMPT_TEMPLATE_FILE = "user-prompt.json";
 
 const BRIEF_FILE: Record<`${RunKind}/${Mode}`, string | null> = {
   "benchmark/text_only": "brief-text-only.md",
@@ -78,12 +84,13 @@ export async function buildBenchmarkPrompt(
   const directory = path.join(/*turbopackIgnore: true*/ options.promptRoot ?? PROMPT_ROOT, version);
   const briefFile = BRIEF_FILE[`${request.runKind}/${request.mode}`];
   if (briefFile === null) throw new Error("Vorschlagsläufe laufen immer im Modus mit Websuche");
-  const [contract, brief] = await Promise.all(
-    ["contract.md", briefFile].map((file) =>
+  const [contract, brief, templateText] = await Promise.all(
+    ["contract.md", briefFile, USER_PROMPT_TEMPLATE_FILE].map((file) =>
       readFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ directory, file), "utf8"),
     ),
   );
   const systemPrompt = [contract.trim(), brief.trim()].join("\n\n");
+  const template = userPromptTemplateSchema.parse(JSON.parse(templateText));
 
   const units = [...snapshot.units].sort((a, b) => compare(a.unitId, b.unitId));
   const taxonomy: TaxonomyInfo = {
@@ -96,7 +103,7 @@ export async function buildBenchmarkPrompt(
     (unit) => unit.parentUnitId as string,
   );
   const userPromptOf = (unit: SnapshotUnit) =>
-    renderUserPrompt(unit, subcommitteesOf.get(unit.unitId) ?? [], taxonomy);
+    renderUserPrompt(template, unit, subcommitteesOf.get(unit.unitId) ?? [], taxonomy);
 
   return {
     version,
@@ -109,8 +116,8 @@ export async function buildBenchmarkPrompt(
       version,
       outputSchemaVersion: OUTPUT_SCHEMA_VERSION,
       systemPrompt,
+      userPromptTemplate: template,
       outputSchema: outputJsonSchema,
-      userPrompts: Object.fromEntries(units.map((unit) => [unit.unitId, userPromptOf(unit)])),
     }),
     forUnit(unitId) {
       const unit = unitById.get(unitId);
