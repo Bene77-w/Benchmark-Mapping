@@ -14,6 +14,7 @@ export const cleanupKindSchema = z.enum([
   "silbentrennung",
   "zu_kurzer_text",
   "artefakt",
+  "markdown",
 ]);
 
 export const snapshotUnitSchema = z

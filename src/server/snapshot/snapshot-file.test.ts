@@ -34,6 +34,23 @@ describe("eingecheckter Snapshot", () => {
     expect(dhs?.inputBasis).toBe("name_only");
   });
 
+  test("enthält keine Markdown-Reste der Extraktion, damit zeilenübergreifende Zitate wörtlich bleiben", async () => {
+    const snapshot = await readSnapshotFile(SNAPSHOT_PATH);
+
+    for (const unit of snapshot.units) {
+      for (const text of [unit.jurisdictionText, unit.parentContextText]) {
+        // Überschriften (###), Zitatmarker (>), Listenpunkte (- ), Hervorhebungen, Code und Links.
+        expect(text ?? "", unit.unitId).not.toMatch(/#|>|(^|\s)-\s|\*|`|\[|\]|\|/);
+      }
+    }
+    const intelligence = snapshot.units.find((unit) => unit.unitId === "house--intelligence");
+    expect(intelligence?.jurisdictionText).toContain(
+      "relating to the following: (A) The Central Intelligence Agency",
+    );
+    const homeland = snapshot.units.find((unit) => unit.unitId === "house--homeland-security");
+    expect(homeland?.jurisdictionText).toContain("non-border enforcement). (B) Customs");
+  });
+
   test("lehnt einen Snapshot ab, dessen Inhalt nicht zum Content-Hash passt", async () => {
     const snapshot = JSON.parse(await readFile(SNAPSHOT_PATH, "utf8"));
     snapshot.units[0].unitName = "verändert";

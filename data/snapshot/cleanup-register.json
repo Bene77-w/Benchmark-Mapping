@@ -5,7 +5,7 @@
     "action": "replace",
     "before": "> *Zusatz:* Das Committee hat hinsichtlich der Regulierung von Nuklearanlagen und Nuklearenergie dieselbe Jurisdiktion wie hinsichtlich nicht-nuklearer Anlagen und Energie.",
     "after": "The committee shall have the same jurisdiction with respect to regulation of nuclear facilities and of use of nuclear energy as it has with respect to regulation of nonnuclear facilities and of use of nonnuclear energy.",
-    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut aus House Rule X clause 1(f)(14) (House Rules and Manual, govinfo HMAN-117)."
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut des Schlusssatzes von House Rule X clause 1(f), der nach der nummerierten Liste (1)–(15) steht (House Rules and Manual, govinfo HMAN-118, § 721)."
   },
   {
     "unitId": "senate--agriculture-nutrition-and-forestry",
@@ -340,5 +340,229 @@
     "before": " It is chaired by Representative Scott Fitzgerald (WI-05).",
     "after": "",
     "reason": "Angabe zum Vorsitz entfernt; sie gehört nicht zur Zuständigkeit."
+  },
+  {
+    "unitId": "house--budget",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Primary Rule X jurisdiction",
+    "after": "Primary Rule X jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--budget",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Supplemental committee jurisdiction",
+    "after": "Supplemental committee jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--ethics",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Primary Rule X jurisdiction",
+    "after": "Primary Rule X jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--ethics",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Supplemental committee jurisdiction",
+    "after": "Supplemental committee jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (A) ",
+    "after": "(A) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (B) ",
+    "after": "(B) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (C) ",
+    "after": "(C) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (D) ",
+    "after": "(D) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (E) ",
+    "after": "(E) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (F) ",
+    "after": "(F) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (G) ",
+    "after": "(G) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (A) ",
+    "after": "(A) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (B) ",
+    "after": "(B) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (C) ",
+    "after": "(C) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (D) ",
+    "after": "(D) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (2) ",
+    "after": "(2) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (3) ",
+    "after": "(3) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (4) ",
+    "after": "(4) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (i) ",
+    "after": "(i) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (ii) ",
+    "after": "(ii) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (iii) ",
+    "after": "(iii) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "including: - Assisting",
+    "after": "including: Assisting",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "; - Preparing",
+    "after": "; Preparing",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "; - Drafting",
+    "after": "; Drafting",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "and - Investigating",
+    "after": "and Investigating",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Oversight of the Small Business Administration",
+    "after": "Oversight of the Small Business Administration",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Consideration of Non-SBA Legislation",
+    "after": "Consideration of Non-SBA Legislation",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Study of American Small Businesses",
+    "after": "Study of American Small Businesses",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
   }
 ]
