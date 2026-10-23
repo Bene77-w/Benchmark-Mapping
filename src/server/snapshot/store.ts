@@ -1,7 +1,7 @@
 import { and, asc, count, desc, eq, ilike, or, type SQL } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { industries, snapshots, unitCleanups, units } from "@/server/db/schema";
-import type { Cleanup, Industry, Snapshot, SnapshotUnit } from "./model";
+import type { Cleanup, Industry, Snapshot, SnapshotSource, SnapshotUnit } from "./model";
 
 /**
  * Snapshot in der Datenbank: Laden (idempotent über den Content-Hash) und Lesen für GUI und Läufe.
@@ -78,6 +78,35 @@ export async function getCurrentSnapshot(db: Database): Promise<SnapshotSummary 
     nameOnlyCount: await countOf(units, eq(units.inputBasis, "name_only")),
     industryCount: await countOf(industries),
     cleanupCount: await countOf(unitCleanups),
+  };
+}
+
+export interface SnapshotContentView {
+  snapshotId: number;
+  version: string;
+  contentHash: string;
+  source: SnapshotSource;
+  /** Reihenfolge nicht festgelegt; wer sie braucht (z. B. der Benchmark-Prompt), sortiert selbst. */
+  units: SnapshotUnit[];
+  industries: Industry[];
+}
+
+/** Units, Industries und Quelle eines geladenen Snapshots, z. B. als Eingabe für den Benchmark-Prompt. */
+export async function getSnapshotContent(
+  db: Database,
+  snapshotId: number,
+): Promise<SnapshotContentView | null> {
+  const [row] = await db.select().from(snapshots).where(eq(snapshots.id, snapshotId));
+  if (!row) return null;
+  const unitRows = await db.select().from(units).where(eq(units.snapshotId, snapshotId));
+  const industryRows = await db.select().from(industries).where(eq(industries.snapshotId, snapshotId));
+  return {
+    snapshotId,
+    version: row.version,
+    contentHash: row.contentHash,
+    source: row.source,
+    units: unitRows.map(({ snapshotId: _snapshotId, ...unit }) => unit),
+    industries: industryRows.map(({ snapshotId: _snapshotId, ...industry }) => industry),
   };
 }
 
