@@ -39,6 +39,12 @@ pnpm snapshot:import [Pfad zum Congress Tracker]   # Standard: CONGRESS_TRACKER_
 
 Er liest `data/committee_matcher_inputs/` (geprüft gegen die Hashes im Corpusmanifest) und `data/committee_matcher_v2/taxonomy/approved_baseline.json` (geprüft gegen `taxonomy_content_hash`), wendet das Bereinigungsregister `data/snapshot/cleanup-register.json` an und schreibt den Snapshot neu. Gleiche Quelle und gleiches Register ergeben denselben Content-Hash. Jede Regel des Registers nennt Unit, Art, vorher/nachher und Begründung; eine Regel, deren Textstelle nicht genau einmal vorkommt, bricht den Import ab. Ersetzte deutsche Texte stehen dort im Originalwortlaut der Quelle (Senate Rule XXV, House Rule X, 15 U.S.C. § 1024(b)). Markdown-Reste der Extraktion (Überschriftszeichen `###`, Zitatmarker `>`, Listenpunkte `-`) sind als Art `markdown` entfernt, damit zeilenübergreifende Zitate wörtlich bleiben.
 
+## Benchmark-Prompt
+
+Der Benchmark-Prompt `prompt-v1` liegt unter `data/prompts/prompt-v1/`: der Vertrag `contract.md` (abgeleitet aus mapping-system-v3 des Submappers) und je ein Brief für die Modi „nur Zuständigkeitstext“ (`brief-text-only.md`) und „mit Websuche“ (`brief-web.md`) sowie der Gold-Brief für Vorschlagsläufe (`brief-gold.md`). Der System-Prompt ist Vertrag + Brief, der User-Prompt rendert Taxonomie und Unit als Datenblöcke. Das Ausgabeschema `unit-answer-v1` (strikt, eine Antwort pro Unit) steht in `src/server/prompt/output-schema.ts` als Zod- und JSON-Schema.
+
+Der Prompt-Hash eines Laufs ist SHA-256 über Version, System-Prompt, Ausgabeschema und die User-Prompts aller Units des Snapshots; jede Textänderung ändert ihn. `prompt-v1` ist eingefroren (Test mit festen Hashes): Textänderungen gehören in eine neue Version. Die Vorschau unter `/prompt` zeigt System- und User-Prompt je Unit und Lauf-Art samt Hash.
+
 ## Prüfungen
 
 ```sh
