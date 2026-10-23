@@ -13,9 +13,11 @@ export const PROMPT_VERSION = "prompt-v1";
 export const PROMPT_ROOT = "data/prompts";
 
 /** Modus eines Laufs: nur Zuständigkeitstext oder zusätzlich Websuche. */
-export type Mode = "text_only" | "web";
+export const MODES = ["text_only", "web"] as const;
+export type Mode = (typeof MODES)[number];
 /** Art eines Laufs: Benchmark (Rangliste) oder Vorschlagslauf für die Gold-Review. */
-export type RunKind = "benchmark" | "proposal";
+export const RUN_KINDS = ["benchmark", "proposal"] as const;
+export type RunKind = (typeof RUN_KINDS)[number];
 
 export interface PromptRequest {
   runKind: RunKind;
