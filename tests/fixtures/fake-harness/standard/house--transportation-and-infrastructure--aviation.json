@@ -1,0 +1,28 @@
+{
+  "delayMs": 400,
+  "tokens": { "input": 5200, "cacheRead": 31000, "cacheWrite": 0, "output": 640, "reasoning": 210 },
+  "webSearches": 0,
+  "nativeCostUsd": 0.0123,
+  "response": {
+    "unit_id": "house--transportation-and-infrastructure--aviation",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "airlines",
+        "evidence_excerpt": "all aspects of civil aviation",
+        "rationale_short": "Fluggesellschaften sind das Kerngeschaeft der zivilen Luftfahrt."
+      },
+      {
+        "industry_id": "airports-air-services",
+        "evidence_excerpt": "including safety, infrastructure",
+        "rationale_short": "Flughaefen und Flugdienste sind die Infrastruktur der zivilen Luftfahrt."
+      }
+    ],
+    "sources": [],
+    "label_uncertain": false,
+    "uncertainty_note": null
+  }
+}
