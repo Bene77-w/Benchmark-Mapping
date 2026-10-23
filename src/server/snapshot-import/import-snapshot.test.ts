@@ -92,4 +92,82 @@ describe("importSnapshot", () => {
       parentContextText: null,
     });
   });
+
+  describe("Bereinigungsregister", () => {
+    test("ersetzt Textstellen, protokolliert vorher/nachher und überträgt sie in den Parent-Kontext", async () => {
+      const snapshot = await importSnapshot({
+        sourceRoot: FIXTURE_ROOT,
+        register: [
+          {
+            unitId: "senate--finance",
+            kind: "silbentrennung",
+            action: "replace",
+            before: "Deposit of public moneys.",
+            after: "Deposit of public money.",
+            reason: "Testfall",
+          },
+        ],
+      });
+
+      const core = unitById(snapshot, "senate--finance");
+      expect(core.jurisdictionText).toContain("3. Deposit of public money. 4. General revenue sharing.");
+      expect(unitById(snapshot, "senate--finance--health-care").parentContextText).toBe(
+        core.jurisdictionText,
+      );
+      expect(snapshot.cleanups).toEqual([
+        {
+          unitId: "senate--finance",
+          kind: "silbentrennung",
+          before: "Deposit of public moneys.",
+          after: "Deposit of public money.",
+          reason: "Testfall",
+        },
+      ]);
+      // Der Quell-Hash beschreibt weiterhin den unbereinigten Text des Congress Trackers.
+      expect(core.sourceInputHash).toBe("def7bcbd1f360143495322959ea32a3d6de8477291af9e8e90b1fe81123fec7c");
+    });
+
+    test("kennzeichnet eine Unit ohne brauchbaren Text als name_only", async () => {
+      const snapshot = await importSnapshot({
+        sourceRoot: FIXTURE_ROOT,
+        register: [
+          { unitId: "joint--taxation", kind: "zu_kurzer_text", action: "name_only", reason: "Testfall" },
+        ],
+      });
+
+      const unit = unitById(snapshot, "joint--taxation");
+      expect(unit.inputBasis).toBe("name_only");
+      expect(unit.jurisdictionText).toBeNull();
+      expect(snapshot.cleanups).toHaveLength(1);
+      expect(snapshot.cleanups[0]).toMatchObject({
+        unitId: "joint--taxation",
+        kind: "zu_kurzer_text",
+        after: "",
+      });
+      expect(snapshot.cleanups[0].before.length).toBeGreaterThan(0);
+    });
+
+    test("bricht ab, wenn eine Regel nicht genau eine Textstelle trifft", async () => {
+      const rule = {
+        unitId: "senate--finance",
+        kind: "artefakt",
+        action: "replace",
+        after: "",
+        reason: "Testfall",
+      } as const;
+
+      await expect(
+        importSnapshot({ sourceRoot: FIXTURE_ROOT, register: [{ ...rule, before: "gibt es nicht" }] }),
+      ).rejects.toThrow(/senate--finance/);
+      await expect(
+        importSnapshot({ sourceRoot: FIXTURE_ROOT, register: [{ ...rule, before: "Revenue measures" }] }),
+      ).rejects.toThrow(/2-mal/);
+      await expect(
+        importSnapshot({
+          sourceRoot: FIXTURE_ROOT,
+          register: [{ ...rule, unitId: "senate--unbekannt", before: "x" }],
+        }),
+      ).rejects.toThrow(/senate--unbekannt/);
+    });
+  });
 });

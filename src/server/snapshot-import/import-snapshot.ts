@@ -1,17 +1,20 @@
 import type { SnapshotUnit } from "@/server/snapshot/model";
+import { applyCleanups, type CleanupRule } from "./cleanup-register";
 import { readCorpus, type SourceUnit } from "./corpus";
 import { readTaxonomy } from "./taxonomy";
 
 export interface ImportOptions {
   /** Wurzel des Congress Trackers (wird nur gelesen). */
   sourceRoot: string;
-  register: readonly unknown[];
+  /** Bereinigungsregister; wird in seiner Reihenfolge angewendet. */
+  register: readonly CleanupRule[];
 }
 
 export async function importSnapshot(options: ImportOptions) {
   const corpus = await readCorpus(options.sourceRoot);
   const taxonomy = await readTaxonomy(options.sourceRoot);
-  const units = withParentContext(corpus.units.map(toSnapshotUnit));
+  const cleaned = applyCleanups(corpus.units.map(toSnapshotUnit), options.register);
+  const units = withParentContext(cleaned.units);
   return {
     source: {
       system: "congress_tracker" as const,
@@ -22,6 +25,7 @@ export async function importSnapshot(options: ImportOptions) {
     },
     units,
     industries: taxonomy.industries,
+    cleanups: cleaned.cleanups,
   };
 }
 
