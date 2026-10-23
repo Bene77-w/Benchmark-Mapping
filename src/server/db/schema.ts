@@ -116,6 +116,7 @@ export const runs = pgTable("runs", {
     .references(() => snapshots.id),
   snapshotHash: text("snapshot_hash").notNull(),
   promptVersion: text("prompt_version").notNull(),
+  /** Hash der festen Anweisungstexte (`promptHash` des Benchmark-Prompts); Daten deckt `snapshotHash` ab. */
   promptHash: text("prompt_hash").notNull(),
   outputSchemaVersion: text("output_schema_version").notNull(),
   outputSchemaHash: text("output_schema_hash").notNull(),
