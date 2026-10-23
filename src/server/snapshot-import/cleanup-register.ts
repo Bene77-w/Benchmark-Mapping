@@ -34,33 +34,26 @@ export function applyCleanups(
 ): { units: SnapshotUnit[]; cleanups: Cleanup[] } {
   const byId = new Map(units.map((unit) => [unit.unitId, { ...unit }]));
   const cleanups: Cleanup[] = [];
-  register.forEach((rule, index) => {
-    const fail = (message: string) => {
+  for (const [index, rule] of register.entries()) {
+    const fail = (message: string): never => {
       throw new Error(`Bereinigungsregister, Regel ${index + 1} (${rule.unitId}): ${message}`);
     };
-    const unit = byId.get(rule.unitId);
-    if (!unit) return fail("Unit gibt es im Korpus nicht");
-    const text = unit.jurisdictionText;
-    if (text === null) return fail("Unit hat keinen Zuständigkeitstext");
+    const unit = byId.get(rule.unitId) ?? fail("Unit gibt es im Korpus nicht");
+    const text = unit.jurisdictionText ?? fail("Unit hat keinen Zuständigkeitstext");
 
     if (rule.action === "name_only") {
       unit.inputBasis = "name_only";
       unit.jurisdictionText = null;
       cleanups.push({ unitId: rule.unitId, kind: rule.kind, before: text, after: "", reason: rule.reason });
-      return;
+      continue;
     }
 
     const occurrences = text.split(rule.before).length - 1;
     if (occurrences !== 1)
       fail(`Textstelle kommt ${occurrences}-mal statt genau einmal vor: "${rule.before}"`);
     unit.jurisdictionText = text.replace(rule.before, () => rule.after);
-    cleanups.push({
-      unitId: rule.unitId,
-      kind: rule.kind,
-      before: rule.before,
-      after: rule.after,
-      reason: rule.reason,
-    });
-  });
+    const { unitId, kind, before, after, reason } = rule;
+    cleanups.push({ unitId, kind, before, after, reason });
+  }
   return { units: units.map((unit) => byId.get(unit.unitId) as SnapshotUnit), cleanups };
 }
