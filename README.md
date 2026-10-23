@@ -14,6 +14,7 @@ Voraussetzungen: Node 24, pnpm 11, Docker mit Compose v2.
 pnpm install
 docker compose up -d   # PostgreSQL
 pnpm dev               # Migrationen + Snapshot laden, dann App auf http://localhost:3000
+pnpm worker            # zweites Terminal: führt die in der GUI angelegten Läufe aus
 ```
 
 `pnpm dev` ruft vorher `pnpm db:prepare` auf: Es wendet die Migrationen an und lädt den eingecheckten Snapshot, falls er noch nicht in der Datenbank steht. Die Snapshot-Seite liegt unter `/snapshot`.
@@ -45,11 +46,17 @@ Der Benchmark-Prompt `prompt-v1` liegt unter `data/prompts/prompt-v1/`: der Vert
 
 Der Prompt-Hash eines Laufs ist SHA-256 über Version, System-Prompt, Ausgabeschema und die User-Prompts aller Units des Snapshots; jede Textänderung ändert ihn. `prompt-v1` ist eingefroren (Test mit festen Hashes): Textänderungen gehören in eine neue Version. Die Vorschau unter `/prompt` zeigt System- und User-Prompt je Unit und Lauf-Art samt Hash.
 
+## Läufe
+
+Unter `/laeufe` wird eine Konfiguration (Harness, Modell, Effort, Modus) mit Parallelität (1–5, Standard 3) und Timeout pro Unit (Standard 30 min) als Lauf angelegt. Der Lauf speichert Prompt-Version und -Hash, Ausgabeschema-Hash und Snapshot-Hash; seine Units stehen als Unit-Ergebnisse fest. Der Worker (`pnpm worker`, eigener Prozess, unabhängig von der GUI) übernimmt wartende Läufe, ruft je Unit den Harness-Adapter auf und schreibt jedes Ergebnis sofort (Antwort oder Fehlerart, Rohantwort, Protokoll, Tokens, Websuchen, Effort, native Kosten, Dauer). Sind alle Units fertig oder fehlgeschlagen, ist der Lauf abgeschlossen. Die Lauf-Seite zeigt den Fortschritt live und eine einfache Bewertung (Mittelwert der Unit-F1) gegen das Test-Gold `tests/fixtures/test-gold.json`, bis Gold-Versionen in der App entstehen. Gespeicherte Konfigurationen lassen sich mit „Erneut starten“ wiederholen.
+
+Bisher gibt es nur den Fake-Harness: Er liest vorbereitete Antworten aus `tests/fixtures/fake-harness/<Szenario>/<unit_id>.json` (Umgebung `FAKE_HARNESS_ROOT`); das Modell der Konfiguration ist der Szenarioname, z. B. `standard`. Eine Datei enthält entweder eine Antwort (`response`, ein String wird wörtlich gesendet, so entstehen Format-Fehler) oder einen simulierten Fehler (`simulate`: `timeout`, `rate_limit`, `harness_error`), dazu `tokens`, `webSearches`, `nativeCostUsd` und `delayMs`.
+
 ## Prüfungen
 
 ```sh
 pnpm check       # Biome, Typecheck, Vitest
-pnpm test:e2e    # Playwright gegen den Dev-Server; Datenbank muss laufen
+pnpm test:e2e    # Playwright gegen Dev-Server und eigenen Worker; Datenbank muss laufen
 ```
 
 Vitest-Tests mit Datenbank laufen gegen eine In-Memory-PGlite (`src/server/db/test-database.ts`) und brauchen kein Docker.
