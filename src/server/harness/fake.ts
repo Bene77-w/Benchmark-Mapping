@@ -134,7 +134,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
           const rawResponse =
             typeof scenario.response === "string" ? scenario.response : JSON.stringify(scenario.response);
           log.push(`Antwort: ${rawResponse}`);
-          result = { ...base, outcome: parseAnswerText(rawResponse), rawResponse };
+          result = { ...base, outcome: parseAnswerText(rawResponse, task.unitId), rawResponse };
         }
       }
       return { ...result, log: log.join("\n") };
