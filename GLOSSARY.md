@@ -9,7 +9,7 @@ Eine Einheit des Kongresses, die einzeln gemappt wird: ein Subcommittee, ein Com
 _Avoid_: Ausschuss (mehrdeutig), Committee (als Oberbegriff)
 
 **Zuständigkeitstext**:
-Der Wortlaut der Jurisdiktion einer Unit aus den Geschäftsordnungen von House und Senat; einzige zulässige Evidence neben dem Namen der Unit.
+Der Wortlaut der Jurisdiktion einer Unit aus den Geschäftsordnungen von House und Senat (beim Joint Economic Committee aus dem Gesetz, 15 U.S.C. § 1024(b), weil es keine Zuständigkeit in den Geschäftsordnungen hat); einzige zulässige Evidence neben dem Namen der Unit.
 _Avoid_: Jurisdiction-Text, Beschreibung
 
 **name_only**:
