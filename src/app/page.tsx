@@ -14,6 +14,12 @@ export default function HomePage() {
         </Link>{" "}
         – Units, Zuständigkeitstexte, Bereinigungen und Taxonomie.
       </p>
+      <p>
+        <Link href="/laeufe" className="underline underline-offset-4">
+          Läufe
+        </Link>{" "}
+        – Konfiguration zusammenstellen, Lauf starten, Fortschritt und Ergebnisse ansehen.
+      </p>
     </div>
   );
 }
