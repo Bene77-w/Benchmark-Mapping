@@ -15,6 +15,8 @@ test("Snapshot-Seite: Units und Taxonomie durchsuchen, Bereinigungen sehen", asy
   await expect(jec.getByRole("insertion")).toContainText("It shall be the function of the joint committee");
 
   await page.getByRole("link", { name: "Taxonomie" }).click();
+  // Erst nach dem Seitenwechsel suchen, sonst geht das Formular noch an die Unit-Ansicht.
+  await expect(page).toHaveURL(/ansicht=taxonomie/);
   await page.getByRole("searchbox", { name: "Suche" }).fill("passenger airline");
   await page.getByRole("button", { name: "Suchen" }).click();
   await expect(page.getByTestId("industry")).toHaveCount(1);
