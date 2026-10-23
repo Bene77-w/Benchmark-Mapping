@@ -28,10 +28,6 @@ Grobe Idee → Wayfinder → bei Bedarf Prototype und Codebase Design → Spec �
 
 Die Auswahl ist keine Pflichtpipeline: Jeder Skill wird bei einer passenden Aufgabe eingesetzt. Diagnosing Bugs unterstützt bei schwierigen Fehlern.
 
-## Tracker
-
-Der gewählte Tracker ist [GitHub Issues für Bene77-w/Benchmark-Mapping](https://github.com/Bene77-w/Benchmark-Mapping/issues). Das Projekt ist über den SSH-Remote `origin` mit diesem Repository verbunden. Die projektspezifische Tracker-Konfiguration steht in `docs/agents/issue-tracker.md`; die lokale `AGENTS.md` beschreibt den Arbeitsablauf.
-
 ## Auswertung
 
 Für jeden Einsatz halten wir Aufgabe, Ergebnis, zusätzlichen Aufwand, nötige Eingriffe und konkrete Probleme mit den Skill-Anweisungen fest. Danach entscheiden wir, ob der Skill unverändert, angepasst oder gar nicht ins globale Setup übernommen wird.
