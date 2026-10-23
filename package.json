@@ -7,6 +7,7 @@
     "dev": "pnpm db:prepare && next dev --port ${APP_PORT:-3000}",
     "build": "next build",
     "start": "next start --port ${APP_PORT:-3000}",
+    "worker": "tsx scripts/worker.ts",
     "db:prepare": "tsx scripts/prepare-db.ts",
     "db:generate": "drizzle-kit generate",
     "snapshot:import": "tsx scripts/import-snapshot.ts",
