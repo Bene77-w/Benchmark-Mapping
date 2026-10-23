@@ -1,0 +1,58 @@
+"use server";
+
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { getDatabase } from "@/server/db/client";
+import { readTestGold } from "@/server/gold/test-gold";
+import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
+import { createRun, createRunFromConfiguration } from "@/server/runs/store";
+
+export interface StartRunState {
+  error: string | null;
+}
+
+const formSchema = z.object({
+  harness: z.string(),
+  model: z.string(),
+  effort: z.string(),
+  mode: z.string(),
+  parallelism: z.coerce.number().int().min(MIN_PARALLELISM).max(MAX_PARALLELISM),
+  timeoutMinutes: z.coerce.number().positive(),
+});
+
+/** Legt einen Lauf über die Units des Test-Golds an; der Worker führt ihn aus. */
+export async function startRun(_previous: StartRunState, formData: FormData): Promise<StartRunState> {
+  let runId: number;
+  try {
+    const form = formSchema.parse(Object.fromEntries(formData));
+    const gold = await readTestGold();
+    ({ runId } = await createRun(getDatabase(), {
+      configuration: configurationSchema.parse(form),
+      parallelism: form.parallelism,
+      timeoutMs: Math.round(form.timeoutMinutes * 60_000),
+      unitIds: gold.units.map((unit) => unit.unitId),
+    }));
+  } catch (error) {
+    return { error: describe(error) };
+  }
+  redirect(`/laeufe/${runId}`);
+}
+
+/** Startet eine gespeicherte Konfiguration erneut. */
+export async function restartConfiguration(formData: FormData): Promise<void> {
+  const configurationId = z.coerce.number().int().parse(formData.get("configurationId"));
+  const gold = await readTestGold();
+  const { runId } = await createRunFromConfiguration(
+    getDatabase(),
+    configurationId,
+    gold.units.map((unit) => unit.unitId),
+  );
+  redirect(`/laeufe/${runId}`);
+}
+
+function describe(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    return error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ");
+  }
+  return error instanceof Error ? error.message : String(error);
+}
