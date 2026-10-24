@@ -32,7 +32,7 @@ export interface ClaudeInvocationOptions {
 
 /** Der Aufruf einer Unit: Argumente, User-Prompt über stdin, leeres Arbeitsverzeichnis, gefilterte Umgebung. */
 export function claudeInvocation(
-  task: ClaudeCall & Pick<HarnessTask, "userPrompt" | "timeoutMs">,
+  task: ClaudeCall & Pick<HarnessTask, "userPrompt" | "timeoutMs" | "signal">,
   options: ClaudeInvocationOptions,
 ): CliInvocation {
   return {
@@ -42,6 +42,7 @@ export function claudeInvocation(
     stdin: task.userPrompt,
     env: isolatedEnv(options.env, CLAUDE_ENV),
     timeoutMs: task.timeoutMs,
+    signal: "signal" in task ? task.signal : undefined,
   };
 }
 
@@ -236,6 +237,7 @@ function outcomeOf(
   rejected: boolean,
 ): HarnessOutcome {
   if (cli.spawnError) return { kind: "harness_error", message: cli.spawnError };
+  if (cli.aborted) return { kind: "harness_error", message: "Aufruf abgebrochen" };
   if (cli.timedOut) {
     // Die CLI wiederholt ein 429 selbst; reißt sie dabei den Timeout, steht der Grund nur im Protokoll.
     if (looksRateLimited(cli.stderr)) {

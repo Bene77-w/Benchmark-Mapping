@@ -21,6 +21,7 @@ import {
   VIOLATION_LABELS,
 } from "../labels";
 import { AutoRefresh } from "./auto-refresh";
+import { PreflightSection } from "./preflight-section";
 
 export const metadata = { title: "Lauf – Benchmark-Mapping" };
 
@@ -107,6 +108,8 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
           {formatDateTime(run.createdAt)} / {formatDateTime(run.finishedAt)}
         </dd>
       </dl>
+
+      <PreflightSection preflight={run.preflight} />
 
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Fortschritt</h2>

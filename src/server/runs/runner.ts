@@ -107,14 +107,6 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
     );
   }
 
-  // Preflight vor jedem (auch fortgesetzten) Lauf; ein Fehler blockiert die Ausführung, das Ergebnis bleibt am Lauf.
-  if (adapter.preflight) {
-    const { model, effort, mode } = configuration;
-    const preflight = await adapter.preflight({ model, effort, mode });
-    await db.update(runs).set({ preflight }).where(eq(runs.id, runId));
-    if (!preflight.ok) throw new Error(describePreflightFailure(preflight));
-  }
-
   const open = await db
     .select({ unitId: unitResults.unitId })
     .from(unitResults)
@@ -159,6 +151,14 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
     }),
   };
   try {
+    // Preflight vor jedem (auch fortgesetzten) Lauf, mit laufendem Lebenszeichen (echte Proben dauern Sekunden);
+    // ein Fehler blockiert die Ausführung, das Ergebnis bleibt am Lauf.
+    if (adapter.preflight) {
+      const { model, effort, mode } = configuration;
+      const preflight = await adapter.preflight({ model, effort, mode });
+      await db.update(runs).set({ preflight }).where(ownRun);
+      if (!preflight.ok) throw new Error(describePreflightFailure(preflight));
+    }
     await forEachLimited(
       open.map(({ unitId }) => unitId),
       run.parallelism,

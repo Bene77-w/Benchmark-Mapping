@@ -20,6 +20,8 @@ export interface CliInvocation {
   /** Vollständige Umgebung des Kindprozesses (siehe `isolatedEnv`). */
   env: CliEnv;
   timeoutMs: number;
+  /** Abbruch von außen: beendet den Prozess wie beim Timeout, meldet aber `aborted`. */
+  signal?: AbortSignal;
 }
 
 export interface CliOutcome {
@@ -28,6 +30,8 @@ export interface CliOutcome {
   /** `null`, wenn der Prozess durch ein Signal endete oder nicht startete. */
   exitCode: number | null;
   timedOut: boolean;
+  /** Über `signal` abgebrochen. */
+  aborted?: boolean;
   /** Startfehler, z. B. CLI nicht gefunden (`ENOENT`). */
   spawnError: string | null;
   durationMs: number;
@@ -61,17 +65,29 @@ export const runCli: CliRunner = (invocation) =>
         // Prozess bereits beendet.
       }
     };
-    const timer = setTimeout(() => {
-      timedOut = true;
+    let aborted = false;
+    const stop = () => {
       killGroup("SIGTERM");
       setTimeout(() => killGroup("SIGKILL"), KILL_GRACE_MS).unref();
+    };
+    const timer = setTimeout(() => {
+      timedOut = true;
+      stop();
     }, invocation.timeoutMs);
+    const onAbort = () => {
+      aborted = true;
+      stop();
+    };
+    if (invocation.signal?.aborted) onAbort();
+    else invocation.signal?.addEventListener("abort", onAbort, { once: true });
 
     const finish = (exitCode: number | null) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      invocation.signal?.removeEventListener("abort", onAbort);
       resolve({
+        aborted,
         stdout: Buffer.concat(stdout).toString("utf8"),
         stderr: Buffer.concat(stderr).toString("utf8"),
         exitCode,
