@@ -2,6 +2,7 @@ import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { configurations, runs, unitResults } from "@/server/db/schema";
 import type { AdapterRegistry, HarnessAdapter, HarnessResult, HarnessTask } from "@/server/harness/adapter";
+import { describePreflightFailure } from "@/server/harness/preflight";
 import { type BenchmarkPrompt, buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { getSnapshotContent } from "@/server/snapshot/store";
 import type { PromptRootOption } from "./store";
@@ -63,6 +64,14 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
     throw new Error(
       `Der Benchmark-Prompt hat sich seit dem Anlegen des Laufs geändert (Hash ${prompt.promptHash} statt ${run.promptHash})`,
     );
+  }
+
+  // Preflight vor jedem (auch fortgesetzten) Lauf; ein Fehler blockiert die Ausführung, das Ergebnis bleibt am Lauf.
+  if (adapter.preflight) {
+    const { model, effort, mode } = configuration;
+    const preflight = await adapter.preflight({ model, effort, mode });
+    await db.update(runs).set({ preflight }).where(eq(runs.id, runId));
+    if (!preflight.ok) throw new Error(describePreflightFailure(preflight));
   }
 
   const open = await db

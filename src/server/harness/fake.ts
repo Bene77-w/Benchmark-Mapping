@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 import { type HarnessAdapter, type HarnessResult, type HarnessTask, parseAnswerText } from "./adapter";
+import { runPreflight } from "./preflight";
 
 /**
  * Fake-Harness für Tests und GUI ohne Kosten. Er liest vorbereitete Antworten aus einem Verzeichnis:
@@ -139,6 +140,29 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
       }
       return { ...result, log: log.join("\n") };
     },
+    /** Preflight: das Szenario (Modell) muss als Verzeichnis existieren. */
+    preflight: ({ model }) =>
+      runPreflight(
+        [
+          {
+            id: "scenario",
+            label: "Szenario vorhanden",
+            async run() {
+              const dir = path.join(/*turbopackIgnore: true*/ root, model);
+              const exists =
+                SAFE_NAME.test(model) &&
+                (await stat(/*turbopackIgnore: true*/ dir).then(
+                  (info) => info.isDirectory(),
+                  () => false,
+                ));
+              return exists
+                ? { status: "ok", message: `Szenario ${model} in ${root}` }
+                : { status: "failed", message: `Szenario ${model} gibt es in ${root} nicht` };
+            },
+          },
+        ],
+        () => FAKE_CLI_VERSION,
+      ),
   };
 }
 

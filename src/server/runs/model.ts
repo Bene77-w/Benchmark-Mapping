@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { HARNESSES, type HarnessErrorKind, type TokenUsage } from "@/server/harness/adapter";
+import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS, type RunKind } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 
@@ -85,6 +86,8 @@ export interface RunSummary {
   outputSchemaHash: string;
   parallelism: number;
   timeoutMs: number;
+  /** Ergebnis des Preflights vor der Ausführung; `null`, solange keiner lief. */
+  preflight: PreflightResult | null;
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
