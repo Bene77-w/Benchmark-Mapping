@@ -1,6 +1,8 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { configurations, runs, unitResults } from "@/server/db/schema";
+import { RUN_SOURCE } from "@/server/pricing/model";
+import { ensureModel } from "@/server/pricing/store";
 import { buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { getCurrentSnapshot, getSnapshotContent } from "@/server/snapshot/store";
 import {
@@ -48,6 +50,8 @@ export async function createRun(
 
   return db.transaction(async (tx) => {
     const configurationId = await ensureConfiguration(tx, parsed.configuration);
+    // Unbekanntes Modell: Eintrag ohne Preis in der Preistabelle, Kosten bleiben „unbekannt“ bis zur Pflege.
+    await ensureModel(tx, parsed.configuration.model, RUN_SOURCE);
     const [run] = await tx
       .insert(runs)
       .values({
