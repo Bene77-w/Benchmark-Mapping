@@ -3,7 +3,8 @@
  *
  *   pnpm worker      (Datenbank wie die App: DATABASE_URL oder localhost:${DB_PORT:-5432})
  *
- * Beenden mit Strg+C. Ein dabei laufender Lauf bleibt im Status „läuft“ stehen.
+ * Beenden mit Strg+C. Ein dabei laufender Lauf bleibt im Status „läuft“; sobald sein Lebenszeichen älter
+ * als 60 s ist, übernimmt ihn der nächste Worker und führt die laufenden und offenen Units aus (fertige nicht).
  */
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";

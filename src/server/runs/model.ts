@@ -4,8 +4,11 @@ import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS, type RunKind } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 
-/** Status eines Laufs: wartet auf den Worker, läuft, abgeschlossen (alle Units haben ein Ergebnis), nicht ausführbar. */
-export const RUN_STATUSES = ["queued", "running", "completed", "failed"] as const;
+/**
+ * Status eines Laufs: wartet auf den Worker, läuft, abgeschlossen (alle Units haben ein Ergebnis), nicht
+ * ausführbar, abgebrochen (fortsetzbar; fertige Units bleiben).
+ */
+export const RUN_STATUSES = ["queued", "running", "completed", "failed", "cancelled"] as const;
 export type RunStatus = (typeof RUN_STATUSES)[number];
 
 /** Status eines Unit-Ergebnisses: offen, laufend, fertig (Antwort), fehlgeschlagen (Fehlerart). */
@@ -91,6 +94,8 @@ export interface RunSummary {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+  /** Bei Ratenlimit: wann der Runner das nächste Mal stellvertretend nachfragt; sonst `null`. */
+  rateLimitedUntil: Date | null;
   progress: RunProgress;
 }
 
