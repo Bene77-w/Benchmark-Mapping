@@ -68,6 +68,8 @@ export interface GoldVersionView {
   status: GoldVersionStatus;
   snapshotId: number;
   snapshotHash: string;
+  /** Label der Gold-Version, die der Entwurf als Ausgangspunkt übernommen hat; sonst `null`. */
+  baseLabel: string | null;
   createdAt: Date;
   frozenAt: Date | null;
   /** Sortiert nach unit_id. */
@@ -82,6 +84,7 @@ export const GOLD_ISSUE_KINDS = [
   "too_many_vertretbar",
   "no_mapping_with_industries",
   "unknown_industry",
+  "unchanged",
 ] as const;
 export type GoldIssueKind = (typeof GOLD_ISSUE_KINDS)[number];
 

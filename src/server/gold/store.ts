@@ -13,6 +13,7 @@ import {
 } from "@/server/db/schema";
 import type { Configuration, RunSummary } from "@/server/runs/model";
 import { createRun, listRuns, type PromptRootOption } from "@/server/runs/store";
+import { hashCanonical } from "@/server/snapshot/hash";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
 import { readGoldCandidates } from "./candidates";
 import {
@@ -143,11 +144,71 @@ export async function saveGoldUnitDecision(
   });
 }
 
-/** Prüft den Entwurf vor dem Abschluss; ohne Entwurf ist das Gold-Set leer. */
+/**
+ * Übernimmt eine eingefrorene Gold-Version als Ausgangspunkt: der neue Entwurf enthält ihre Units samt
+ * Kategorie, no_mapping, Notiz und Gold-Industries. Nur möglich, solange es keinen Entwurf gibt; der Entwurf
+ * bezieht sich auf den aktuellen Snapshot, der alle Units der Version enthalten muss.
+ */
+export async function startGoldDraftFromVersion(db: Database, label: string): Promise<GoldVersionView> {
+  const base = await getGoldVersion(db, label);
+  if (!base) throw new Error(`Gold-Version ${label} gibt es nicht`);
+  await db.transaction(async (tx) => {
+    const [existing] = await tx.select({ id: goldVersions.id }).from(goldVersions).where(isDraft);
+    if (existing) throw new Error("Es gibt bereits einen Gold-Entwurf: zuerst abschließen oder verwerfen");
+    const snapshot = await getCurrentSnapshot(tx);
+    if (!snapshot) throw new Error("Kein Snapshot geladen");
+    const known = new Set(
+      (
+        await tx.select({ unitId: units.unitId }).from(units).where(eq(units.snapshotId, snapshot.snapshotId))
+      ).map((row) => row.unitId),
+    );
+    const unknown = base.units.filter((unit) => !known.has(unit.unitId));
+    if (unknown.length > 0) {
+      throw new Error(
+        `Units von ${label} gibt es im aktuellen Snapshot nicht: ${unknown.map((u) => u.unitId).join(", ")}`,
+      );
+    }
+    const [draft] = await tx
+      .insert(goldVersions)
+      .values({ snapshotId: snapshot.snapshotId, snapshotHash: snapshot.contentHash, baseVersionId: base.id })
+      .returning({ id: goldVersions.id });
+    if (base.units.length === 0) return;
+    await tx.insert(goldUnits).values(
+      base.units.map(({ unitId, category, noMapping, note }) => ({
+        goldVersionId: draft.id,
+        unitId,
+        category,
+        noMapping,
+        note,
+      })),
+    );
+    const baseIndustries = base.units.flatMap((unit) =>
+      unit.industries.map((industry) => ({ goldVersionId: draft.id, unitId: unit.unitId, ...industry })),
+    );
+    if (baseIndustries.length > 0) await tx.insert(goldIndustries).values(baseIndustries);
+  });
+  const draft = await getGoldDraft(db);
+  if (!draft) throw new Error("Gold-Entwurf fehlt");
+  return draft;
+}
+
+/**
+ * Prüft den Entwurf vor dem Abschluss; ohne Entwurf ist das Gold-Set leer. Ein Entwurf, der seinem
+ * Ausgangspunkt gleicht, ergibt keine neue Gold-Version.
+ */
 export async function checkGoldDraft(db: Database): Promise<GoldIssue[]> {
   const draft = await getGoldDraft(db);
   if (!draft) return validateGold([], new Set());
-  return validateGold(draft.units, await industryIdsOf(db, draft.snapshotId));
+  const issues = validateGold(draft.units, await industryIdsOf(db, draft.snapshotId));
+  const base = draft.baseLabel ? await getGoldVersion(db, draft.baseLabel) : null;
+  if (base && hashCanonical(base.units) === hashCanonical(draft.units)) {
+    issues.push({
+      kind: "unchanged",
+      unitId: null,
+      message: `Keine Änderung gegenüber ${base.label}: eine neue Gold-Version entsteht nur aus Änderungen`,
+    });
+  }
+  return issues;
 }
 
 /**
@@ -199,7 +260,7 @@ export async function listGoldVersions(db: Database): Promise<Omit<GoldVersionVi
     .from(goldVersions)
     .where(eq(goldVersions.status, "frozen"))
     .orderBy(desc(goldVersions.frozenAt), desc(goldVersions.id));
-  return rows.map(toVersionSummary);
+  return toVersionSummaries(db, rows);
 }
 
 export interface ProposalRunRequest {
@@ -374,8 +435,9 @@ async function withUnits(db: Database, row: typeof goldVersions.$inferSelect): P
           .where(eq(goldIndustries.goldVersionId, row.id))
           .orderBy(asc(goldIndustries.industryId));
   const industriesByUnit = Map.groupBy(industryRows, (industry) => industry.unitId);
+  const [summary] = await toVersionSummaries(db, [row]);
   return {
-    ...toVersionSummary(row),
+    ...summary,
     units: unitRows.map(
       (unit): GoldUnit => ({
         unitId: unit.unitId,
@@ -392,14 +454,32 @@ async function withUnits(db: Database, row: typeof goldVersions.$inferSelect): P
   };
 }
 
-function toVersionSummary(row: typeof goldVersions.$inferSelect): Omit<GoldVersionView, "units"> {
-  return {
+const isDraft = eq(goldVersions.status, "draft");
+
+/** Zusammenfassungen ohne Units, mit dem Label des Ausgangspunkts. */
+async function toVersionSummaries(
+  db: Database,
+  rows: (typeof goldVersions.$inferSelect)[],
+): Promise<Omit<GoldVersionView, "units">[]> {
+  const baseIds = [
+    ...new Set(rows.flatMap((row) => (row.baseVersionId === null ? [] : [row.baseVersionId]))),
+  ];
+  const bases =
+    baseIds.length === 0
+      ? []
+      : await db
+          .select({ id: goldVersions.id, label: goldVersions.label })
+          .from(goldVersions)
+          .where(inArray(goldVersions.id, baseIds));
+  const labelOf = new Map(bases.map((base) => [base.id, base.label]));
+  return rows.map((row) => ({
     id: row.id,
     label: row.label,
     status: row.status,
     snapshotId: row.snapshotId,
     snapshotHash: row.snapshotHash,
+    baseLabel: row.baseVersionId === null ? null : (labelOf.get(row.baseVersionId) ?? null),
     createdAt: row.createdAt,
     frozenAt: row.frozenAt,
-  };
+  }));
 }
