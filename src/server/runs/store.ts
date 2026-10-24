@@ -117,6 +117,16 @@ export async function listRuns(db: Database): Promise<RunSummary[]> {
   return selectRunSummaries(db);
 }
 
+/**
+ * Läufe, die in Rangliste und Diagrammen erscheinen dürfen: abgeschlossene Benchmark-Läufe, neueste zuerst.
+ * Vorschlagsläufe liefern nur Vorschläge für die Gold-Review und erscheinen hier nie.
+ */
+export async function listEvaluationRuns(db: Database): Promise<RunSummary[]> {
+  return (await selectRunSummaries(db)).filter(
+    (run) => run.kind === "benchmark" && run.status === "completed",
+  );
+}
+
 export interface SavedConfiguration extends ConfigurationView {
   runCount: number;
   latestRunId: number | null;
