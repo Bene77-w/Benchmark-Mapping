@@ -4,7 +4,7 @@ import { createTestDatabase } from "@/server/db/test-database";
 import { createFakeAdapter } from "@/server/harness/fake";
 import { buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { processNextRun } from "@/server/runs/runner";
-import { getRun } from "@/server/runs/store";
+import { createRun, getRun, listEvaluationRuns } from "@/server/runs/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
@@ -278,5 +278,26 @@ describe("Vorschlagsläufe und Review", { timeout: 30_000 }, () => {
     const ethics = await getGoldUnitReview(db, ETHICS);
     expect(ethics?.decisionsDiffer).toBe(true);
     expect(ethics?.proposals.map((p) => p.answer?.decision)).toEqual(["no_mapping", "mapped", "no_mapping"]);
+  });
+});
+
+describe("Auswertung", { timeout: 30_000 }, () => {
+  test("Vorschlagsläufe erscheinen nie in Rangliste oder Diagrammen, abgeschlossene Benchmark-Läufe schon", async () => {
+    const db = await databaseWithSnapshot();
+    await addGoldUnit(db, { unitId: AVIATION, category: "a" });
+    await addGoldUnit(db, { unitId: ETHICS, category: "c" });
+    const proposalRun = await startProposalRun(db, {
+      configuration: { harness: "fake", model: "vorschlag-a", effort: "max" },
+    });
+    const benchmarkRun = await createRun(db, {
+      configuration: { harness: "fake", model: "vorschlag-a", effort: "max", mode: "web" },
+      unitIds: [AVIATION, ETHICS],
+    });
+    expect(await listEvaluationRuns(db)).toEqual([]);
+
+    const adapters = { fake: createFakeAdapter() };
+    while ((await processNextRun(db, { adapters })) !== null) {}
+    expect((await getRun(db, proposalRun.runId))?.status).toBe("completed");
+    expect((await listEvaluationRuns(db)).map((run) => run.id)).toEqual([benchmarkRun.runId]);
   });
 });
