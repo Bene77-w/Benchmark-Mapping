@@ -101,6 +101,29 @@ export async function createRunFromConfiguration(
   );
 }
 
+/**
+ * Bricht einen wartenden oder laufenden Lauf ab. Der Worker startet danach keine Units mehr; Aufrufe, die
+ * gerade laufen, werden noch gespeichert. Fortsetzen mit `resumeRun`.
+ */
+export async function cancelRun(db: Database, runId: number): Promise<void> {
+  const [cancelled] = await db
+    .update(runs)
+    .set({ status: "cancelled", rateLimitedUntil: null })
+    .where(and(eq(runs.id, runId), inArray(runs.status, ["queued", "running"])))
+    .returning({ id: runs.id });
+  if (!cancelled) throw new Error(`Lauf ${runId} lässt sich nicht abbrechen (wartet nicht und läuft nicht)`);
+}
+
+/** Setzt einen abgebrochenen Lauf fort: er wartet wieder auf den Worker, der nur offene Units aufruft. */
+export async function resumeRun(db: Database, runId: number): Promise<void> {
+  const [resumed] = await db
+    .update(runs)
+    .set({ status: "queued" })
+    .where(and(eq(runs.id, runId), eq(runs.status, "cancelled")))
+    .returning({ id: runs.id });
+  if (!resumed) throw new Error(`Lauf ${runId} lässt sich nicht fortsetzen (nicht abgebrochen)`);
+}
+
 export async function getRun(db: Database, runId: number): Promise<RunView | null> {
   const [summary] = await selectRunSummaries(db, runId);
   if (!summary) return null;

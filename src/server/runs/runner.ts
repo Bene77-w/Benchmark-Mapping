@@ -22,10 +22,13 @@ export interface RunnerDeps extends PromptRootOption {
   timeoutGraceMs?: number;
   /** Takt der stellvertretenden Nachfrage bei Ratenlimit (Standard 10 min; in Tests kürzer). */
   rateLimitRetryMs?: number;
+  /** Abstand, in dem der Runner sein Lebenszeichen schreibt und auf einen Abbruch prüft (Standard 2 s). */
+  heartbeatMs?: number;
 }
 
 const DEFAULT_TIMEOUT_GRACE_MS = 30_000;
 const DEFAULT_RATE_LIMIT_RETRY_MS = 10 * 60 * 1000;
+const DEFAULT_HEARTBEAT_MS = 2_000;
 
 /**
  * Übernimmt den ältesten wartenden Lauf und führt ihn aus. Liefert seine ID oder `null`, wenn keiner wartet.
@@ -81,6 +84,19 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
     .from(unitResults)
     .where(and(eq(unitResults.runId, runId), eq(unitResults.status, "pending")))
     .orderBy(asc(unitResults.unitId));
+  const stop = new AbortController();
+  /** Schreibt das Lebenszeichen; ist der Lauf nicht mehr `running` (abgebrochen), endet die Ausführung. */
+  const heartbeat = async (): Promise<boolean> => {
+    if (stop.signal.aborted) return false;
+    const [alive] = await db
+      .update(runs)
+      .set({ heartbeatAt: new Date() })
+      .where(and(eq(runs.id, runId), eq(runs.status, "running")))
+      .returning({ id: runs.id });
+    if (!alive) stop.abort();
+    return Boolean(alive);
+  };
+  const timer = setInterval(() => void heartbeat().catch(() => {}), deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS);
   const context: RunContext = {
     db,
     runId,
@@ -93,26 +109,34 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
       timeoutMs: run.timeoutMs,
     },
     timeoutGraceMs: deps.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS,
+    proceed: heartbeat,
     rateLimit: new RateLimitWait({
       intervalMs: deps.rateLimitRetryMs ?? DEFAULT_RATE_LIMIT_RETRY_MS,
-      signal: new AbortController().signal,
+      signal: stop.signal,
       onChange: async (until) => {
         await db.update(runs).set({ rateLimitedUntil: until }).where(eq(runs.id, runId));
       },
     }),
   };
-  await forEachLimited(
-    open.map(({ unitId }) => unitId),
-    run.parallelism,
-    (unitId) => runUnit(context, unitId),
-  );
+  try {
+    await forEachLimited(
+      open.map(({ unitId }) => unitId),
+      run.parallelism,
+      (unitId) => runUnit(context, unitId),
+    );
+  } finally {
+    clearInterval(timer);
+  }
 
   const [{ value: unfinished }] = await db
     .select({ value: count() })
     .from(unitResults)
     .where(and(eq(unitResults.runId, runId), inArray(unitResults.status, ["pending", "running"])));
   if (unfinished === 0) {
-    await db.update(runs).set({ status: "completed", finishedAt: new Date() }).where(eq(runs.id, runId));
+    await db
+      .update(runs)
+      .set({ status: "completed", finishedAt: new Date() })
+      .where(and(eq(runs.id, runId), eq(runs.status, "running")));
   }
 }
 
@@ -124,6 +148,8 @@ interface RunContext {
   prompt: BenchmarkPrompt;
   task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
   timeoutGraceMs: number;
+  /** Vor jedem Aufruf: `false`, wenn der Lauf abgebrochen wurde und keine Aufrufe mehr starten dürfen. */
+  proceed: () => Promise<boolean>;
   rateLimit: RateLimitWait;
 }
 
@@ -146,7 +172,8 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     userPrompt: unitPrompt.userPrompt,
     outputSchema: prompt.outputSchema,
   };
-  const call = async () => {
+  const call = async (): Promise<HarnessResult | null> => {
+    if (!(await context.proceed())) return null;
     await db
       .update(unitResults)
       .set({ status: "running", startedAt: new Date(), unitPromptHash: unitPrompt.unitPromptHash })
@@ -157,11 +184,17 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
   const attempts: HarnessResult[] = [];
   for (;;) {
     await rateLimit.whenOpen();
-    let result: HarnessResult | null = await call();
-    if (result.outcome.kind === "rate_limit") {
+    let result = await call();
+    if (result?.outcome.kind === "rate_limit") {
       await db.update(unitResults).set({ status: "pending" }).where(where);
       result = await rateLimit.represent(call);
+      if (!result && !(await context.proceed())) return;
       if (!result) continue;
+    }
+    if (!result) {
+      // Abgebrochen: die Unit bleibt bzw. wird wieder offen (ein erster Fehlversuch verfällt).
+      await db.update(unitResults).set({ status: "pending" }).where(where);
+      return;
     }
     attempts.push(result);
     if (attempts.length === 1 && RETRYABLE.has(result.outcome.kind)) {

@@ -27,9 +27,10 @@ export class RateLimitWait {
   /**
    * Nach einem Ratenlimit: Wartet schon ein Stellvertreter, liefert `null` sofort (der Aufrufer wartet über
    * `whenOpen` und ruft dann erneut auf). Sonst wartet dieser Aufrufer im Takt und ruft `probe` erneut auf,
-   * bis kein Ratenlimit mehr kommt, und liefert dieses Ergebnis; `null`, wenn das Warten abgebrochen wurde.
+   * bis kein Ratenlimit mehr kommt, und liefert dieses Ergebnis; `null`, wenn das Warten abgebrochen wurde
+   * (Signal oder `probe` liefert `null`).
    */
-  async represent(probe: () => Promise<HarnessResult>): Promise<HarnessResult | null> {
+  async represent(probe: () => Promise<HarnessResult | null>): Promise<HarnessResult | null> {
     if (this.waiting) return null;
     const { intervalMs, signal, onChange } = this.options;
     let release = () => {};
@@ -42,7 +43,7 @@ export class RateLimitWait {
         const slept = await sleep(intervalMs, true, { signal }).catch(() => false);
         if (!slept) return null;
         const result = await probe();
-        if (result.outcome.kind !== "rate_limit") return result;
+        if (result?.outcome.kind !== "rate_limit") return result;
       }
     } finally {
       await onChange(null);
