@@ -10,6 +10,9 @@ export default defineConfig({
   testDir: "tests/e2e",
   fullyParallel: true,
   reporter: "list",
+  // Der Dev-Server kompiliert Seiten beim ersten Aufruf; parallel laufende Specs überschreiten sonst die
+  // 5-s-Grenze bei Weiterleitungen nach Server Actions.
+  expect: { timeout: 15_000 },
   use: { baseURL: `http://localhost:${port}`, trace: "retain-on-failure" },
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /gold\.spec\.ts/ },
