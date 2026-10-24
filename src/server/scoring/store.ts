@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
-import { evaluations } from "@/server/db/schema";
+import { evaluations, unitResults } from "@/server/db/schema";
 import type { RunView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import { hashCanonical } from "@/server/snapshot/hash";
@@ -88,8 +88,10 @@ export async function ensureEvaluations(
 }
 
 /**
- * Gespeicherte Bewertungen der Läufe gegen die Gold-Version, die zum Gold-Inhalt (Hash) und Regelstand
- * passen; je Lauf höchstens eine.
+ * Gespeicherte Bewertungen der Läufe gegen die Gold-Version, die noch gültig sind; je Lauf höchstens eine.
+ * Gültig ist eine Bewertung, solange Gold-Inhalt (Hash) und Regelstand passen und – bei einer unvollständigen –
+ * keine ihrer fehlenden Units inzwischen ein Ergebnis hat (Ergänzung). Vorhandene Ergebnisse eines
+ * abgeschlossenen Laufs ändern sich nicht mehr, deshalb bleibt eine vollständige Bewertung gültig.
  */
 export async function currentStoredEvaluations(
   db: Database,
@@ -107,11 +109,26 @@ export async function currentStoredEvaluations(
     })
     .from(evaluations)
     .where(and(inArray(evaluations.runId, runIds), eq(evaluations.goldVersion, gold.version)));
-  return new Map(
-    rows
-      .filter((row) => row.goldHash === goldHash && row.scoringVersion === SCORING_VERSION)
-      .map((row) => [row.runId, row.result]),
-  );
+  const current = rows.filter((row) => row.goldHash === goldHash && row.scoringVersion === SCORING_VERSION);
+  const incompleteRunIds = current.filter((row) => !row.result.complete).map((row) => row.runId);
+  const finished =
+    incompleteRunIds.length === 0
+      ? []
+      : await db
+          .select({ runId: unitResults.runId, unitId: unitResults.unitId })
+          .from(unitResults)
+          .where(
+            and(
+              inArray(unitResults.runId, incompleteRunIds),
+              inArray(unitResults.status, ["done", "failed"]),
+            ),
+          );
+  const finishedByRun = Map.groupBy(finished, (row) => row.runId);
+  const supplemented = (row: (typeof current)[number]) => {
+    const results = new Set((finishedByRun.get(row.runId) ?? []).map((entry) => entry.unitId));
+    return row.result.missingUnitIds.some((unitId) => results.has(unitId));
+  };
+  return new Map(current.filter((row) => !supplemented(row)).map((row) => [row.runId, row.result]));
 }
 
 /** Gespeicherte Bewertungen eines Laufs, nach Gold-Version sortiert. */

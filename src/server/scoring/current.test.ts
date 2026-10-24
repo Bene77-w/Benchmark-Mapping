@@ -15,7 +15,7 @@ import { readTestGold } from "@/server/gold/test-gold";
 import type { HarnessAdapter } from "@/server/harness/adapter";
 import { createFakeAdapter } from "@/server/harness/fake";
 import { processNextRun } from "@/server/runs/runner";
-import { createRun, getRun } from "@/server/runs/store";
+import { createRun, getRun, supplementRun } from "@/server/runs/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
@@ -144,5 +144,54 @@ describe("Neubewertung bei neuer Gold-Version", { timeout: 60_000 }, () => {
       expect(stored[1].score).toBeCloseTo((0.8 + 2 / 3 + 1 + 0) / 4, 10);
     }
     expect(calls.length).toBe(callsBefore);
+  });
+});
+
+describe("Hinzugefügte Units", { timeout: 60_000 }, () => {
+  test("ein Lauf ohne Ergebnis für eine neue Unit ist unvollständig und ausgeblendet; die Ergänzung ruft nur sie auf", async () => {
+    const db = await databaseWithSnapshot();
+    const { adapter, calls } = countingAdapter();
+    await freezeFirstGold(db, [AVIATION, LIVESTOCK, ETHICS, VETERANS]);
+    const runId = await runToCompletion(db, adapter, [AVIATION, LIVESTOCK, ETHICS, VETERANS]);
+    const before = await getRun(db, runId);
+
+    await startGoldDraftFromVersion(db, "gold-v1");
+    await addTestGoldUnit(db, JEC);
+    expect((await finalizeGoldDraft(db)).reevaluation).toMatchObject({ runs: 1, complete: 0, incomplete: 1 });
+    const v2 = await goldOf(db, "gold-v2");
+    const hidden = await listCurrentEvaluations(db, v2);
+    expect(hidden.runs).toEqual([]);
+    expect(hidden.incomplete.map(({ run, missingUnitIds }) => [run.id, missingUnitIds])).toEqual([
+      [runId, [JEC]],
+    ]);
+
+    calls.length = 0;
+    expect(
+      await supplementRun(
+        db,
+        runId,
+        v2.units.map((unit) => unit.unitId),
+      ),
+    ).toEqual({ added: [JEC] });
+    expect((await getRun(db, runId))?.status).toBe("queued");
+    expect(await processNextRun(db, { adapters: { fake: adapter } })).toBe(runId);
+    expect(calls).toEqual([JEC]);
+
+    const supplemented = await getRun(db, runId);
+    expect(supplemented?.status).toBe("completed");
+    expect(supplemented?.progress).toEqual({ total: 5, pending: 0, running: 0, done: 4, failed: 1 });
+    // Die bisherigen Ergebnisse bleiben unverändert; die ergänzte Unit hat ihren eigenen Zeitstempel.
+    for (const unit of before?.units ?? []) {
+      expect(supplemented?.units.find((entry) => entry.unitId === unit.unitId)).toEqual(unit);
+    }
+    const jec = supplemented?.units.find((unit) => unit.unitId === JEC);
+    expect(jec?.finishedAt?.getTime()).toBeGreaterThan(before?.finishedAt?.getTime() ?? Number.NaN);
+
+    // Fake-Antworten: Aviation 1, Livestock 2/3, Ethics 1, Veterans 0, JEC (no_mapping-Gold, Antwort mapped) 0.
+    const visible = await listCurrentEvaluations(db, v2);
+    expect(visible.incomplete).toEqual([]);
+    expect(visible.runs.map((entry) => entry.run.id)).toEqual([runId]);
+    expect(visible.runs[0].evaluation.score).toBeCloseTo((1 + 2 / 3 + 1 + 0 + 0) / 5, 10);
+    expect(await getReevaluationStatus(db, v2)).toMatchObject({ evaluated: 1, complete: 1, incomplete: 0 });
   });
 });
