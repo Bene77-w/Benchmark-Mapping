@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
-import type { SimpleGoldUnit } from "@/server/scoring/simple-score";
+import { CATEGORIES, GOLD_CLASSES, type GoldVersion } from "@/server/scoring/model";
 
 /**
  * Test-Gold aus den Fixtures: Units und Referenzantworten für den Durchstich mit dem Fake-Harness, bis
@@ -15,19 +15,21 @@ const testGoldSchema = z.object({
     .array(
       z.object({
         unitId: z.string().min(1),
+        category: z.enum(CATEGORIES),
         noMapping: z.boolean(),
         industries: z.array(
-          z.object({ industryId: z.string().min(1), class: z.enum(["positiv", "vertretbar"]) }),
+          z.object({
+            industryId: z.string().min(1),
+            class: z.enum(GOLD_CLASSES),
+            webOnly: z.boolean().default(false),
+          }),
         ),
       }),
     )
     .min(1),
 });
 
-export interface TestGold {
-  version: string;
-  units: SimpleGoldUnit[];
-}
+export type TestGold = GoldVersion;
 
 export async function readTestGold(file: string = TEST_GOLD_PATH): Promise<TestGold> {
   const { version, units } = testGoldSchema.parse(
