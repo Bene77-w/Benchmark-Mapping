@@ -4,7 +4,12 @@ import path from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
-import { type HarnessResult, type HarnessTask, parseAnswerText } from "@/server/harness/adapter";
+import {
+  type HarnessAdapter,
+  type HarnessResult,
+  type HarnessTask,
+  parseAnswerText,
+} from "@/server/harness/adapter";
 import { createFakeAdapter } from "@/server/harness/fake";
 import { buildBenchmarkPrompt, PROMPT_ROOT, PROMPT_VERSION } from "@/server/prompt/benchmark-prompt";
 import type { Snapshot } from "@/server/snapshot/model";
@@ -107,10 +112,12 @@ describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
     const veterans = run?.units.find((unit) => unit.unitId === "house--veterans-affairs--health");
     expect(veterans).toMatchObject({
       status: "failed",
+      // Ungültiges JSON löst einen Wiederholversuch aus; der Fake antwortet beide Male gleich.
+      attempts: 2,
       answer: null,
       error: { kind: "invalid_json" },
       rawResponse: expect.stringContaining("Medical Care Facilities"),
-      tokens: { outputTokens: 95 },
+      tokens: { outputTokens: 2 * 95 },
     });
 
     expect(await processNextRun(db, { adapters: { fake: createFakeAdapter() } })).toBeNull();
@@ -266,6 +273,187 @@ describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
     });
   });
 });
+
+describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
+  test("Timeout, ungültiges JSON oder Schemaverstoß lösen genau einen Wiederholversuch aus; gelingt er, zählt seine Antwort", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("wiederholung", {
+      "house--ethics": { calls: [{ response: "kein JSON" }, { response: noMappingAnswer("house--ethics") }] },
+      "joint--joint-economic-committee": {
+        calls: [{ simulate: "timeout" }, { response: noMappingAnswer("joint--joint-economic-committee") }],
+      },
+      "house--veterans-affairs--health": {
+        calls: [
+          { response: { unit_id: "house--veterans-affairs--health" } },
+          { response: noMappingAnswer("house--veterans-affairs--health") },
+        ],
+      },
+    });
+    const adapter = countingAdapter(createFakeAdapter({ root }));
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "wiederholung" },
+      unitIds: ["house--ethics", "joint--joint-economic-committee", "house--veterans-affairs--health"],
+    });
+
+    await processNextRun(db, { adapters: { fake: adapter } });
+
+    const run = await getRun(db, runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.progress).toMatchObject({ done: 3, failed: 0 });
+    for (const unit of run?.units ?? []) {
+      expect(unit).toMatchObject({
+        status: "done",
+        attempts: 2,
+        error: null,
+        answer: { decision: "no_mapping" },
+      });
+    }
+    expect(adapter.callsOf("house--ethics")).toBe(2);
+  });
+
+  test("scheitert auch der Wiederholversuch, ist die Unit ein Format-Fehler; Regelverstöße und Harness-Fehler werden nicht wiederholt", async () => {
+    const db = await databaseWithSnapshot();
+    const ruleViolation = {
+      ...noMappingAnswer("house--veterans-affairs--health"),
+      decision: "mapped",
+      no_mapping_reason: null,
+      assignments: [{ industry_id: "gibt-es-nicht", evidence_excerpt: "Health", rationale_short: "Kurz." }],
+    };
+    const root = await fakeScenario("fehlschlag", {
+      "house--ethics": { calls: [{ response: { unit_id: "house--ethics" } }, { response: "kein JSON" }] },
+      "joint--joint-economic-committee": { simulate: "timeout" },
+      "house--veterans-affairs--health": { response: ruleViolation },
+      "house--transportation-and-infrastructure--aviation": { simulate: "harness_error" },
+    });
+    const adapter = countingAdapter(createFakeAdapter({ root }));
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "fehlschlag" },
+      unitIds: [
+        "house--ethics",
+        "joint--joint-economic-committee",
+        "house--veterans-affairs--health",
+        "house--transportation-and-infrastructure--aviation",
+      ],
+    });
+
+    await processNextRun(db, { adapters: { fake: adapter } });
+
+    const run = await getRun(db, runId);
+    expect(run?.status).toBe("completed");
+    const unit = (unitId: string) => run?.units.find((result) => result.unitId === unitId);
+    expect(unit("house--ethics")).toMatchObject({
+      status: "failed",
+      attempts: 2,
+      answer: null,
+      error: { kind: "invalid_json" },
+      rawResponse: "kein JSON",
+    });
+    expect(unit("joint--joint-economic-committee")).toMatchObject({
+      status: "failed",
+      attempts: 2,
+      error: { kind: "timeout" },
+    });
+    expect(unit("house--veterans-affairs--health")).toMatchObject({
+      status: "done",
+      attempts: 1,
+      answer: { assignments: [{ industry_id: "gibt-es-nicht" }] },
+    });
+    expect(unit("house--transportation-and-infrastructure--aviation")).toMatchObject({
+      status: "failed",
+      attempts: 1,
+      error: { kind: "harness_error" },
+    });
+    expect(adapter.callsOf("house--ethics")).toBe(2);
+    expect(adapter.callsOf("joint--joint-economic-committee")).toBe(2);
+    expect(adapter.callsOf("house--veterans-affairs--health")).toBe(1);
+    expect(adapter.callsOf("house--transportation-and-infrastructure--aviation")).toBe(1);
+  });
+
+  test("Tokens, Websuchen, Kosten und Dauer aller Versuche werden zusammengezählt, das Protokoll enthält beide", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("kosten", {
+      "house--ethics": {
+        calls: [
+          {
+            response: "kein JSON",
+            tokens: { input: 100, cacheRead: 1000, cacheWrite: 10, output: 20, reasoning: 5 },
+            webSearches: 1,
+            nativeCostUsd: 0.01,
+            delayMs: 50,
+          },
+          {
+            response: noMappingAnswer("house--ethics"),
+            tokens: { input: 200, cacheRead: 2000, cacheWrite: 0, output: 40 },
+            webSearches: 2,
+            nativeCostUsd: 0.02,
+            delayMs: 50,
+          },
+        ],
+      },
+    });
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "kosten" },
+      unitIds: ["house--ethics"],
+    });
+
+    await processNextRun(db, { adapters: { fake: createFakeAdapter({ root }) } });
+
+    const [unit] = (await getRun(db, runId))?.units ?? [];
+    expect(unit).toMatchObject({
+      status: "done",
+      attempts: 2,
+      tokens: {
+        inputTokens: 300,
+        cacheReadTokens: 3000,
+        cacheWriteTokens: 10,
+        outputTokens: 60,
+        reasoningTokens: 5,
+      },
+      webSearches: 3,
+    });
+    expect(unit.nativeCostUsd).toBeCloseTo(0.03);
+    expect(unit.durationMs).toBeGreaterThanOrEqual(100);
+    expect(unit.log).toMatch(/Versuch 1[\s\S]*kein JSON[\s\S]*Versuch 2/);
+  });
+});
+
+/** Legt ein Fake-Szenario `name` mit je einer Datei pro Unit an und liefert die Wurzel. */
+async function fakeScenario(name: string, files: Record<string, unknown>): Promise<string> {
+  const root = await mkdtemp(path.join(tmpdir(), "fake-harness-"));
+  await mkdir(path.join(root, name));
+  for (const [unitId, file] of Object.entries(files)) {
+    await writeFile(path.join(root, name, `${unitId}.json`), JSON.stringify(file));
+  }
+  return root;
+}
+
+function noMappingAnswer(unitId: string) {
+  return {
+    unit_id: unitId,
+    decision: "no_mapping",
+    no_mapping_reason: "Keine Industry.",
+    broad_scope_exception: false,
+    broad_scope_reason: null,
+    assignments: [],
+    sources: [],
+    label_uncertain: false,
+    uncertainty_note: null,
+  };
+}
+
+/** Reicht Aufrufe an `adapter` durch und zählt sie je Unit. */
+function countingAdapter(adapter: HarnessAdapter) {
+  const calls: string[] = [];
+  return {
+    harness: adapter.harness,
+    calls,
+    callsOf: (unitId: string) => calls.filter((id) => id === unitId).length,
+    run(task: HarnessTask) {
+      calls.push(task.unitId);
+      return adapter.run(task);
+    },
+  };
+}
 
 /** Adapter, dessen Aufrufe erst auf Freigabe mit einer gültigen no_mapping-Antwort enden. */
 function gatedAdapter() {
