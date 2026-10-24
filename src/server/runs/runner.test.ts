@@ -528,6 +528,38 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     expect(run?.units.map((unit) => unit.attempts)).toEqual([1, 1, 1, 2, 1]);
   });
 
+  test("nach einem Worker-Absturz übernimmt ein anderer Worker den Lauf und führt laufende und offene Units aus, fertige nicht", async () => {
+    const db = await databaseWithSnapshot();
+    const unitIds = [...STANDARD_UNITS].sort().slice(0, 4);
+    const [first, second, third, fourth] = unitIds;
+    const crashed = gatedAdapter();
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, parallelism: 2, unitIds });
+
+    // Der abgestürzte Worker: schreibt kein Lebenszeichen mehr, seine laufenden Aufrufe kehren nie zurück.
+    const crashedWorker = processNextRun(db, { adapters: { fake: crashed }, heartbeatMs: 3_600_000 });
+    await crashed.waitForCalls(2);
+    crashed.release(1);
+    await crashed.waitForCalls(3);
+    expect((await getRun(db, runId))?.progress).toMatchObject({ done: 1, running: 2, pending: 1 });
+
+    // Solange das Lebenszeichen frisch ist, übernimmt niemand den Lauf.
+    const other = countingAdapter(createFakeAdapter());
+    expect(await processNextRun(db, { adapters: { fake: other } })).toBeNull();
+
+    expect(await processNextRun(db, { adapters: { fake: other }, staleAfterMs: 0 })).toBe(runId);
+    expect(new Set(other.calls)).toEqual(new Set([second, third, fourth]));
+    expect(other.callsOf(first)).toBe(0);
+    const resumed = await getRun(db, runId);
+    expect(resumed).toMatchObject({ status: "completed", progress: { done: 3, failed: 1, running: 0 } });
+
+    // Kehren die Aufrufe des totgeglaubten Workers doch noch zurück, überschreiben sie nichts, und er startet
+    // keine weiteren.
+    crashed.releaseAll();
+    await crashedWorker;
+    expect(await getRun(db, runId)).toEqual(resumed);
+    expect(crashed.calls).toHaveLength(3);
+  });
+
   test("nur wartende oder laufende Läufe lassen sich abbrechen, nur abgebrochene fortsetzen", async () => {
     const db = await databaseWithSnapshot();
     const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: ["house--ethics"] });
