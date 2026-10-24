@@ -1,4 +1,8 @@
 import { z } from "zod";
+import type { HarnessErrorKind } from "@/server/harness/adapter";
+import type { UnitAnswer } from "@/server/prompt/output-schema";
+import type { ConfigurationView, UnitResultStatus } from "@/server/runs/model";
+import type { SnapshotUnit } from "@/server/snapshot/model";
 
 /**
  * Gold-Set und Gold-Versionen (Begriffe in GLOSSARY.md). Es gibt höchstens einen Entwurf (`draft`), den die
@@ -133,4 +137,39 @@ export class GoldValidationError extends Error {
     super(`Gold-Review nicht abschließbar: ${issues.map((issue) => issue.message).join("; ")}`);
     this.name = "GoldValidationError";
   }
+}
+
+/** Ein Vorschlag: die Antwort (oder der Fehler) eines Vorschlagslaufs für eine Unit. */
+export interface GoldProposal {
+  runId: number;
+  configuration: ConfigurationView;
+  status: UnitResultStatus;
+  answer: UnitAnswer | null;
+  error: { kind: HarnessErrorKind; message: string | null } | null;
+}
+
+/** Eine Industry in der Review: von Vorschlägen genannt und/oder im Gold. */
+export interface GoldReviewIndustry {
+  industryId: string;
+  /** `null`, wenn die industry_id in der Taxonomie nicht vorkommt. */
+  industryName: string | null;
+  sectorName: string | null;
+  description: string | null;
+  /** Vorschlagsläufe, deren Antwort die Industry nennt (in der Reihenfolge der Vorschläge). */
+  proposedBy: number[];
+  /** Alle Vorschläge mit Antwort nennen sie; sonst ist sie ein Unterschied. */
+  unanimous: boolean;
+  gold: GoldIndustry | null;
+}
+
+/** Alles, was die Gold-Review für eine Unit des Entwurfs braucht. */
+export interface GoldUnitReview {
+  unit: SnapshotUnit;
+  gold: GoldUnit;
+  /** Vorschläge der Vorschlagsläufe des Entwurfs, ältester zuerst. */
+  proposals: GoldProposal[];
+  /** Sortiert nach industry_id. */
+  industries: GoldReviewIndustry[];
+  /** Die Vorschläge mit Antwort sind sich bei mapped/no_mapping nicht einig. */
+  decisionsDiffer: boolean;
 }

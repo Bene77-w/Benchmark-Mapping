@@ -1,12 +1,27 @@
-import { and, asc, count, desc, eq } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
-import { goldIndustries, goldUnits, goldVersions, industries, units } from "@/server/db/schema";
+import {
+  configurations,
+  goldIndustries,
+  goldProposalRuns,
+  goldUnits,
+  goldVersions,
+  industries,
+  runs,
+  unitResults,
+  units,
+} from "@/server/db/schema";
+import type { Configuration, RunSummary } from "@/server/runs/model";
+import { createRun, listRuns, type PromptRootOption } from "@/server/runs/store";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
 import {
   type GoldCategory,
   type GoldIssue,
+  type GoldProposal,
+  type GoldReviewIndustry,
   type GoldUnit,
   type GoldUnitDecision,
+  type GoldUnitReview,
   GoldValidationError,
   type GoldVersionView,
   goldUnitDecisionSchema,
@@ -164,6 +179,137 @@ export async function listGoldVersions(db: Database): Promise<Omit<GoldVersionVi
     .where(eq(goldVersions.status, "frozen"))
     .orderBy(desc(goldVersions.frozenAt), desc(goldVersions.id));
   return rows.map(toVersionSummary);
+}
+
+export interface ProposalRunRequest {
+  /** Harness, Modell und Effort; der Modus ist bei Vorschlagsläufen immer „mit Websuche“. */
+  configuration: Omit<Configuration, "mode">;
+  parallelism?: number;
+  timeoutMs?: number;
+}
+
+/**
+ * Startet einen Vorschlagslauf (Lauf-Art `proposal`, Gold-Brief, mit Web) über alle Units des Entwurfs und
+ * ordnet ihn dem Entwurf zu; der Worker führt ihn aus.
+ */
+export async function startProposalRun(
+  db: Database,
+  request: ProposalRunRequest,
+  options: PromptRootOption = {},
+): Promise<{ runId: number }> {
+  const draft = await getGoldDraft(db);
+  if (!draft || draft.units.length === 0) throw new Error("Der Gold-Entwurf hat noch keine Units");
+  const { runId } = await createRun(
+    db,
+    {
+      configuration: { ...request.configuration, mode: "web" },
+      kind: "proposal",
+      parallelism: request.parallelism,
+      timeoutMs: request.timeoutMs,
+      unitIds: draft.units.map((unit) => unit.unitId),
+    },
+    options,
+  );
+  await db.insert(goldProposalRuns).values({ goldVersionId: draft.id, runId });
+  return { runId };
+}
+
+/** Vorschlagsläufe des Entwurfs, neueste zuerst. */
+export async function getGoldProposalRuns(db: Database): Promise<RunSummary[]> {
+  const draft = await getGoldDraft(db);
+  if (!draft) return [];
+  const runIds = new Set(await proposalRunIdsOf(db, draft.id));
+  return (await listRuns(db)).filter((run) => runIds.has(run.id));
+}
+
+/** Review-Ansicht einer Unit des Entwurfs: Unit, Gold-Entscheidung, Vorschläge und ihre Unterschiede. */
+export async function getGoldUnitReview(db: Database, unitId: string): Promise<GoldUnitReview | null> {
+  const draft = await getGoldDraft(db);
+  const gold = draft?.units.find((unit) => unit.unitId === unitId);
+  if (!draft || !gold) return null;
+  const [unitRow] = await db
+    .select()
+    .from(units)
+    .where(and(eq(units.snapshotId, draft.snapshotId), eq(units.unitId, unitId)));
+  const { snapshotId: _snapshotId, ...unit } = unitRow;
+
+  const runIds = await proposalRunIdsOf(db, draft.id);
+  const resultRows =
+    runIds.length === 0
+      ? []
+      : await db
+          .select({ result: unitResults, configuration: configurations })
+          .from(unitResults)
+          .innerJoin(runs, eq(unitResults.runId, runs.id))
+          .innerJoin(configurations, eq(runs.configurationId, configurations.id))
+          .where(and(inArray(unitResults.runId, runIds), eq(unitResults.unitId, unitId)))
+          .orderBy(asc(unitResults.runId));
+  const proposals = resultRows.map(
+    ({ result, configuration }): GoldProposal => ({
+      runId: result.runId,
+      configuration: {
+        id: configuration.id,
+        harness: configuration.harness,
+        model: configuration.model,
+        effort: configuration.effort,
+        mode: configuration.mode,
+      },
+      status: result.status,
+      answer: result.answer,
+      error: result.errorKind ? { kind: result.errorKind, message: result.errorMessage } : null,
+    }),
+  );
+
+  const answered = proposals.filter((proposal) => proposal.answer !== null);
+  const industryIds = new Set([
+    ...answered.flatMap((proposal) => proposal.answer?.assignments.map((a) => a.industry_id) ?? []),
+    ...gold.industries.map((industry) => industry.industryId),
+  ]);
+  const taxonomy =
+    industryIds.size === 0
+      ? []
+      : await db
+          .select()
+          .from(industries)
+          .where(
+            and(
+              eq(industries.snapshotId, draft.snapshotId),
+              inArray(industries.industryId, [...industryIds]),
+            ),
+          );
+  const taxonomyById = new Map(taxonomy.map((industry) => [industry.industryId, industry]));
+  const reviewIndustries = [...industryIds].sort().map((industryId): GoldReviewIndustry => {
+    const proposedBy = answered
+      .filter((proposal) => proposal.answer?.assignments.some((a) => a.industry_id === industryId))
+      .map((proposal) => proposal.runId);
+    const entry = taxonomyById.get(industryId);
+    return {
+      industryId,
+      industryName: entry?.industryName ?? null,
+      sectorName: entry?.sectorName ?? null,
+      description: entry?.description ?? null,
+      proposedBy,
+      unanimous: proposedBy.length > 0 && proposedBy.length === answered.length,
+      gold: gold.industries.find((industry) => industry.industryId === industryId) ?? null,
+    };
+  });
+
+  return {
+    unit,
+    gold,
+    proposals,
+    industries: reviewIndustries,
+    decisionsDiffer: new Set(answered.map((proposal) => proposal.answer?.decision)).size > 1,
+  };
+}
+
+async function proposalRunIdsOf(db: Database, goldVersionId: number): Promise<number[]> {
+  const rows = await db
+    .select({ runId: goldProposalRuns.runId })
+    .from(goldProposalRuns)
+    .where(eq(goldProposalRuns.goldVersionId, goldVersionId))
+    .orderBy(asc(goldProposalRuns.runId));
+  return rows.map((row) => row.runId);
 }
 
 async function industryIdsOf(db: Database, snapshotId: number): Promise<Set<string>> {
