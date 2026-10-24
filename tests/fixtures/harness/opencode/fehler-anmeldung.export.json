@@ -1,0 +1,92 @@
+{
+  "info": {
+    "id": "ses_000000",
+    "projectID": "<entfernt>",
+    "agent": "benchmark",
+    "model": {
+      "id": "deepseek-v4.1-flash-free",
+      "providerID": "opencode",
+      "variant": "default"
+    },
+    "cost": 0,
+    "tokens": {
+      "input": 0,
+      "output": 0,
+      "reasoning": 0,
+      "cache": {
+        "read": 0,
+        "write": 0
+      }
+    },
+    "outcome": "failed",
+    "time": {
+      "created": 1792850322314,
+      "updated": 1792850322991,
+      "idle": 1792850322996
+    },
+    "title": "bm-test",
+    "location": {
+      "directory": "/tmp/benchmark-opencode-XXXXXX/work"
+    }
+  },
+  "messages": [
+    {
+      "id": "msg_000000",
+      "time": {
+        "created": 1792850322350
+      },
+      "type": "agent-switched",
+      "agent": "benchmark",
+      "previous": "benchmark"
+    },
+    {
+      "id": "msg_000000",
+      "time": {
+        "created": 1792850322457
+      },
+      "text": "Antworte nur mit: ok",
+      "files": [],
+      "type": "user"
+    },
+    {
+      "id": "msg_000000",
+      "time": {
+        "created": 1792850322479,
+        "completed": 1792850322991
+      },
+      "type": "assistant",
+      "agent": "benchmark",
+      "model": {
+        "id": "deepseek-v4.1-flash-free",
+        "providerID": "opencode",
+        "variant": "default"
+      },
+      "content": [],
+      "finish": "error",
+      "error": {
+        "type": "provider.auth",
+        "message": "OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.",
+        "status": 403,
+        "response": {
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"FreeTierError\",\"message\":\"OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.\"}}"
+        }
+      }
+    },
+    {
+      "id": "msg_000000",
+      "time": {
+        "created": 1792850322996
+      },
+      "type": "idle",
+      "outcome": "failed",
+      "error": {
+        "type": "provider.auth",
+        "message": "OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.",
+        "status": 403,
+        "response": {
+          "body": "{\"type\":\"error\",\"error\":{\"type\":\"FreeTierError\",\"message\":\"OpenCode's free tier can only be used from within OpenCode. Download it at https://opencode.ai and keep building.\"}}"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "note": "Echte Ausgabe (Erkundung vor dem Adapter): Free-Modell von OpenCode Zen, headless abgelehnt (HTTP 403 provider.auth). Aufgenommen mit temporärem Datenverzeichnis und Agent ohne system-Feld; Ausgaben bereinigt.",
+  "command": "opencode run --standalone --format json --agent benchmark -m opencode/deepseek-v4.1-flash-free --title bm-test",
+  "task": {
+    "unitId": "preflight",
+    "model": "opencode/deepseek-v4.1-flash-free",
+    "effort": "default",
+    "mode": "text_only"
+  },
+  "exitCode": 1,
+  "timedOut": false,
+  "durationMs": 700
+}
