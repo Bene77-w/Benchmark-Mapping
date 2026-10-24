@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
-import { lstat, readdir, readFile, readlink } from "node:fs/promises";
+import { lstat, readdir, readFile, readlink, rm } from "node:fs/promises";
 import path from "node:path";
-import { beforeAll, describe, expect, test } from "vitest";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import type { HarnessTask } from "./adapter";
 import { cliOutcome, scriptedRunner } from "./cli-fixture";
 import { createCodexAdapter } from "./codex";
@@ -16,6 +16,9 @@ import { codexFixture, codexFixtureRunner, fakeAuthHome } from "./codex-fixture"
 let authHome = "";
 beforeAll(async () => {
   authHome = await fakeAuthHome();
+});
+afterAll(async () => {
+  await rm(authHome, { recursive: true, force: true });
 });
 
 async function runFixture(name: string, overrides: Partial<HarnessTask> = {}) {
