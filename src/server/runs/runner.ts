@@ -105,18 +105,68 @@ async function runUnit(
     })
     .where(where);
 
-  let result: HarnessResult;
+  let result = await callAdapter(adapter, task, unitPrompt, prompt);
+  if (RETRYABLE.has(result.outcome.kind)) {
+    await db
+      .update(unitResults)
+      .set({ attempts: sql`${unitResults.attempts} + 1` })
+      .where(where);
+    result = combineAttempts([result, await callAdapter(adapter, task, unitPrompt, prompt)]);
+  }
+  await db.update(unitResults).set(resultColumns(result)).where(where);
+}
+
+/** Fehlerarten, die genau einen Wiederholversuch auslösen; danach zählen sie als Format-Fehler. */
+const RETRYABLE = new Set<HarnessResult["outcome"]["kind"]>(["timeout", "invalid_json", "schema_violation"]);
+
+async function callAdapter(
+  adapter: HarnessAdapter,
+  task: Omit<HarnessTask, "systemPrompt" | "userPrompt" | "outputSchema">,
+  unitPrompt: { systemPrompt: string; userPrompt: string },
+  prompt: BenchmarkPrompt,
+): Promise<HarnessResult> {
   try {
-    result = await adapter.run({
+    return await adapter.run({
       ...task,
       systemPrompt: unitPrompt.systemPrompt,
       userPrompt: unitPrompt.userPrompt,
       outputSchema: prompt.outputSchema,
     });
   } catch (error) {
-    result = adapterFailure(error);
+    return adapterFailure(error);
   }
-  await db.update(unitResults).set(resultColumns(result)).where(where);
+}
+
+/**
+ * Fasst die Versuche einer Unit zusammen: Antwort bzw. Fehlerart und Metadaten des letzten Versuchs; Tokens,
+ * Websuchen, native Kosten und Dauer aller Versuche (bezahlt ist jeder), Protokolle nacheinander.
+ */
+function combineAttempts(attempts: HarnessResult[]): HarnessResult {
+  const last = attempts[attempts.length - 1];
+  const withTokens = attempts.flatMap((attempt) => (attempt.tokens ? [attempt.tokens] : []));
+  return {
+    ...last,
+    log: attempts.map((attempt, index) => `--- Versuch ${index + 1} ---\n${attempt.log}`).join("\n"),
+    tokens:
+      withTokens.length === 0
+        ? null
+        : {
+            inputTokens: sum(withTokens.map((tokens) => tokens.inputTokens)) ?? 0,
+            cacheReadTokens: sum(withTokens.map((tokens) => tokens.cacheReadTokens)) ?? 0,
+            cacheWriteTokens: sum(withTokens.map((tokens) => tokens.cacheWriteTokens)) ?? 0,
+            outputTokens: sum(withTokens.map((tokens) => tokens.outputTokens)) ?? 0,
+            reasoningTokens: sum(withTokens.map((tokens) => tokens.reasoningTokens)),
+          },
+    webSearches: sum(attempts.map((attempt) => attempt.webSearches)),
+    nativeCostUsd: sum(attempts.map((attempt) => attempt.nativeCostUsd)),
+    durationMs: sum(attempts.map((attempt) => attempt.durationMs)) ?? 0,
+  };
+}
+
+/** Summe der bekannten Werte; `null`, wenn keiner bekannt ist. */
+function sum(values: (number | null)[]): number | null {
+  const known = values.filter((value): value is number => value !== null);
+  return known.length === 0 ? null : known.reduce((total, value) => total + value, 0);
 }
 
 function resultColumns(result: HarnessResult): Partial<typeof unitResults.$inferInsert> {
