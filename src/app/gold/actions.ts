@@ -12,6 +12,7 @@ import {
   finalizeGoldDraft,
   removeGoldUnit,
   saveGoldUnitDecision,
+  startGoldDraftFromVersion,
   startProposalRun,
 } from "@/server/gold/store";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
@@ -131,6 +132,20 @@ export async function finalizeAction(_previous: ActionState): Promise<ActionStat
   }
   revalidatePath("/gold", "layout");
   redirect(`/gold/versionen/${label}`);
+}
+
+/** Übernimmt eine eingefrorene Gold-Version als Ausgangspunkt eines neuen Entwurfs. */
+export async function startDraftFromVersionAction(
+  _previous: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  try {
+    await startGoldDraftFromVersion(getDatabase(), z.string().parse(formData.get("label")));
+  } catch (error) {
+    return { error: describe(error) };
+  }
+  revalidatePath("/gold", "layout");
+  redirect("/gold");
 }
 
 function describe(error: unknown): string {

@@ -14,6 +14,8 @@ import {
   MIN_PARALLELISM,
 } from "@/server/runs/model";
 import { listConfigurations, listRuns } from "@/server/runs/store";
+import { listCurrentEvaluations } from "@/server/scoring/current";
+import { ReevaluationStatusLine } from "../gold/reevaluation-status";
 import { restartConfiguration } from "./actions";
 import { configurationLabel, formatDateTime, progressLabel, RUN_STATUS_LABELS } from "./labels";
 import { NewRunForm } from "./new-run-form";
@@ -39,6 +41,10 @@ async function RunsContent() {
     listConfigurations(db),
     listRuns(db),
   ]);
+  const current = gold ? await listCurrentEvaluations(db, gold) : null;
+  const incomplete = new Map(
+    (current?.incomplete ?? []).map((entry) => [entry.run.id, entry.missingUnitIds]),
+  );
 
   return (
     <>
@@ -54,6 +60,17 @@ async function RunsContent() {
           )}{" "}
           Läufe führt der Worker aus (<code>pnpm worker</code>), unabhängig von dieser Seite.
         </p>
+        {current && (
+          <ReevaluationStatusLine
+            status={{
+              goldVersion: current.goldVersion,
+              runs: current.runs.length + current.incomplete.length,
+              evaluated: current.runs.length + current.incomplete.length,
+              complete: current.runs.length,
+              incomplete: current.incomplete.length,
+            }}
+          />
+        )}
         <NewRunForm
           harnesses={AVAILABLE_HARNESSES.map((harness) => ({
             value: harness,
@@ -125,7 +142,15 @@ async function RunsContent() {
                     </Link>
                   </TableCell>
                   <TableCell>{configurationLabel(run.configuration)}</TableCell>
-                  <TableCell>{RUN_STATUS_LABELS[run.status]}</TableCell>
+                  <TableCell>
+                    {RUN_STATUS_LABELS[run.status]}
+                    {incomplete.has(run.id) && (
+                      <span className="ml-2 text-xs text-destructive" data-testid="run-list-incomplete">
+                        unvollständig für {current?.goldVersion} ({incomplete.get(run.id)?.length} Units
+                        fehlen)
+                      </span>
+                    )}
+                  </TableCell>
                   <TableCell>{progressLabel(run.progress)}</TableCell>
                   <TableCell>{formatDateTime(run.createdAt)}</TableCell>
                 </TableRow>

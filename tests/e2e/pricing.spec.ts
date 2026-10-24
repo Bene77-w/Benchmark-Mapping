@@ -23,6 +23,8 @@ async function savePrice(page: Page, price: { input: string; output: string }) {
 test("Preis anlegen und ändern; Lauf zeigt geschätzte und native Kosten, Preisänderung wirkt auf die Anzeige", async ({
   page,
 }) => {
+  // Der Lauf wartet auf den einen Worker, den die Läufe aus runs.spec gleichzeitig belegen.
+  test.setTimeout(90_000);
   await savePrice(page, { input: "1", output: "12" });
 
   await page.goto("/laeufe");

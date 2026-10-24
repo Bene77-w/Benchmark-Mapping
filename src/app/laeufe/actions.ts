@@ -6,7 +6,13 @@ import { z } from "zod";
 import { getDatabase } from "@/server/db/client";
 import { requireActiveGold } from "@/server/gold/active";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
-import { cancelRun, createRun, createRunFromConfiguration, resumeRun } from "@/server/runs/store";
+import {
+  cancelRun,
+  createRun,
+  createRunFromConfiguration,
+  resumeRun,
+  supplementRun,
+} from "@/server/runs/store";
 
 export interface StartRunState {
   error: string | null;
@@ -21,7 +27,7 @@ const formSchema = z.object({
   timeoutMinutes: z.coerce.number().positive(),
 });
 
-/** Legt einen Lauf über die Units des Test-Golds an; der Worker führt ihn aus. */
+/** Legt einen Lauf über die Units der aktuellen Gold-Version an; der Worker führt ihn aus. */
 export async function startRun(_previous: StartRunState, formData: FormData): Promise<StartRunState> {
   let runId: number;
   try {
@@ -62,6 +68,21 @@ export async function cancelRunAction(formData: FormData): Promise<void> {
 export async function resumeRunAction(formData: FormData): Promise<void> {
   const runId = z.coerce.number().int().parse(formData.get("runId"));
   await resumeRun(getDatabase(), runId);
+  revalidatePath(`/laeufe/${runId}`);
+}
+
+/**
+ * Ergänzt einen Lauf mit derselben Konfiguration um die Units der aktuellen Gold-Version, für die er kein
+ * Ergebnis hat; der Worker ruft nur diese auf.
+ */
+export async function supplementRunAction(formData: FormData): Promise<void> {
+  const runId = z.coerce.number().int().parse(formData.get("runId"));
+  const gold = await requireActiveGold(getDatabase());
+  await supplementRun(
+    getDatabase(),
+    runId,
+    gold.units.map((unit) => unit.unitId),
+  );
   revalidatePath(`/laeufe/${runId}`);
 }
 
