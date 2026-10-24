@@ -14,6 +14,7 @@ import {
 import type { Configuration, RunSummary } from "@/server/runs/model";
 import { createRun, listRuns, type PromptRootOption } from "@/server/runs/store";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
+import { readGoldCandidates } from "./candidates";
 import {
   type GoldCategory,
   type GoldIssue,
@@ -67,6 +68,26 @@ export async function addGoldUnit(
       throw new Error(`Das Gold-Set hat bereits ${MAX_GOLD_UNITS} Units (Höchstzahl)`);
     }
   });
+}
+
+/**
+ * Übernimmt die empfohlene 30er-Auswahl der Kandidatenliste in den Entwurf: ergänzt fehlende Units mit ihrer
+ * Kategorie, bis 30 erreicht sind; bereits gewählte Units bleiben unverändert.
+ */
+export async function adoptRecommendedCandidates(
+  db: Database,
+): Promise<{ added: number; skipped: string[] }> {
+  const recommended = (await readGoldCandidates()).filter((candidate) => candidate.recommended);
+  const selected = new Set((await getGoldDraft(db))?.units.map((unit) => unit.unitId) ?? []);
+  const missing = recommended.filter((candidate) => !selected.has(candidate.unitId));
+  const room = Math.max(0, MAX_GOLD_UNITS - selected.size);
+  for (const candidate of missing.slice(0, room)) await addGoldUnit(db, candidate);
+  return { added: Math.min(room, missing.length), skipped: missing.slice(room).map((c) => c.unitId) };
+}
+
+/** Verwirft den Entwurf samt Entscheidungen; Vorschlagsläufe bleiben als Läufe erhalten. */
+export async function discardGoldDraft(db: Database): Promise<void> {
+  await db.delete(goldVersions).where(eq(goldVersions.status, "draft"));
 }
 
 export async function setGoldUnitCategory(
