@@ -162,3 +162,112 @@ describe("web_only je Modus", () => {
     }
   });
 });
+
+describe("Evidence-Prüfung", () => {
+  const JEC: ScoringUnit = {
+    unitId: "u1",
+    unitName: "Joint Economic Committee",
+    kind: "committee_direct",
+    inputBasis: "jurisdiction_text",
+    jurisdictionText:
+      "Matters relating to the “Economic Report” of the President’s Council,\n  including   employment.",
+  };
+  const NAME_ONLY: ScoringUnit = {
+    unitId: "u1",
+    unitName: "Subcommittee on Rail Safety",
+    kind: "subcommittee",
+    inputBasis: "name_only",
+    jurisdictionText: null,
+  };
+
+  function evidenceOf(excerpt: string, options: { mode?: Mode; unit?: ScoringUnit } = {}) {
+    const { mode = "text_only", unit = JEC } = options;
+    const result = evaluateUnit(
+      gold([{ industryId: "a" }]),
+      { kind: "answer", answer: answer([assignment("a", excerpt)]) },
+      { mode, units: [unit] },
+    );
+    return { kinds: result.violations.map((violation) => violation.kind), evidence: result.evidence };
+  }
+
+  test.each([
+    { name: "wörtlich aus dem Zuständigkeitstext", excerpt: "Matters relating to the" },
+    { name: "wörtlich aus dem Namen der Unit", excerpt: "Joint Economic Committee" },
+    { name: "gerade statt typografische Anführungszeichen", excerpt: 'the "Economic Report" of the' },
+    { name: "gerader statt typografischer Apostroph", excerpt: "President's Council" },
+    { name: "Zeilenumbruch und mehrfacher Leerraum", excerpt: "Council, including employment" },
+    { name: "Leerraum am Rand und im Zitat", excerpt: "  of the   President’s\tCouncil " },
+    { name: "zwei Wörter in Anführungszeichen", excerpt: "“Economic Report”" },
+  ])("wörtlich: $name", ({ excerpt }) => {
+    expect(evidenceOf(excerpt)).toEqual({ kinds: [], evidence: { checked: 1, verbatim: 1 } });
+  });
+
+  test("typografische Anführungszeichen im Zitat passen auf gerade im Text", () => {
+    const unit = { ...JEC, jurisdictionText: 'the "Economic Report" and the President\'s Council' };
+    expect(evidenceOf("the „Economic Report“ and the President‘s Council", { unit }).kinds).toEqual([]);
+  });
+
+  test.each([
+    { name: "Paraphrase", excerpt: "matters concerning the Economic Report" },
+    { name: "aus zwei Stellen zusammengesetzt", excerpt: "Economic Report including employment" },
+    { name: "Groß-/Kleinschreibung zählt", excerpt: "matters relating to the" },
+    { name: "aus der Taxonomie statt aus der Quelle", excerpt: "Banks Regional" },
+  ])("nicht wörtlich: $name", ({ excerpt }) => {
+    expect(evidenceOf(excerpt)).toEqual({
+      kinds: ["evidence_not_verbatim"],
+      evidence: { checked: 1, verbatim: 0 },
+    });
+  });
+
+  test.each([
+    { excerpt: "employment", kinds: ["evidence_too_short"], verbatim: 1 },
+    { excerpt: "  “Economic  ", kinds: ["evidence_too_short"], verbatim: 1 },
+    { excerpt: "the “", kinds: ["evidence_too_short"], verbatim: 1 },
+    { excerpt: "banking", kinds: ["evidence_not_verbatim", "evidence_too_short"], verbatim: 0 },
+    { excerpt: "", kinds: ["evidence_not_verbatim", "evidence_too_short"], verbatim: 0 },
+  ])("mindestens zwei Wörter: „$excerpt“ → $kinds", ({ excerpt, kinds, verbatim }) => {
+    expect(evidenceOf(excerpt)).toEqual({ kinds, evidence: { checked: 1, verbatim } });
+  });
+
+  test("name_only: nur der Name der Unit ist Quelle", () => {
+    expect(evidenceOf("Rail Safety", { unit: NAME_ONLY }).kinds).toEqual([]);
+    expect(evidenceOf("Matters relating to the", { unit: NAME_ONLY }).kinds).toEqual([
+      "evidence_not_verbatim",
+    ]);
+  });
+
+  test("Recherche ist nur im Modus mit Web zulässig und zählt nicht als Zitat", () => {
+    expect(evidenceOf("Recherche", { mode: "web" })).toEqual({
+      kinds: [],
+      evidence: { checked: 0, verbatim: 0 },
+    });
+    expect(evidenceOf(" Recherche ", { mode: "web" }).kinds).toEqual([]);
+    expect(evidenceOf("Recherche", { mode: "text_only" })).toEqual({
+      kinds: ["recherche_without_web"],
+      evidence: { checked: 0, verbatim: 0 },
+    });
+  });
+
+  test("Verstöße nennen die betroffene Zuordnung", () => {
+    const result = evaluateUnit(gold([{ industryId: "a" }, { industryId: "b" }]), {
+      kind: "answer",
+      answer: answer([assignment("a"), assignment("b", "aviation")]),
+    });
+    expect(result.violations).toEqual([{ kind: "evidence_too_short", assignmentIndex: 1, industryId: "b" }]);
+  });
+
+  test("Evidence-Treue eines Laufs ist der Anteil wörtlicher an allen geprüften Zitaten", () => {
+    const goldUnits = ["u1", "u2", "u3"].map((unitId) => gold([{ industryId: "a" }], { unitId }));
+    const evaluation = evaluateRun(
+      input(goldUnits, {
+        u1: { kind: "answer", answer: answer([assignment("a"), assignment("b", "civil air travel")]) },
+        u2: { kind: "answer", answer: answer([assignment("a", "Recherche")]) },
+        u3: { kind: "answer", answer: answer([assignment("a", "Subcommittee on Aviation")]) },
+      }),
+    );
+    expect(evaluation.evidenceFidelity).toBeCloseTo(2 / 3, 10);
+    expect(
+      evaluateRun(input(goldUnits, { u1: mapped([]), u2: mapped([]), u3: mapped([]) })).evidenceFidelity,
+    ).toBe(null);
+  });
+});
