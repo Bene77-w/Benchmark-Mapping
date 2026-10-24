@@ -43,3 +43,19 @@ test("isolatedEnv übernimmt nur die Positivliste und Zusätze", () => {
     isolatedEnv({ HOME: "/h", PATH: "/p", DATABASE_URL: "x", CODEX_HOME: "/c" }, ["CODEX_HOME"], { A: "1" }),
   ).toEqual({ HOME: "/h", PATH: "/p", CODEX_HOME: "/c", A: "1" });
 });
+
+test("runCli beendet den Prozess bei Abbruch über das Signal", async () => {
+  const controller = new AbortController();
+  const pending = runCli({
+    cwd: os.tmpdir(),
+    env: { PATH: process.env.PATH },
+    timeoutMs: 30_000,
+    command: process.execPath,
+    args: ["-e", "setTimeout(() => {}, 60000)"],
+    signal: controller.signal,
+  });
+  setTimeout(() => controller.abort(), 100);
+  const outcome = await pending;
+  expect(outcome).toMatchObject({ aborted: true, timedOut: false });
+  expect(outcome.durationMs).toBeLessThan(5_000);
+});

@@ -97,8 +97,6 @@ describe("Preflight vor dem Lauf", { timeout: 30_000 }, () => {
     const run = await getRun(db, runId);
     expect(run?.status).toBe("failed");
     expect(run?.error).toContain("Szenario gibt-es-nicht");
-    expect(run?.preflight?.checks).toEqual([
-      expect.objectContaining({ id: "scenario", status: "failed" }),
-    ]);
+    expect(run?.preflight?.checks).toEqual([expect.objectContaining({ id: "scenario", status: "failed" })]);
   });
 });

@@ -33,6 +33,11 @@ export interface HarnessTask {
   mode: Mode;
   /** Höchstdauer des Aufrufs; der Adapter bricht danach ab und meldet `timeout`. */
   timeoutMs: number;
+  /**
+   * Optionaler Abbruch: echte Adapter beenden dann den CLI-Prozess und melden `harness_error`. Der Runner
+   * entscheidet, ob er ihn setzt (bisher nicht: laufende Units werden beim Abbruch zu Ende geführt).
+   */
+  signal?: AbortSignal;
 }
 
 /**

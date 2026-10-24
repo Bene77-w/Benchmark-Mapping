@@ -33,6 +33,8 @@ test("Lauf mit Fake-Harness starten, bewerten und Konfiguration erneut starten",
   await expect(page.getByTestId("progress-failed")).toHaveText("1");
   await expect(page.getByTestId("progress-running")).toHaveText("0");
   await expect(page.getByTestId("run-score")).toHaveText("0.533");
+  await expect(page.getByTestId("preflight-status")).toHaveText("bestanden");
+  await expect(page.getByTestId("preflight-check")).toContainText("Szenario vorhanden");
   await expect(page.getByTestId("run-interval")).toContainText("Bootstrap-Intervall");
   await expect(page.getByTestId("evaluation-gold")).toHaveText("test-gold");
   await expect(page.getByTestId("run-format-errors")).toHaveText("1");
@@ -104,4 +106,13 @@ test("Lauf live verfolgen, abbrechen und fortsetzen, ohne fertige Units erneut a
   await expect(
     rows.filter({ hasNotText: "house--veterans-affairs--health" }).getByTestId("unit-attempts"),
   ).toHaveText(["1", "1", "1", "1"]);
+});
+
+test("ein fehlgeschlagener Preflight blockiert den Lauf und wird angezeigt", async ({ page }) => {
+  await startFakeRun(page, "gibt-es-nicht", 1);
+  await expect(page.getByTestId("run-status")).toHaveText("nicht ausführbar", { timeout: 20_000 });
+  await expect(page.getByTestId("preflight-status")).toContainText("fehlgeschlagen");
+  await expect(page.getByTestId("preflight-check")).toContainText("Szenario gibt-es-nicht gibt es");
+  await expect(page.getByText("Preflight fehlgeschlagen: Szenario vorhanden")).toBeVisible();
+  await expect(page.getByTestId("progress-pending")).toHaveText("5");
 });

@@ -213,3 +213,13 @@ function flag(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
   return index === -1 ? undefined : args[index + 1];
 }
+
+test("ein abgebrochener Aufruf ist ein Harness-Fehler, das Signal geht an den Prozessstart", async () => {
+  const controller = new AbortController();
+  const runner = scriptedRunner(cliOutcome({ exitCode: null, aborted: true }));
+  const result = await createClaudeCodeAdapter({ runCli: runner, env: {} }).run(
+    task({ signal: controller.signal }),
+  );
+  expect(runner.calls[0].signal).toBe(controller.signal);
+  expect(result.outcome).toEqual({ kind: "harness_error", message: "Aufruf abgebrochen" });
+});
