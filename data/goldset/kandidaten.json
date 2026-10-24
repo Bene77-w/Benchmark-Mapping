@@ -1,0 +1,348 @@
+{
+  "source": "docs/goldset/kandidaten.md (Stand 2026-10-23)",
+  "note": "Hilfe für die Auswahl in der App, keine feste Auswahl. recommended = Empfehlung: 30er-Auswahl (B1 ohne Senats-Paar).",
+  "candidates": [
+    {
+      "code": "A1",
+      "unitId": "house--energy-and-commerce--health",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A2",
+      "unitId": "house--financial-services--housing-and-insurance",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A3",
+      "unitId": "senate--energy-and-natural-resources--public-lands-forests-and-mining",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A4",
+      "unitId": "house--energy-and-commerce--commerce-manufacturing-and-trade",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A5",
+      "unitId": "house--energy-and-commerce--environment",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A6",
+      "unitId": "house--financial-services--digital-assets-financial-technology-and-artificial-intelligence",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A7",
+      "unitId": "senate--appropriations--financial-services-and-general-government",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A8",
+      "unitId": "house--appropriations--labor-health-and-human-services-education-and-related-agencies",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A9",
+      "unitId": "house--transportation-and-infrastructure--highways-and-transit",
+      "category": "a",
+      "recommended": true
+    },
+    {
+      "code": "A10",
+      "unitId": "house--homeland-security--transportation-and-maritime-security",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A11",
+      "unitId": "senate--commerce-science-and-transportation--surface-transportation-freight-pipelines-and-safety",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A12",
+      "unitId": "house--oversight-and-government-reform--health-care-and-financial-services",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "A13",
+      "unitId": "house--appropriations--energy-and-water-development-and-related-agencies",
+      "category": "a",
+      "recommended": false
+    },
+    {
+      "code": "B1",
+      "unitId": "house--appropriations--defense",
+      "category": "b",
+      "recommended": true
+    },
+    {
+      "code": "B2",
+      "unitId": "senate--banking-housing-and-urban-affairs--financial-institutions-and-consumer-protection",
+      "category": "b",
+      "recommended": false
+    },
+    {
+      "code": "B3",
+      "unitId": "house--transportation-and-infrastructure--railroads-pipelines-and-hazardous-materials",
+      "category": "b",
+      "recommended": true
+    },
+    {
+      "code": "B4",
+      "unitId": "senate--armed-services--airland",
+      "category": "b",
+      "recommended": false
+    },
+    {
+      "code": "B5",
+      "unitId": "senate--agriculture-nutrition-and-forestry--livestock-dairy-poultry-and-food-safety",
+      "category": "b",
+      "recommended": false
+    },
+    {
+      "code": "C1",
+      "unitId": "house--rules--legislative-and-budget-process",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C2",
+      "unitId": "house--foreign-affairs--africa",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C3",
+      "unitId": "senate--indian-affairs",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C4",
+      "unitId": "house--strategic-competition-between-the-united-states-and-the-chinese-communist-party",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "C5",
+      "unitId": "joint--printing",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C6",
+      "unitId": "house--ways-and-means--social-security",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "C7",
+      "unitId": "senate--special-committee-on-aging",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C8",
+      "unitId": "house--energy-and-commerce--oversight-and-investigations",
+      "category": "c",
+      "recommended": true
+    },
+    {
+      "code": "C9",
+      "unitId": "house--small-business--economic-growth-tax-and-capital-access",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "C10",
+      "unitId": "senate--foreign-relations--state-department-and-usaid-management-international-operations-and-bilateral-international-development",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "C11",
+      "unitId": "house--judiciary--administrative-state-regulatory-reform-and-antitrust",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "C12",
+      "unitId": "house--appropriations--legislative-branch",
+      "category": "c",
+      "recommended": false
+    },
+    {
+      "code": "D1",
+      "unitId": "house--agriculture",
+      "category": "d",
+      "recommended": true
+    },
+    {
+      "code": "D2",
+      "unitId": "house--energy-and-commerce",
+      "category": "d",
+      "recommended": true
+    },
+    {
+      "code": "D3",
+      "unitId": "house--foreign-affairs",
+      "category": "d",
+      "recommended": true
+    },
+    {
+      "code": "D4",
+      "unitId": "senate--health-education-labor-and-pensions",
+      "category": "d",
+      "recommended": false
+    },
+    {
+      "code": "D5",
+      "unitId": "senate--veterans-affairs",
+      "category": "d",
+      "recommended": true
+    },
+    {
+      "code": "D6",
+      "unitId": "senate--appropriations",
+      "category": "d",
+      "recommended": false
+    },
+    {
+      "code": "D7",
+      "unitId": "senate--finance",
+      "category": "d",
+      "recommended": false
+    },
+    {
+      "code": "E1",
+      "unitId": "senate--finance--health-care",
+      "category": "e",
+      "recommended": true
+    },
+    {
+      "code": "E2",
+      "unitId": "senate--finance--taxation-and-irs-oversight",
+      "category": "e",
+      "recommended": true
+    },
+    {
+      "code": "E3",
+      "unitId": "senate--finance--energy-natural-resources-and-infrastructure",
+      "category": "e",
+      "recommended": false
+    },
+    {
+      "code": "E4",
+      "unitId": "senate--homeland-security-and-governmental-affairs--border-management-federal-workforce-and-regulatory-affairs",
+      "category": "e",
+      "recommended": false
+    },
+    {
+      "code": "E5",
+      "unitId": "senate--finance--fiscal-responsibility-and-economic-growth",
+      "category": "e",
+      "recommended": false
+    },
+    {
+      "code": "F1",
+      "unitId": "house--agriculture--conservation-research-and-biotechnology",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F2",
+      "unitId": "senate--agriculture-nutrition-and-forestry--conservation-forestry-natural-resources-and-biotechnology",
+      "category": "f",
+      "recommended": false
+    },
+    {
+      "code": "F3",
+      "unitId": "house--science-space-and-technology--research-and-technology",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F4",
+      "unitId": "house--veterans-affairs--disability-assistance-and-memorial-affairs",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F5",
+      "unitId": "senate--commerce-science-and-transportation--science-manufacturing-and-competitiveness",
+      "category": "f",
+      "recommended": false
+    },
+    {
+      "code": "F6",
+      "unitId": "senate--judiciary--crime-and-counterterrorism",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F7",
+      "unitId": "house--financial-services--national-security-illicit-finance-and-international-financial-institutions",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F8",
+      "unitId": "senate--banking-housing-and-urban-affairs--national-security-and-international-trade-and-finance",
+      "category": "f",
+      "recommended": false
+    },
+    {
+      "code": "F9",
+      "unitId": "senate--environment-and-public-works--fisheries-wildlife-and-water",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F10",
+      "unitId": "house--natural-resources--water-wildlife-and-fisheries",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F11",
+      "unitId": "house--agriculture--general-farm-commodities-risk-management-and-credit",
+      "category": "f",
+      "recommended": false
+    },
+    {
+      "code": "F12",
+      "unitId": "senate--armed-services--personnel",
+      "category": "f",
+      "recommended": false
+    },
+    {
+      "code": "F13",
+      "unitId": "house--judiciary--courts-intellectual-property-artificial-intelligence-and-the-internet",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F14",
+      "unitId": "senate--environment-and-public-works--chemical-safety-waste-management-environmental-justice-and-regulatory-oversight",
+      "category": "f",
+      "recommended": true
+    },
+    {
+      "code": "F15",
+      "unitId": "house--armed-services--seapower-and-projection-forces",
+      "category": "f",
+      "recommended": true
+    }
+  ]
+}

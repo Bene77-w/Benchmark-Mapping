@@ -8,10 +8,13 @@ import { createRun, getRun, listEvaluationRuns } from "@/server/runs/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
+import { readGoldCandidates } from "./candidates";
 import { GoldValidationError } from "./model";
 import {
   addGoldUnit,
+  adoptRecommendedCandidates,
   checkGoldDraft,
+  discardGoldDraft,
   finalizeGoldDraft,
   getGoldDraft,
   getGoldProposalRuns,
@@ -299,5 +302,38 @@ describe("Auswertung", { timeout: 30_000 }, () => {
     while ((await processNextRun(db, { adapters })) !== null) {}
     expect((await getRun(db, proposalRun.runId))?.status).toBe("completed");
     expect((await listEvaluationRuns(db)).map((run) => run.id)).toEqual([benchmarkRun.runId]);
+  });
+});
+
+describe("Kandidatenliste als Hilfe", { timeout: 30_000 }, () => {
+  test("alle Kandidaten gibt es im Snapshot; die Empfehlung umfasst 30 Units", async () => {
+    const candidates = await readGoldCandidates();
+    const known = new Set(snapshot.units.map((unit) => unit.unitId));
+    expect(candidates.length).toBe(57);
+    expect(candidates.filter((candidate) => !known.has(candidate.unitId))).toEqual([]);
+    expect(candidates.filter((candidate) => candidate.recommended)).toHaveLength(30);
+    expect(candidates.find((candidate) => candidate.code === "C5")).toEqual({
+      code: "C5",
+      unitId: "joint--printing",
+      category: "c",
+      recommended: true,
+    });
+  });
+
+  test("die Empfehlung ergänzt den Entwurf bis 30 Units, ohne gewählte Units zu ändern; Verwerfen leert ihn", async () => {
+    const db = await databaseWithSnapshot();
+    await addGoldUnit(db, { unitId: "joint--printing", category: "f" });
+    await addGoldUnit(db, { unitId: AVIATION, category: "a" });
+
+    const { added, skipped } = await adoptRecommendedCandidates(db);
+    expect(added).toBe(28);
+    expect(skipped).toHaveLength(1);
+    const draft = await getGoldDraft(db);
+    expect(draft?.units).toHaveLength(30);
+    expect(draft?.units.find((unit) => unit.unitId === "joint--printing")?.category).toBe("f");
+    expect(draft?.units.find((unit) => unit.unitId === "senate--indian-affairs")?.category).toBe("c");
+
+    await discardGoldDraft(db);
+    expect(await getGoldDraft(db)).toBeNull();
   });
 });
