@@ -112,20 +112,20 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
     .where(and(eq(unitResults.runId, runId), eq(unitResults.status, "pending")))
     .orderBy(asc(unitResults.unitId));
   const stop = new AbortController();
-  const ownRun = and(eq(runs.id, runId), eq(runs.status, "running"), eq(runs.claimId, claimId));
+  const ownRun = and(eq(runs.id, runId), eq(runs.claimId, claimId));
   /**
-   * Schreibt das Lebenszeichen. Läuft der Lauf nicht mehr (abgebrochen) oder hat ihn ein anderer Worker
-   * übernommen, endet die Ausführung.
+   * Schreibt das Lebenszeichen und meldet den Zustand: `active`, `cancelled` (abgebrochen) oder `lost` (ein
+   * anderer Worker hat den Lauf übernommen). Außer bei `active` endet auch ein Warten bei Ratenlimit.
    */
-  const heartbeat = async (): Promise<boolean> => {
-    if (stop.signal.aborted) return false;
-    const [alive] = await db
+  const heartbeat = async (): Promise<RunState> => {
+    const [row] = await db
       .update(runs)
       .set({ heartbeatAt: new Date() })
       .where(ownRun)
-      .returning({ id: runs.id });
-    if (!alive) stop.abort();
-    return Boolean(alive);
+      .returning({ status: runs.status });
+    const state: RunState = !row ? "lost" : row.status === "running" ? "active" : "cancelled";
+    if (state !== "active") stop.abort();
+    return state;
   };
   const timer = setInterval(() => void heartbeat().catch(() => {}), deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS);
   const context: RunContext = {
@@ -140,7 +140,7 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
       timeoutMs: run.timeoutMs,
     },
     timeoutGraceMs: deps.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS,
-    proceed: heartbeat,
+    state: heartbeat,
     rateLimit: new RateLimitWait({
       intervalMs: deps.rateLimitRetryMs ?? DEFAULT_RATE_LIMIT_RETRY_MS,
       signal: stop.signal,
@@ -168,6 +168,8 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
   }
 }
 
+type RunState = "active" | "cancelled" | "lost";
+
 /** Was alle Units eines Laufs gemeinsam haben. */
 interface RunContext {
   db: Database;
@@ -176,8 +178,8 @@ interface RunContext {
   prompt: BenchmarkPrompt;
   task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
   timeoutGraceMs: number;
-  /** Vor jedem Aufruf: `false`, wenn der Lauf abgebrochen wurde und keine Aufrufe mehr starten dürfen. */
-  proceed: () => Promise<boolean>;
+  /** Zustand des Laufs vor jedem Aufruf (schreibt zugleich das Lebenszeichen). */
+  state: () => Promise<RunState>;
   rateLimit: RateLimitWait;
 }
 
@@ -203,8 +205,14 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     userPrompt: unitPrompt.userPrompt,
     outputSchema: prompt.outputSchema,
   };
+  const attempts: HarnessResult[] = [];
+  /**
+   * Ein Aufruf, sofern der Lauf noch läuft (`null` sonst). Den Wiederholversuch einer begonnenen Unit führt
+   * auch ein abgebrochener Lauf noch aus; nur ein übernommener nicht.
+   */
   const call = async (): Promise<HarnessResult | null> => {
-    if (!(await context.proceed())) return null;
+    const state = await context.state();
+    if (state === "lost" || (state === "cancelled" && attempts.length === 0)) return null;
     await db
       .update(unitResults)
       .set({ status: "running", startedAt: new Date(), unitPromptHash: unitPrompt.unitPromptHash })
@@ -212,18 +220,17 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     return callAdapter(context, task);
   };
 
-  const attempts: HarnessResult[] = [];
   for (;;) {
     await rateLimit.whenOpen();
     let result = await call();
     if (result?.outcome.kind === "rate_limit") {
       await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       result = await rateLimit.represent(call);
-      if (!result && !(await context.proceed())) return;
+      if (!result && (await context.state()) !== "active") return;
       if (!result) continue;
     }
     if (!result) {
-      // Abgebrochen: die Unit bleibt bzw. wird wieder offen (ein erster Fehlversuch verfällt).
+      // Abgebrochen oder übernommen: die Unit bleibt bzw. wird wieder offen.
       await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       return;
     }

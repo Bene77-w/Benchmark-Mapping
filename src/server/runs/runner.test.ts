@@ -586,6 +586,35 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     expect(await listEvaluations(db, runId)).toMatchObject([{ goldVersion: gold.version, complete: true }]);
   });
 
+  test("eine beim Abbruch laufende Unit wird mit ihrem Wiederholversuch zu Ende geführt", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("abbruch", {
+      "house--ethics": {
+        calls: [{ response: "kein JSON", delayMs: 300 }, { response: noMappingAnswer("house--ethics") }],
+      },
+      "joint--joint-economic-committee": { response: noMappingAnswer("joint--joint-economic-committee") },
+    });
+    const adapter = countingAdapter(createFakeAdapter({ root }));
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "abbruch" },
+      parallelism: 1,
+      unitIds: ["house--ethics", "joint--joint-economic-committee"],
+    });
+
+    const processing = processNextRun(db, { adapters: { fake: adapter } });
+    await expect.poll(async () => (await getRun(db, runId))?.progress.running).toBe(1);
+    await cancelRun(db, runId);
+    await processing;
+
+    const run = await getRun(db, runId);
+    expect(run?.status).toBe("cancelled");
+    expect(run?.units).toMatchObject([
+      { unitId: "house--ethics", status: "done", attempts: 2 },
+      { unitId: "joint--joint-economic-committee", status: "pending", attempts: 0 },
+    ]);
+    expect(adapter.calls).toEqual(["house--ethics", "house--ethics"]);
+  });
+
   test("nur wartende oder laufende Läufe lassen sich abbrechen, nur abgebrochene fortsetzen", async () => {
     const db = await databaseWithSnapshot();
     const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: ["house--ethics"] });
