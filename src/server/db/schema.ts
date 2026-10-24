@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  type AnyPgColumn,
   boolean,
   date,
   doublePrecision,
@@ -185,7 +186,8 @@ export const unitResults = pgTable(
 
 /**
  * Gold-Version: höchstens ein Entwurf (`draft`, ohne Label), den die Gold-Review bearbeitet; der Abschluss
- * friert ihn als `gold-vN` ein (`frozen`, danach unveränderlich). Bezieht sich auf einen Snapshot.
+ * friert ihn als `gold-vN` ein (`frozen`, danach unveränderlich). Bezieht sich auf einen Snapshot. Ein Entwurf kann
+ * eine bestehende Gold-Version als Ausgangspunkt übernehmen (`baseVersionId`).
  */
 export const goldVersions = pgTable(
   "gold_versions",
@@ -197,6 +199,8 @@ export const goldVersions = pgTable(
       .notNull()
       .references(() => snapshots.id),
     snapshotHash: text("snapshot_hash").notNull(),
+    /** Gold-Version, die als Ausgangspunkt übernommen wurde; `null` bei einem Entwurf von Grund auf. */
+    baseVersionId: integer("base_version_id").references((): AnyPgColumn => goldVersions.id),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     frozenAt: timestamp("frozen_at", { withTimezone: true }),
   },

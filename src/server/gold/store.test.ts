@@ -24,6 +24,7 @@ import {
   removeGoldUnit,
   saveGoldUnitDecision,
   setGoldUnitCategory,
+  startGoldDraftFromVersion,
   startProposalRun,
 } from "./store";
 
@@ -335,5 +336,69 @@ describe("Kandidatenliste als Hilfe", { timeout: 30_000 }, () => {
 
     await discardGoldDraft(db);
     expect(await getGoldDraft(db)).toBeNull();
+  });
+});
+
+describe("Gold-Version als Ausgangspunkt", { timeout: 30_000 }, () => {
+  async function withGoldV1(): Promise<Database> {
+    const db = await databaseWithSnapshot();
+    await addGoldUnit(db, { unitId: AVIATION, category: "f" });
+    await addGoldUnit(db, { unitId: ETHICS, category: "c" });
+    await saveGoldUnitDecision(db, ETHICS, {
+      category: "c",
+      noMapping: true,
+      note: "keine Industry",
+      industries: [],
+    });
+    await saveGoldUnitDecision(db, AVIATION, {
+      category: "f",
+      noMapping: false,
+      note: null,
+      industries: [
+        { industryId: "airlines", class: "positiv", webOnly: false },
+        { industryId: "aerospace-defense", class: "vertretbar", webOnly: true },
+      ],
+    });
+    await finalizeGoldDraft(db);
+    return db;
+  }
+
+  test("übernimmt eine bestehende Version als Entwurf und schließt Änderungen als neue Version ab", async () => {
+    const db = await withGoldV1();
+    const v1 = await getGoldVersion(db, "gold-v1");
+
+    const draft = await startGoldDraftFromVersion(db, "gold-v1");
+    expect(draft).toMatchObject({ status: "draft", label: null, baseLabel: "gold-v1" });
+    expect(draft.units).toEqual(v1?.units);
+    // Unverändert entsteht keine neue Gold-Version.
+    expect((await checkGoldDraft(db)).map((issue) => issue.kind)).toEqual(["unchanged"]);
+
+    await saveGoldUnitDecision(db, AVIATION, {
+      category: "f",
+      noMapping: false,
+      note: null,
+      industries: [
+        { industryId: "airlines", class: "positiv", webOnly: false },
+        { industryId: "aerospace-defense", class: "positiv", webOnly: true },
+      ],
+    });
+    expect(await checkGoldDraft(db)).toEqual([]);
+    expect((await finalizeGoldDraft(db)).label).toBe("gold-v2");
+
+    const v2 = await getGoldVersion(db, "gold-v2");
+    expect(v2?.baseLabel).toBe("gold-v1");
+    expect(v2?.units.find((unit) => unit.unitId === AVIATION)?.industries).toEqual([
+      { industryId: "aerospace-defense", class: "positiv", webOnly: true },
+      { industryId: "airlines", class: "positiv", webOnly: false },
+    ]);
+    expect(await getGoldVersion(db, "gold-v1")).toEqual(v1);
+    expect((await getLatestGoldVersion(db))?.label).toBe("gold-v2");
+  });
+
+  test("solange ein Entwurf besteht, lässt sich keine Version übernehmen; unbekannte Versionen sind ein Fehler", async () => {
+    const db = await withGoldV1();
+    await expect(startGoldDraftFromVersion(db, "gold-v9")).rejects.toThrow(/gold-v9/);
+    await startGoldDraftFromVersion(db, "gold-v1");
+    await expect(startGoldDraftFromVersion(db, "gold-v1")).rejects.toThrow(/Entwurf/);
   });
 });

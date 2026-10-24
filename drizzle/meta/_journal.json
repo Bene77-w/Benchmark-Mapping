@@ -50,6 +50,13 @@
       "when": 1792827801046,
       "tag": "0006_gold",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792851810579,
+      "tag": "0007_gold_ausgangspunkt",
+      "breakpoints": true
     }
   ]
 }
