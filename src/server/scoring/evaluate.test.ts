@@ -271,3 +271,98 @@ describe("Evidence-Prüfung", () => {
     ).toBe(null);
   });
 });
+
+describe("Regelverstöße", () => {
+  const ids = (count: number) => TAXONOMY.slice(0, count).map((id) => assignment(id));
+  const broad = { broad_scope_exception: true, broad_scope_reason: "Mehrere getrennte Kernzuständigkeiten." };
+
+  function kindsOf(outcomeAnswer: UnitAnswer, unit: Partial<ScoringUnit> = {}, mode: Mode = "text_only") {
+    const result = evaluateUnit(
+      gold([{ industryId: "a" }]),
+      { kind: "answer", answer: outcomeAnswer },
+      { mode, units: [{ ...UNIT, ...unit }] },
+    );
+    return result.violations.map((violation) => violation.kind);
+  }
+
+  test.each([
+    { name: "2 ohne Broad Scope", answer: answer(ids(2)), kinds: [] },
+    { name: "3 ohne Broad Scope", answer: answer(ids(3)), kinds: ["too_many_assignments"] },
+    { name: "3 mit Broad Scope", answer: answer(ids(3), broad), kinds: [] },
+    { name: "5 mit Broad Scope", answer: answer(ids(5), broad), kinds: [] },
+    { name: "6 mit Broad Scope", answer: answer(ids(6), broad), kinds: ["too_many_assignments"] },
+  ])("Anzahl bei Subcommittee mit Text: $name → $kinds", ({ answer: given, kinds }) => {
+    expect(kindsOf(given)).toEqual(kinds);
+  });
+
+  test.each([
+    { kind: "committee_parent_core", inputBasis: "jurisdiction_text" },
+    { kind: "subcommittee", inputBasis: "name_only" },
+  ] as const)("höchstens 2 Zuordnungen bei $kind/$inputBasis, auch mit Broad Scope", (unit) => {
+    const sourceUnit = { ...unit, unitName: "civil aviation", jurisdictionText: null };
+    const textUnit = unit.inputBasis === "name_only" ? sourceUnit : { ...unit };
+    expect(kindsOf(answer(ids(2)), textUnit)).toEqual([]);
+    expect(kindsOf(answer(ids(3), broad), textUnit)).toEqual(["too_many_assignments"]);
+  });
+
+  test.each([
+    { reason: null, kinds: ["broad_scope_without_reason"] },
+    { reason: "  ", kinds: ["broad_scope_without_reason"] },
+    { reason: "Mehrere Kernzuständigkeiten.", kinds: [] },
+  ])("Broad Scope mit Begründung $reason → $kinds", ({ reason, kinds }) => {
+    expect(kindsOf(answer(ids(3), { broad_scope_exception: true, broad_scope_reason: reason }))).toEqual(
+      kinds,
+    );
+  });
+
+  test.each([
+    {
+      name: "mapped ohne Zuordnungen",
+      answer: answer([], { decision: "mapped" }),
+      kinds: ["decision_contradiction"],
+    },
+    {
+      name: "no_mapping mit Zuordnungen",
+      answer: answer(ids(1), { decision: "no_mapping" }),
+      kinds: ["decision_contradiction"],
+    },
+    { name: "mapped mit Zuordnungen", answer: answer(ids(1)), kinds: [] },
+    { name: "no_mapping ohne Zuordnungen", answer: answer([]), kinds: [] },
+  ])("Widerspruch decision/assignments: $name", ({ answer: given, kinds }) => {
+    expect(kindsOf(given)).toEqual(kinds);
+  });
+
+  test("unbekannte industry_id wird je Zuordnung gezählt und zählt als falsch genannt", () => {
+    const result = evaluateUnit(gold([{ industryId: "a" }]), mapped(["a", "erfunden", "Airlines"]));
+    expect(result.violations.filter((violation) => violation.kind === "unknown_industry_id")).toEqual([
+      { kind: "unknown_industry_id", assignmentIndex: 1, industryId: "erfunden" },
+      { kind: "unknown_industry_id", assignmentIndex: 2, industryId: "Airlines" },
+    ]);
+    expect(result.score).toBeCloseTo(0.5, 10);
+  });
+
+  test("Regelverstöße werden je Lauf einzeln nach Art gezählt; Format-Fehler sind keine Regelverstöße", () => {
+    const goldUnits = ["u1", "u2", "u3", "u4"].map((unitId) => gold([{ industryId: "a" }], { unitId }));
+    const evaluation = evaluateRun(
+      input(goldUnits, {
+        u1: { kind: "answer", answer: answer([assignment("a", "aviation"), assignment("x", "airplanes")]) },
+        u2: {
+          kind: "answer",
+          answer: answer(ids(3), { broad_scope_exception: true, broad_scope_reason: null }),
+        },
+        u3: { kind: "answer", answer: answer([assignment("a", "Recherche")], { decision: "no_mapping" }) },
+        u4: { kind: "failed", errorKind: "invalid_json" },
+      }),
+    );
+    expect(evaluation.violations).toEqual({
+      evidence_not_verbatim: 1,
+      evidence_too_short: 2,
+      too_many_assignments: 0,
+      broad_scope_without_reason: 1,
+      recherche_without_web: 1,
+      decision_contradiction: 1,
+      unknown_industry_id: 1,
+    });
+    expect(evaluation.formatErrors).toBe(1);
+  });
+});

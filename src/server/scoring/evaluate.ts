@@ -22,7 +22,12 @@ import {
 interface Context {
   mode: Mode;
   units: ReadonlyMap<string, ScoringUnit>;
+  industryIds: ReadonlySet<string>;
 }
+
+/** Normalfall höchstens 2 Zuordnungen; 3 bis 5 nur mit Broad-Scope-Ausnahme, nie mehr als 5. */
+const NORMAL_LIMIT = 2;
+const BROAD_SCOPE_LIMIT = 5;
 
 /**
  * Vollständige Bewertung eines Laufs gegen eine Gold-Version (reine Funktion, deterministisch).
@@ -34,6 +39,7 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
   const context: Context = {
     mode: input.mode,
     units: new Map(input.units.map((unit) => [unit.unitId, unit])),
+    industryIds: new Set(input.industryIds),
   };
   const goldUnits = [...input.gold.units].sort((a, b) => compareIds(a.unitId, b.unitId));
   const units = goldUnits.map((goldUnit) =>
@@ -120,9 +126,18 @@ function checkRules(
 ): Pick<UnitEvaluation, "violations" | "evidence"> {
   const violations: Violation[] = [];
   const evidence = { checked: 0, verbatim: 0 };
+  const count = answer.assignments.length;
+  const addForAnswer = (kind: ViolationKind) =>
+    violations.push({ kind, assignmentIndex: null, industryId: null });
+  if ((answer.decision === "mapped") !== count > 0) addForAnswer("decision_contradiction");
+  if (count > assignmentLimit(answer, unit)) addForAnswer("too_many_assignments");
+  if (answer.broad_scope_exception && !answer.broad_scope_reason?.trim()) {
+    addForAnswer("broad_scope_without_reason");
+  }
   answer.assignments.forEach((entry, assignmentIndex) => {
     const add = (kind: ViolationKind) =>
       violations.push({ kind, assignmentIndex, industryId: entry.industry_id });
+    if (!context.industryIds.has(entry.industry_id)) add("unknown_industry_id");
     if (isRecherche(entry.evidence_excerpt)) {
       if (context.mode !== "web") add("recherche_without_web");
       return;
@@ -133,6 +148,12 @@ function checkRules(
     if (wordCount(entry.evidence_excerpt) < 2) add("evidence_too_short");
   });
   return { violations, evidence };
+}
+
+/** committee_parent_core und name_only: höchstens 2, auch mit Broad-Scope-Ausnahme. */
+function assignmentLimit(answer: UnitAnswer, unit: ScoringUnit): number {
+  if (unit.kind === "committee_parent_core" || unit.inputBasis === "name_only") return NORMAL_LIMIT;
+  return answer.broad_scope_exception ? BROAD_SCOPE_LIMIT : NORMAL_LIMIT;
 }
 
 function effectiveClass(goldClass: GoldClass, webOnly: boolean, mode: Mode): GoldClass {
