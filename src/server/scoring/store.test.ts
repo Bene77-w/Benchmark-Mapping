@@ -25,14 +25,30 @@ beforeAll(async () => {
   testGold = await readTestGold();
 });
 
-async function completedRun(): Promise<{ db: Database; runId: number }> {
-  const db = await createTestDatabase();
-  await loadSnapshot(db, snapshot);
+// Eine Test-Datenbank mit vollem Snapshot für alle Fälle (weniger Last im Parallelbetrieb); jeder Fall legt
+// seinen eigenen Lauf an.
+let shared: Promise<Database> | undefined;
+function database(): Promise<Database> {
+  shared ??= (async () => {
+    const db = await createTestDatabase();
+    await loadSnapshot(db, snapshot);
+    return db;
+  })();
+  return shared;
+}
+
+async function queuedRun(): Promise<{ db: Database; runId: number }> {
+  const db = await database();
   const { runId } = await createRun(db, {
     configuration: fakeConfiguration,
     unitIds: testGold.units.map((unit) => unit.unitId),
   });
-  await processNextRun(db, { adapters: { fake: createFakeAdapter() } });
+  return { db, runId };
+}
+
+async function completedRun(): Promise<{ db: Database; runId: number }> {
+  const { db, runId } = await queuedRun();
+  expect(await processNextRun(db, { adapters: { fake: createFakeAdapter() } })).toBe(runId);
   return { db, runId };
 }
 
@@ -113,12 +129,7 @@ describe("Bewertung speichern", { timeout: 30_000 }, () => {
   });
 
   test("ein noch nicht abgeschlossener Lauf wird bewertet, aber nicht gespeichert", async () => {
-    const db = await createTestDatabase();
-    await loadSnapshot(db, snapshot);
-    const { runId } = await createRun(db, {
-      configuration: fakeConfiguration,
-      unitIds: testGold.units.map((unit) => unit.unitId),
-    });
+    const { db, runId } = await queuedRun();
 
     const evaluation = await ensureEvaluation(db, runId, testGold);
     expect(evaluation).toMatchObject({ complete: false, score: null });
