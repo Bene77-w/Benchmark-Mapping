@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { estimateRunCost, estimateUnitCost, type PriceTable } from "./cost";
+import { estimateRunCost, estimateUnitCost, nativeCostOf, type PriceTable } from "./cost";
 
 /**
  * Seam 2 – Kostenfunktion: Tokens + Websuchen + Preistabelle (gültig zum Laufdatum) → geschätzte Kosten
@@ -201,6 +201,16 @@ describe("Kosten eines Laufs", () => {
     expect(costs.units.c).toMatchObject({ kind: "unknown" });
     expect(costs.estimated).toMatchObject({ kind: "unknown", knownUsd: 1, unknownUnits: 2 });
     expect(costs.native).toEqual({ usd: 0.9, unitsWithout: 2 });
+  });
+
+  test("native 0 bei fehlgeschlagener Unit gilt als keine Angabe; bei fertiger Unit bleibt 0 ein Wert", () => {
+    const costs = estimateRunCost(
+      run([unit("a", "done", million, 0), unit("b", "failed", null, 0), unit("c", "failed", million, 0.2)]),
+      prices,
+    );
+    expect(costs.native).toEqual({ usd: 0.2, unitsWithout: 1 });
+    expect(nativeCostOf({ status: "failed", nativeCostUsd: 0 })).toBeNull();
+    expect(nativeCostOf({ status: "done", nativeCostUsd: 0 })).toBe(0);
   });
 
   test("ohne Preis fürs Modell sind alle Units unbekannt; ohne native Angaben bleibt die native Summe leer", () => {

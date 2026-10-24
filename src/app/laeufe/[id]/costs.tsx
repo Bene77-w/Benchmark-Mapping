@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CostEstimate, RunCosts } from "@/server/pricing/cost";
+import { type CostEstimate, nativeCostOf, type RunCosts } from "@/server/pricing/cost";
 import { formatUsd } from "@/server/pricing/format";
 
 /** Kennzeichnung aller geschätzten Kosten. */
@@ -46,6 +46,7 @@ export function unitCostLabel(cost: CostEstimate | null | undefined): string {
   return cost.kind === "estimated" ? formatUsd(cost.usd) : "unbekannt";
 }
 
-export function nativeCostLabel(usd: number | null): string {
+export function nativeCostLabel(unit: Parameters<typeof nativeCostOf>[0]): string {
+  const usd = nativeCostOf(unit);
   return usd === null ? "–" : formatUsd(usd);
 }
