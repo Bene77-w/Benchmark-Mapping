@@ -7,8 +7,14 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { readGoldCandidates } from "@/server/gold/candidates";
-import { GOLD_CATEGORIES, GOLD_CATEGORY_LABELS, MAX_GOLD_UNITS } from "@/server/gold/model";
-import { checkGoldDraft, getGoldDraft, getGoldProposalRuns, listGoldVersions } from "@/server/gold/store";
+import { GOLD_CATEGORIES, GOLD_CATEGORY_LABELS, MAX_GOLD_UNITS, toScoringGold } from "@/server/gold/model";
+import {
+  checkGoldDraft,
+  getGoldDraft,
+  getGoldProposalRuns,
+  getLatestGoldVersion,
+  listGoldVersions,
+} from "@/server/gold/store";
 import { HARNESS_LABELS } from "@/server/harness/adapter";
 import { AVAILABLE_HARNESSES } from "@/server/harness/registry";
 import {
@@ -17,6 +23,7 @@ import {
   MAX_PARALLELISM,
   MIN_PARALLELISM,
 } from "@/server/runs/model";
+import { reevaluateAllRuns } from "@/server/scoring/current";
 import { searchUnits } from "@/server/snapshot/store";
 import { AutoRefresh } from "../laeufe/[id]/auto-refresh";
 import { configurationLabel, formatDateTime, progressLabel, RUN_STATUS_LABELS } from "../laeufe/labels";
@@ -27,9 +34,11 @@ import {
   discardDraftAction,
   finalizeAction,
   removeUnitAction,
+  startDraftFromVersionAction,
   startProposalRunAction,
 } from "./actions";
 import { decisionLabel, selectClass } from "./labels";
+import { ReevaluationStatusLine } from "./reevaluation-status";
 
 export const metadata = { title: "Gold – Benchmark-Mapping" };
 
@@ -47,14 +56,17 @@ export default function GoldPage() {
 async function GoldContent() {
   await connection();
   const db = getDatabase();
-  const [draft, issues, proposalRuns, versions, units, candidates] = await Promise.all([
+  const [draft, issues, proposalRuns, versions, units, candidates, latest] = await Promise.all([
     getGoldDraft(db),
     checkGoldDraft(db),
     getGoldProposalRuns(db),
     listGoldVersions(db),
     searchUnits(db, {}),
     readGoldCandidates(),
+    getLatestGoldVersion(db),
   ]);
+  // Die neueste Gold-Version ist die aktuelle; Läufe ohne gültige Bewertung gegen sie werden hier nachbewertet.
+  const reevaluation = latest ? await reevaluateAllRuns(db, toScoringGold(latest)) : null;
   const candidateByUnit = new Map(candidates.map((candidate) => [candidate.unitId, candidate]));
   const unitName = new Map(units.map((unit) => [unit.unitId, unit.unitName]));
   const selected = draft?.units ?? [];
@@ -89,12 +101,28 @@ async function GoldContent() {
             ))}
           </ul>
         )}
+        {reevaluation && <ReevaluationStatusLine status={reevaluation} />}
+        {latest && !draft && (
+          <ActionForm action={startDraftFromVersionAction}>
+            <input type="hidden" name="label" value={latest.label ?? ""} />
+            <Button type="submit" variant="outline">
+              {latest.label} als Ausgangspunkt bearbeiten
+            </Button>
+          </ActionForm>
+        )}
       </section>
 
       <section className="space-y-3">
         <h2 className="text-lg font-medium">
           Gold-Entwurf: <span data-testid="draft-count">{selected.length}</span> von {MAX_GOLD_UNITS} Units
         </h2>
+        {draft?.baseLabel && (
+          <p className="text-sm">
+            Ausgangspunkt: <span data-testid="draft-base">{draft.baseLabel}</span>. Jede Änderung (Klassen,
+            web_only, no_mapping, hinzugefügte oder entfernte Units) ergibt beim Abschluss eine neue
+            Gold-Version; danach werden alle Läufe ohne Modellaufruf neu bewertet.
+          </p>
+        )}
         <p className="text-sm text-muted-foreground">
           Units aus dem Snapshot wählen und kategorisieren. Die Kandidatenliste (
           <code>docs/goldset/kandidaten.md</code>) ist nur eine Hilfe; Kürzel wie „A1“ stehen bei den Units.
@@ -270,7 +298,8 @@ async function GoldContent() {
         <h2 className="text-lg font-medium">Abschluss</h2>
         {issues.length === 0 ? (
           <p className="text-sm" data-testid="gold-check">
-            Prüfung bestanden: Der Abschluss friert den Entwurf als neue Gold-Version ein.
+            Prüfung bestanden: Der Abschluss friert den Entwurf als neue Gold-Version ein und bewertet alle
+            abgeschlossenen Benchmark-Läufe gegen sie neu.
           </p>
         ) : (
           <div data-testid="gold-check" className="space-y-1 text-sm">

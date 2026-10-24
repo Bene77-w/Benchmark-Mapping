@@ -11,7 +11,7 @@ import type { UnitResultView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import { type RunEvaluation, VIOLATION_KINDS } from "@/server/scoring/model";
 import { ensureEvaluation, listEvaluations, type StoredEvaluation } from "@/server/scoring/store";
-import { cancelRunAction, resumeRunAction } from "../actions";
+import { cancelRunAction, resumeRunAction, supplementRunAction } from "../actions";
 import {
   CATEGORY_LABELS,
   configurationLabel,
@@ -53,6 +53,12 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
   const stored = await listEvaluations(db, run.id);
   const unitEvaluations = new Map((evaluation?.units ?? []).map((unit) => [unit.unitId, unit]));
   const active = run.status === "queued" || run.status === "running";
+  // Ergänzen mit derselben Konfiguration: nur die Units der aktuellen Gold-Version ohne Ergebnis werden aufgerufen.
+  const canSupplement =
+    run.kind === "benchmark" &&
+    (run.status === "completed" || run.status === "failed") &&
+    evaluation !== null &&
+    !evaluation.complete;
   const { progress } = run;
 
   return (
@@ -71,6 +77,14 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
               <input type="hidden" name="runId" value={run.id} />
               <Button type="submit" variant="outline" size="sm">
                 Abbrechen
+              </Button>
+            </form>
+          )}
+          {canSupplement && (
+            <form action={supplementRunAction}>
+              <input type="hidden" name="runId" value={run.id} />
+              <Button type="submit" variant="outline" size="sm" data-testid="run-supplement">
+                Fehlende Units ergänzen ({evaluation?.missingUnitIds.length})
               </Button>
             </form>
           )}
@@ -222,8 +236,8 @@ function EvaluationSection({
           <span className="text-muted-foreground">Score erst nach Abschluss des Laufs</span>
         ) : !evaluation.complete ? (
           <span className="text-destructive" data-testid="run-incomplete">
-            unvollständig für {evaluation.goldVersion}: kein Ergebnis für{" "}
-            {evaluation.missingUnitIds.join(", ")}
+            unvollständig für {evaluation.goldVersion} und deshalb aus der Auswertung ausgeblendet: kein
+            Ergebnis für {evaluation.missingUnitIds.join(", ")}
           </span>
         ) : (
           <>
