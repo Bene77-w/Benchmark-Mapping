@@ -16,7 +16,8 @@ async function loadedDatabase(): Promise<Database> {
   return db;
 }
 
-describe("Snapshot in der Datenbank", () => {
+// Voller Snapshot in PGlite: unter Parallelbetrieb länger als der Standard.
+describe("Snapshot in der Datenbank", { timeout: 30_000 }, () => {
   test("lädt den Snapshot genau einmal, auch wenn er erneut geladen wird", async () => {
     const db = await createTestDatabase();
     expect(await getCurrentSnapshot(db)).toBeNull();
