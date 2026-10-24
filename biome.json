@@ -17,6 +17,7 @@
       "!.claude",
       "!drizzle",
       "!data/snapshot",
+      "!data/pricing",
       "!tests/fixtures"
     ]
   },
