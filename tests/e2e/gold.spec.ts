@@ -10,15 +10,16 @@ async function addUnit(page: Page, unitId: string, category: string) {
   await expect(page.getByTestId("gold-unit-row").filter({ hasText: unitId })).toBeVisible();
 }
 
-async function startProposalRun(page: Page, model: string, effort: string) {
+async function startProposalRun(page: Page, model: string, effort: string, expectedRuns: number) {
   await page.getByLabel("Harness").selectOption("fake");
   await page.getByLabel("Modell").fill(model);
   await page.getByLabel("Effort").fill(effort);
   await page.getByRole("button", { name: "Vorschlagslauf starten" }).click();
-  await expect(page.getByText(/Vorschlagslauf #\d+ angelegt/)).toBeVisible();
+  await expect(page.getByTestId("proposal-run-row")).toHaveCount(expectedRuns, { timeout: 15_000 });
 }
 
 test("Gold-Review mit Fake-Vorschlägen abschließen", async ({ page }) => {
+  test.setTimeout(150_000);
   // Eigenes Effort je Testlauf, damit die Konfigurationen neu sind.
   const effort = `e2e-${Date.now()}`;
   await page.goto("/gold");
@@ -35,11 +36,11 @@ test("Gold-Review mit Fake-Vorschlägen abschließen", async ({ page }) => {
   await expect(page.getByTestId("draft-count")).toHaveText("2");
   await expect(page.getByRole("button", { name: "Gold-Review abschließen" })).toBeDisabled();
 
-  await startProposalRun(page, "vorschlag-a", effort);
-  await startProposalRun(page, "vorschlag-b", effort);
-  await expect(page.getByTestId("proposal-run-row")).toHaveCount(2);
+  await startProposalRun(page, "vorschlag-a", effort, 1);
+  await startProposalRun(page, "vorschlag-b", effort, 2);
+  // Der Worker führt Läufe nacheinander aus; Läufe anderer Tests können vor den Vorschlagsläufen dran sein.
   await expect(page.getByTestId("proposal-run-status")).toHaveText(["abgeschlossen", "abgeschlossen"], {
-    timeout: 20_000,
+    timeout: 90_000,
   });
 
   // Review Aviation: zwei Vorschläge nebeneinander, Unterschiede hervorgehoben.
