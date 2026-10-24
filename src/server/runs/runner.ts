@@ -14,7 +14,14 @@ import type { PromptRootOption } from "./store";
 
 export interface RunnerDeps extends PromptRootOption {
   adapters: AdapterRegistry;
+  /**
+   * Spielraum über das Timeout des Laufs hinaus: meldet ein Adapter bis dahin nichts, wertet der Runner den
+   * Aufruf selbst als Timeout (Standard 30 s; Adapter erzwingen das Timeout eigentlich selbst).
+   */
+  timeoutGraceMs?: number;
 }
+
+const DEFAULT_TIMEOUT_GRACE_MS = 30_000;
 
 /**
  * Übernimmt den ältesten wartenden Lauf und führt ihn aus. Liefert seine ID oder `null`, wenn keiner wartet.
@@ -70,11 +77,23 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
     .from(unitResults)
     .where(and(eq(unitResults.runId, runId), eq(unitResults.status, "pending")))
     .orderBy(asc(unitResults.unitId));
-  const task = { model: configuration.model, effort: configuration.effort, mode: configuration.mode };
+  const context: RunContext = {
+    db,
+    runId,
+    adapter,
+    prompt,
+    task: {
+      model: configuration.model,
+      effort: configuration.effort,
+      mode: configuration.mode,
+      timeoutMs: run.timeoutMs,
+    },
+    timeoutGraceMs: deps.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS,
+  };
   await forEachLimited(
     open.map(({ unitId }) => unitId),
     run.parallelism,
-    (unitId) => runUnit(db, runId, adapter, prompt, { ...task, timeoutMs: run.timeoutMs, unitId }),
+    (unitId) => runUnit(context, unitId),
   );
 
   const [{ value: unfinished }] = await db
@@ -86,54 +105,64 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
   }
 }
 
-async function runUnit(
-  db: Database,
-  runId: number,
-  adapter: HarnessAdapter,
-  prompt: BenchmarkPrompt,
-  task: Omit<HarnessTask, "systemPrompt" | "userPrompt" | "outputSchema">,
-): Promise<void> {
-  const unitPrompt = prompt.forUnit(task.unitId);
-  const where = and(eq(unitResults.runId, runId), eq(unitResults.unitId, task.unitId));
-  await db
-    .update(unitResults)
-    .set({
-      status: "running",
-      startedAt: new Date(),
-      unitPromptHash: unitPrompt.unitPromptHash,
-      attempts: sql`${unitResults.attempts} + 1`,
-    })
-    .where(where);
-
-  let result = await callAdapter(adapter, task, unitPrompt, prompt);
-  if (RETRYABLE.has(result.outcome.kind)) {
-    await db
-      .update(unitResults)
-      .set({ attempts: sql`${unitResults.attempts} + 1` })
-      .where(where);
-    result = combineAttempts([result, await callAdapter(adapter, task, unitPrompt, prompt)]);
-  }
-  await db.update(unitResults).set(resultColumns(result)).where(where);
+/** Was alle Units eines Laufs gemeinsam haben. */
+interface RunContext {
+  db: Database;
+  runId: number;
+  adapter: HarnessAdapter;
+  prompt: BenchmarkPrompt;
+  task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
+  timeoutGraceMs: number;
 }
 
 /** Fehlerarten, die genau einen Wiederholversuch auslösen; danach zählen sie als Format-Fehler. */
 const RETRYABLE = new Set<HarnessResult["outcome"]["kind"]>(["timeout", "invalid_json", "schema_violation"]);
 
-async function callAdapter(
-  adapter: HarnessAdapter,
-  task: Omit<HarnessTask, "systemPrompt" | "userPrompt" | "outputSchema">,
-  unitPrompt: { systemPrompt: string; userPrompt: string },
-  prompt: BenchmarkPrompt,
-): Promise<HarnessResult> {
+async function runUnit(context: RunContext, unitId: string): Promise<void> {
+  const { db, runId, prompt } = context;
+  const unitPrompt = prompt.forUnit(unitId);
+  const where = and(eq(unitResults.runId, runId), eq(unitResults.unitId, unitId));
+  const startAttempt = () =>
+    db
+      .update(unitResults)
+      .set({
+        status: "running",
+        startedAt: new Date(),
+        unitPromptHash: unitPrompt.unitPromptHash,
+        attempts: sql`${unitResults.attempts} + 1`,
+      })
+      .where(where);
+  const task: HarnessTask = {
+    ...context.task,
+    unitId,
+    systemPrompt: unitPrompt.systemPrompt,
+    userPrompt: unitPrompt.userPrompt,
+    outputSchema: prompt.outputSchema,
+  };
+
+  await startAttempt();
+  let result = await callAdapter(context, task);
+  if (RETRYABLE.has(result.outcome.kind)) {
+    await startAttempt();
+    result = combineAttempts([result, await callAdapter(context, task)]);
+  }
+  await db.update(unitResults).set(resultColumns(result)).where(where);
+}
+
+/**
+ * Ein Aufruf des Adapters. Wirft er, ist das ein Harness-Fehler; meldet er sich nicht bis Timeout plus
+ * Spielraum, ein Timeout (der Aufruf selbst lässt sich nicht abbrechen, sein spätes Ergebnis verfällt).
+ */
+async function callAdapter(context: RunContext, task: HarnessTask): Promise<HarnessResult> {
+  const limitMs = task.timeoutMs + context.timeoutGraceMs;
+  let timer: NodeJS.Timeout | undefined;
+  const guard = new Promise<HarnessResult>((resolve) => {
+    timer = setTimeout(() => resolve(runnerTimeout(limitMs)), limitMs);
+  });
   try {
-    return await adapter.run({
-      ...task,
-      systemPrompt: unitPrompt.systemPrompt,
-      userPrompt: unitPrompt.userPrompt,
-      outputSchema: prompt.outputSchema,
-    });
-  } catch (error) {
-    return adapterFailure(error);
+    return await Promise.race([context.adapter.run(task).catch(adapterFailure), guard]);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -199,15 +228,28 @@ function resultColumns(result: HarnessResult): Partial<typeof unitResults.$infer
 /** Ein Adapter, der wirft statt ein Ergebnis zu liefern, ergibt einen Harness-Fehler der Unit. */
 function adapterFailure(error: unknown): HarnessResult {
   const message = `Adapter-Fehler: ${error instanceof Error ? error.message : String(error)}`;
+  return runnerResult({ kind: "harness_error", message }, 0);
+}
+
+function runnerTimeout(limitMs: number): HarnessResult {
+  const message = `Der Harness hat sich nicht innerhalb von ${limitMs} ms gemeldet; Abbruch durch den Runner`;
+  return runnerResult({ kind: "timeout", message }, limitMs);
+}
+
+/** Ergebnis ohne Antwort des Harness, das der Runner selbst bildet. */
+function runnerResult(
+  outcome: HarnessResult["outcome"] & { message: string },
+  durationMs: number,
+): HarnessResult {
   return {
-    outcome: { kind: "harness_error", message },
+    outcome,
     rawResponse: null,
-    log: message,
+    log: outcome.message,
     tokens: null,
     webSearches: null,
     effort: { reported: null, confirmed: false },
     nativeCostUsd: null,
-    durationMs: 0,
+    durationMs,
     exitCode: null,
     cliVersion: null,
     modelReported: null,
