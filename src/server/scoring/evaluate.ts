@@ -4,6 +4,8 @@ import type { UnitAnswer } from "@/server/prompt/output-schema";
 import { isRecherche, isVerbatim, wordCount } from "./evidence";
 import {
   BOOTSTRAP_CONFIDENCE,
+  CATEGORIES,
+  type CategoryScore,
   DEFAULT_BOOTSTRAP_SAMPLES,
   DEFAULT_BOOTSTRAP_SEED,
   type GoldClass,
@@ -48,6 +50,8 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
   const missingUnitIds = units.filter((unit) => unit.status === "missing").map((unit) => unit.unitId);
   const complete = missingUnitIds.length === 0;
   const scores = units.map((unit) => unit.score ?? 0);
+  const seed = input.seed ?? DEFAULT_BOOTSTRAP_SEED;
+  const samples = input.bootstrapSamples ?? DEFAULT_BOOTSTRAP_SAMPLES;
   const violations = Object.fromEntries(VIOLATION_KINDS.map((kind) => [kind, 0])) as Record<
     ViolationKind,
     number
@@ -62,17 +66,13 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
     complete,
     missingUnitIds,
     score: complete ? mean(scores) : null,
-    interval: null,
-    bootstrap: {
-      seed: input.seed ?? DEFAULT_BOOTSTRAP_SEED,
-      samples: input.bootstrapSamples ?? DEFAULT_BOOTSTRAP_SAMPLES,
-      confidence: BOOTSTRAP_CONFIDENCE,
-    },
+    interval: complete && scores.length > 0 ? bootstrapInterval(scores, seed, samples) : null,
+    bootstrap: { seed, samples, confidence: BOOTSTRAP_CONFIDENCE },
     formatErrors: units.filter((unit) => unit.status === "format_error").length,
     harnessFailures: units.filter((unit) => unit.status === "failed").length,
     violations,
     evidenceFidelity: checked === 0 ? null : verbatim / checked,
-    categories: [],
+    categories: categoryScores(units, complete),
     units,
   };
 }
@@ -107,6 +107,12 @@ function evaluateUnit(gold: GoldUnit, outcome: UnitOutcome | undefined, context:
     status: "answer",
     errorKind: null,
     named,
+    deviations: {
+      matchedPositive: positive.filter((id) => named.includes(id)),
+      missingPositive: positive.filter((id) => !named.includes(id)),
+      namedAcceptable: named.filter((id) => classes.get(id) === "vertretbar"),
+      namedWrong: named.filter((id) => !classes.has(id)),
+    },
     score: unitScore(gold, named, classes, positive),
     ...checkRules(answer, sourceUnit(gold.unitId, context), context),
   };
@@ -178,6 +184,58 @@ function unitScore(
 
 function precisionOf(named: readonly string[], classes: ReadonlyMap<string, GoldClass>): number {
   return named.filter((id) => classes.has(id)).length / named.length;
+}
+
+function categoryScores(units: readonly UnitEvaluation[], complete: boolean): CategoryScore[] {
+  return CATEGORIES.flatMap((category) => {
+    const ofCategory = units.filter((unit) => unit.category === category);
+    if (ofCategory.length === 0) return [];
+    const score = complete ? mean(ofCategory.map((unit) => unit.score ?? 0)) : null;
+    return [{ category, unitCount: ofCategory.length, score }];
+  });
+}
+
+/**
+ * Perzentil-Bootstrap über die Units: `samples`-mal n Unit-Scores mit Zurücklegen ziehen, Mittelwerte
+ * sortieren, das zentrale Konfidenzintervall ablesen (lineare Interpolation). Mit festem Seed reproduzierbar;
+ * die Reihenfolge der Scores folgt den sortierten unit_ids.
+ */
+function bootstrapInterval(
+  scores: readonly number[],
+  seed: number,
+  samples: number,
+): { low: number; high: number } {
+  const random = mulberry32(seed);
+  const means: number[] = [];
+  for (let sample = 0; sample < samples; sample += 1) {
+    let sum = 0;
+    for (let draw = 0; draw < scores.length; draw += 1) {
+      sum += scores[Math.floor(random() * scores.length)];
+    }
+    means.push(sum / scores.length);
+  }
+  means.sort((a, b) => a - b);
+  const tail = (1 - BOOTSTRAP_CONFIDENCE) / 2;
+  return { low: quantile(means, tail), high: quantile(means, 1 - tail) };
+}
+
+function quantile(sorted: readonly number[], q: number): number {
+  const position = q * (sorted.length - 1);
+  const lower = Math.floor(position);
+  const upper = Math.min(lower + 1, sorted.length - 1);
+  return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
+}
+
+/** Kleiner, deterministischer 32-Bit-Zufallsgenerator (Mulberry32); Werte in [0, 1). */
+function mulberry32(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (state + 0x6d2b79f5) >>> 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
+  };
 }
 
 function mean(values: readonly number[]): number {
