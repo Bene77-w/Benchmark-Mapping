@@ -4,11 +4,14 @@ import { Suspense } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { readTestGold } from "@/server/gold/test-gold";
+import { estimateRunCost } from "@/server/pricing/cost";
+import { getPriceTable } from "@/server/pricing/store";
 import type { UnitResultView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import { simpleRunScore } from "@/server/scoring/simple-score";
 import { configurationLabel, formatDateTime, RUN_STATUS_LABELS, UNIT_STATUS_LABELS } from "../labels";
 import { AutoRefresh } from "./auto-refresh";
+import { ESTIMATE_NOTE, nativeCostLabel, RunCostSummary, unitCostLabel } from "./costs";
 
 export const metadata = { title: "Lauf – Benchmark-Mapping" };
 
@@ -30,6 +33,7 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
   const runId = Number(id);
   const run = Number.isInteger(runId) ? await getRun(getDatabase(), runId) : null;
   if (!run) notFound();
+  const costs = estimateRunCost(run, await getPriceTable(getDatabase()));
   const gold = await readTestGold();
   const { score, unitScores } = simpleRunScore(
     new Map(run.units.map((unit) => [unit.unitId, unit.answer])),
@@ -100,6 +104,8 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
         </p>
       </section>
 
+      <RunCostSummary costs={costs} model={run.configuration.model} />
+
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Units</h2>
         <Table>
@@ -110,6 +116,10 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
               <TableHead>Antwort</TableHead>
               <TableHead className="text-right">Unit-Score</TableHead>
               <TableHead className="text-right">Tokens (in / cache / out)</TableHead>
+              <TableHead className="text-right" title={ESTIMATE_NOTE}>
+                Kosten (geschätzt)
+              </TableHead>
+              <TableHead className="text-right">Kosten (nativ)</TableHead>
               <TableHead className="text-right">Dauer</TableHead>
             </TableRow>
           </TableHeader>
@@ -125,6 +135,12 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
                     : "–"}
                 </TableCell>
                 <TableCell className="text-right">{tokensLabel(unit)}</TableCell>
+                <TableCell className="text-right" data-testid="unit-cost-estimated">
+                  {unitCostLabel(costs.units[unit.unitId])}
+                </TableCell>
+                <TableCell className="text-right" data-testid="unit-cost-native">
+                  {nativeCostLabel(unit.nativeCostUsd)}
+                </TableCell>
                 <TableCell className="text-right">
                   {unit.durationMs === null ? "–" : `${(unit.durationMs / 1000).toFixed(1)} s`}
                 </TableCell>

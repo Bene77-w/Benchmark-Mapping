@@ -44,26 +44,34 @@ export async function loadModelsDevSnapshot(
   });
 }
 
-/** Die ganze Preistabelle für die Kostenfunktion. */
+/** Die ganze Preistabelle für die Kostenfunktion (Preise je Schlüssel nach Gültig-ab-Datum aufsteigend). */
 export async function getPriceTable(db: Database): Promise<PriceTable> {
-  const table: PriceTable = { models: {}, webSearch: {} };
-  for (const row of await db.select().from(modelPrices)) {
-    const price: ModelPrice = {
-      validFrom: row.validFrom,
-      input: row.input,
-      cacheRead: row.cacheRead,
-      cacheWrite: row.cacheWrite,
-      output: row.output,
-    };
-    (table.models[row.modelId] ??= []).push(price);
-  }
-  for (const row of await db.select().from(webSearchPrices)) {
-    (table.webSearch[row.harness] ??= []).push({ validFrom: row.validFrom, perSearch: row.perSearch });
-  }
-  for (const prices of [...Object.values(table.models), ...Object.values(table.webSearch)]) {
-    prices.sort((a, b) => (a.validFrom < b.validFrom ? -1 : 1));
-  }
-  return table;
+  const priceRows = await db.select().from(modelPrices).orderBy(asc(modelPrices.validFrom));
+  const searchRows = await db.select().from(webSearchPrices).orderBy(asc(webSearchPrices.validFrom));
+  const modelGroups = Map.groupBy(priceRows, (row) => row.modelId);
+  const searchGroups = Map.groupBy(searchRows, (row) => row.harness);
+  return {
+    models: Object.fromEntries(
+      [...modelGroups].map(([modelId, rows]) => [
+        modelId,
+        rows.map(
+          ({ validFrom, input, cacheRead, cacheWrite, output }): ModelPrice => ({
+            validFrom,
+            input,
+            cacheRead,
+            cacheWrite,
+            output,
+          }),
+        ),
+      ]),
+    ),
+    webSearch: Object.fromEntries(
+      [...searchGroups].map(([harness, rows]) => [
+        harness,
+        rows.map(({ validFrom, perSearch }) => ({ validFrom, perSearch })),
+      ]),
+    ),
+  };
 }
 
 /** Legt ein Modell ohne Preis an, falls es die ID noch nicht gibt. */
