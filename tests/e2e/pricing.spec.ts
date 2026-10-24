@@ -36,18 +36,19 @@ test("Preis anlegen und ändern; Lauf zeigt geschätzte und native Kosten, Preis
   await expect(page.getByTestId("run-status")).toHaveText("abgeschlossen", { timeout: 30_000 });
 
   // Fixture-Tokens der 5 Units: 24 600 Input, 155 000 Cache-Read, 1 200 Cache-Write, 1 655 Output
-  // → 0,0246 + 0,0155 + 0,0024 + 0,01986 = 0,06236 USD; nativ 0,0489 USD.
-  await expect(page.getByTestId("run-cost-estimated")).toHaveText("$0.0624");
+  // → 0,0246 + 0,0155 + 0,0024 + 0,01986 = 0,06236 USD; dazu der Wiederholversuch der invalid_json-Unit
+  // (5 600 · 1 + 31 000 · 0,1 + 95 · 12 = 9 840 µ$) → 0,0722 USD; nativ 0,0489 + 0,0089 = 0,0578 USD.
+  await expect(page.getByTestId("run-cost-estimated")).toHaveText("$0.0722");
   await expect(page.getByText("geschätzt zum API-Listenpreis").first()).toBeVisible();
-  await expect(page.getByTestId("run-cost-native")).toHaveText("$0.0489");
+  await expect(page.getByTestId("run-cost-native")).toHaveText("$0.0578");
   // house--ethics: 3 900 · 1 + 31 000 · 0,1 + 180 · 12 = 9 160 µ$.
   const ethics = page.getByTestId("unit-row").filter({ hasText: "house--ethics" });
   await expect(ethics.getByTestId("unit-cost-estimated")).toHaveText("$0.0092");
   await expect(ethics.getByTestId("unit-cost-native")).toHaveText("$0.0071");
 
-  // Preis ändern (gleiches Gültig-ab-Datum): Input 2 statt 1 → +0,0246 USD.
+  // Preis ändern (gleiches Gültig-ab-Datum): Input 2 statt 1 → +(24 600 + 5 600) µ$ = 0,1024 USD.
   await savePrice(page, { input: "2", output: "12" });
   await page.goto(runUrl);
-  await expect(page.getByTestId("run-cost-estimated")).toHaveText("$0.0870");
-  await expect(page.getByTestId("run-cost-native")).toHaveText("$0.0489");
+  await expect(page.getByTestId("run-cost-estimated")).toHaveText("$0.1024");
+  await expect(page.getByTestId("run-cost-native")).toHaveText("$0.0578");
 });

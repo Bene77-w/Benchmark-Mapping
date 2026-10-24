@@ -17,7 +17,7 @@ pnpm dev               # Migrationen + Snapshot laden, dann App auf http://local
 pnpm worker            # zweites Terminal: führt die in der GUI angelegten Läufe aus
 ```
 
-`pnpm dev` ruft vorher `pnpm db:prepare` auf: Es wendet die Migrationen an und lädt den eingecheckten Snapshot, falls er noch nicht in der Datenbank steht. Die Snapshot-Seite liegt unter `/snapshot`.
+`pnpm dev` ruft vorher `pnpm db:prepare` auf: Es wendet die Migrationen an und lädt den eingecheckten Snapshot, falls er noch nicht in der Datenbank steht, sowie die Preise des datierten models.dev-Auszugs. Die Snapshot-Seite liegt unter `/snapshot`.
 
 Ports sind per Umgebungsvariable wählbar, damit mehrere Worktrees nebeneinander laufen können; beide Befehle müssen dieselben Werte sehen:
 
@@ -45,6 +45,18 @@ Er liest `data/committee_matcher_inputs/` (geprüft gegen die Hashes im Corpusma
 Der Benchmark-Prompt `prompt-v1` liegt unter `data/prompts/prompt-v1/`: der Vertrag `contract.md` (abgeleitet aus mapping-system-v3 des Submappers) und je ein Brief für die Modi „nur Zuständigkeitstext“ (`brief-text-only.md`) und „mit Websuche“ (`brief-web.md`) sowie der Gold-Brief für Vorschlagsläufe (`brief-gold.md`). Der System-Prompt ist Vertrag + Brief, der User-Prompt rendert Taxonomie und Unit als Datenblöcke nach der Vorlage `user-prompt.json` (alle festen Texte des User-Prompts; `src/server/prompt/render.ts` legt nur Reihenfolge und Bedingungen fest). Das Ausgabeschema `unit-answer-v1` (strikt, eine Antwort pro Unit) steht in `src/server/prompt/output-schema.ts` als Zod- und JSON-Schema.
 
 Der Prompt-Hash eines Laufs ist SHA-256 über die festen Anweisungstexte: Version, System-Prompt (Vertrag + Brief bzw. Gold-Brief), Vorlage des User-Prompts und Ausgabeschema; jede Textänderung daran ändert ihn. Die Daten (Units, Taxonomie) deckt der Snapshot-Hash ab, ein neuer Snapshot lässt den Prompt-Hash gleich. Je Unit-Ergebnis wird zusätzlich der Unit-Hash über den exakt gesendeten Text (System-Prompt, User-Prompt, Ausgabeschema) gespeichert. `prompt-v1` ist eingefroren (Test mit festen Hashes): Textänderungen gehören in eine neue Version. Die Vorschau unter `/prompt` zeigt System- und User-Prompt je Unit und Lauf-Art samt Prompt-, Unit- und Snapshot-Hash.
+
+## Kosten und Preistabelle
+
+Geschätzte Kosten sind Tokens × Preis aus der eigenen Preistabelle plus Websuchen × Preis pro Suche, zum API-Listenpreis, auch bei Abo-Läufen. Sie werden beim Anzeigen berechnet (`src/server/pricing/cost.ts`, reine Funktion) und nie gespeichert; eine Preisänderung wirkt deshalb sofort auf alle Läufe. Maßgeblich ist je Modell bzw. Harness der Preis mit dem jüngsten Gültig-ab-Datum bis zum Anlegen des Laufs (UTC). Fehlt ein nötiger Preis (Modell, Cache-Tarif bei Cache-Tokens, Websuchpreis bei Websuchen) oder meldet der Harness keine Tokens, sind die Kosten „unbekannt“, nie 0. Die Lauf-Seite zeigt geschätzte und native Kosten (Gegenprobe, z. B. `total_cost_usd` von Claude Code) nebeneinander, je Unit und als Summe; eine native 0 bei einer fehlgeschlagenen Unit gilt als keine Angabe.
+
+Unter `/modelle` werden Preise je Modell-ID (USD pro Million Tokens für Input, Cache-Read, Cache-Write, Output; Output gilt auch für Reasoning) und Websuchpreise je Harness angelegt und geändert: Gleiches Gültig-ab-Datum überschreibt, ein neues Datum ergänzt die Historie. Ein Lauf mit unbekanntem Modell legt dort einen Eintrag ohne Preis an. Die Erstbefüllung kommt aus `data/pricing/models-dev-2026-10-24.json` (Anbieter anthropic, openai, deepseek; Grundtarif ohne Kontextstufen; Modell-IDs als `anbieter/modell` und bei Anthropic/OpenAI zusätzlich ohne Präfix). Neuer Auszug:
+
+```sh
+pnpm pricing:import [api.json]   # ohne Argument von https://models.dev/api.json
+```
+
+Danach `MODELS_DEV_SNAPSHOT_PATH` in `src/server/pricing/models-dev.ts` auf die neue Datei setzen; `pnpm db:prepare` ergänzt deren Preise, bestehende bleiben unverändert.
 
 ## Läufe
 
