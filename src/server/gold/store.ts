@@ -1,8 +1,18 @@
-import { and, asc, count, eq, inArray } from "drizzle-orm";
+import { and, asc, count, desc, eq } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
-import { goldIndustries, goldUnits, goldVersions, units } from "@/server/db/schema";
+import { goldIndustries, goldUnits, goldVersions, industries, units } from "@/server/db/schema";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
-import { type GoldCategory, type GoldUnit, type GoldVersionView, MAX_GOLD_UNITS } from "./model";
+import {
+  type GoldCategory,
+  type GoldIssue,
+  type GoldUnit,
+  type GoldUnitDecision,
+  GoldValidationError,
+  type GoldVersionView,
+  goldUnitDecisionSchema,
+  MAX_GOLD_UNITS,
+  validateGold,
+} from "./model";
 
 /**
  * Gold-Erstellung in der Datenbank. Alle Änderungen betreffen den einzigen Entwurf; eingefrorene
@@ -63,6 +73,107 @@ export async function removeGoldUnit(db: Database, unitId: string): Promise<void
   await db.delete(goldUnits).where(and(eq(goldUnits.goldVersionId, draft.id), eq(goldUnits.unitId, unitId)));
 }
 
+/** Speichert die Entscheidung der Gold-Review für eine Unit des Entwurfs (ersetzt die bisherige). */
+export async function saveGoldUnitDecision(
+  db: Database,
+  unitId: string,
+  decision: GoldUnitDecision,
+): Promise<void> {
+  const parsed = goldUnitDecisionSchema.parse(decision);
+  const draft = await requireDraft(db);
+  const known = await industryIdsOf(db, draft.snapshotId);
+  const unknown = parsed.industries.filter((industry) => !known.has(industry.industryId));
+  if (unknown.length > 0) {
+    throw new Error(
+      `Industries gibt es in der Taxonomie nicht: ${unknown.map((i) => i.industryId).join(", ")}`,
+    );
+  }
+  await db.transaction(async (tx) => {
+    const where = and(eq(goldUnits.goldVersionId, draft.id), eq(goldUnits.unitId, unitId));
+    const updated = await tx
+      .update(goldUnits)
+      .set({ category: parsed.category, noMapping: parsed.noMapping, note: parsed.note || null })
+      .where(where)
+      .returning({ unitId: goldUnits.unitId });
+    if (updated.length === 0) throw new Error(`Unit ${unitId} ist nicht im Gold-Set`);
+    await tx
+      .delete(goldIndustries)
+      .where(and(eq(goldIndustries.goldVersionId, draft.id), eq(goldIndustries.unitId, unitId)));
+    if (parsed.industries.length > 0) {
+      await tx
+        .insert(goldIndustries)
+        .values(parsed.industries.map((industry) => ({ goldVersionId: draft.id, unitId, ...industry })));
+    }
+  });
+}
+
+/** Prüft den Entwurf vor dem Abschluss; ohne Entwurf ist das Gold-Set leer. */
+export async function checkGoldDraft(db: Database): Promise<GoldIssue[]> {
+  const draft = await getGoldDraft(db);
+  if (!draft) return validateGold([], new Set());
+  return validateGold(draft.units, await industryIdsOf(db, draft.snapshotId));
+}
+
+/**
+ * Schließt die Gold-Review ab: friert den Entwurf als nächste Gold-Version (`gold-vN`) ein. Wirft
+ * `GoldValidationError`, wenn die Prüfung Befunde hat.
+ */
+export async function finalizeGoldDraft(db: Database): Promise<{ id: number; label: string }> {
+  const issues = await checkGoldDraft(db);
+  if (issues.length > 0) throw new GoldValidationError(issues);
+  return db.transaction(async (tx) => {
+    const draft = await requireDraft(tx);
+    const [{ value: frozen }] = await tx
+      .select({ value: count() })
+      .from(goldVersions)
+      .where(eq(goldVersions.status, "frozen"));
+    const label = `gold-v${frozen + 1}`;
+    await tx
+      .update(goldVersions)
+      .set({ status: "frozen", label, frozenAt: new Date() })
+      .where(eq(goldVersions.id, draft.id));
+    return { id: draft.id, label };
+  });
+}
+
+/** Eine eingefrorene Gold-Version über ihr Label (`gold-v1`, …). */
+export async function getGoldVersion(db: Database, label: string): Promise<GoldVersionView | null> {
+  const [row] = await db
+    .select()
+    .from(goldVersions)
+    .where(and(eq(goldVersions.status, "frozen"), eq(goldVersions.label, label)));
+  return row ? withUnits(db, row) : null;
+}
+
+/** Die neueste eingefrorene Gold-Version oder `null`. */
+export async function getLatestGoldVersion(db: Database): Promise<GoldVersionView | null> {
+  const [row] = await db
+    .select()
+    .from(goldVersions)
+    .where(eq(goldVersions.status, "frozen"))
+    .orderBy(desc(goldVersions.frozenAt), desc(goldVersions.id))
+    .limit(1);
+  return row ? withUnits(db, row) : null;
+}
+
+/** Eingefrorene Gold-Versionen ohne Units, neueste zuerst. */
+export async function listGoldVersions(db: Database): Promise<Omit<GoldVersionView, "units">[]> {
+  const rows = await db
+    .select()
+    .from(goldVersions)
+    .where(eq(goldVersions.status, "frozen"))
+    .orderBy(desc(goldVersions.frozenAt), desc(goldVersions.id));
+  return rows.map(toVersionSummary);
+}
+
+async function industryIdsOf(db: Database, snapshotId: number): Promise<Set<string>> {
+  const rows = await db
+    .select({ industryId: industries.industryId })
+    .from(industries)
+    .where(eq(industries.snapshotId, snapshotId));
+  return new Set(rows.map((row) => row.industryId));
+}
+
 async function ensureDraft(tx: Database): Promise<typeof goldVersions.$inferSelect> {
   const [existing] = await tx.select().from(goldVersions).where(eq(goldVersions.status, "draft"));
   if (existing) return existing;
@@ -93,17 +204,11 @@ async function withUnits(db: Database, row: typeof goldVersions.$inferSelect): P
       : await db
           .select()
           .from(goldIndustries)
-          .where(inArray(goldIndustries.goldVersionId, [row.id]))
+          .where(eq(goldIndustries.goldVersionId, row.id))
           .orderBy(asc(goldIndustries.industryId));
   const industriesByUnit = Map.groupBy(industryRows, (industry) => industry.unitId);
   return {
-    id: row.id,
-    label: row.label,
-    status: row.status,
-    snapshotId: row.snapshotId,
-    snapshotHash: row.snapshotHash,
-    createdAt: row.createdAt,
-    frozenAt: row.frozenAt,
+    ...toVersionSummary(row),
     units: unitRows.map(
       (unit): GoldUnit => ({
         unitId: unit.unitId,
@@ -117,5 +222,17 @@ async function withUnits(db: Database, row: typeof goldVersions.$inferSelect): P
         })),
       }),
     ),
+  };
+}
+
+function toVersionSummary(row: typeof goldVersions.$inferSelect): Omit<GoldVersionView, "units"> {
+  return {
+    id: row.id,
+    label: row.label,
+    status: row.status,
+    snapshotId: row.snapshotId,
+    snapshotHash: row.snapshotHash,
+    createdAt: row.createdAt,
+    frozenAt: row.frozenAt,
   };
 }
