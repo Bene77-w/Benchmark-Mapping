@@ -1,5 +1,6 @@
 import {
   boolean,
+  date,
   doublePrecision,
   integer,
   jsonb,
@@ -166,4 +167,49 @@ export const unitResults = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.runId, table.unitId] })],
+);
+
+/**
+ * Modell der Preistabelle, Schlüssel ist die Modell-ID wie in der Konfiguration. Ein Eintrag ohne Preise ist
+ * erlaubt: Läufe mit unbekanntem Modell legen ihn an, ihre Kosten sind „unbekannt“, bis ein Preis gepflegt ist.
+ */
+export const models = pgTable("models", {
+  id: text("id").primaryKey(),
+  /** Herkunft des Eintrags, z. B. „models.dev 2026-10-24“, „Lauf“ oder „manuell“. */
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Preise eines Modells in USD pro Million Tokens, gültig ab `validFrom` (bis zum nächsten Eintrag). */
+export const modelPrices = pgTable(
+  "model_prices",
+  {
+    id: serial("id").primaryKey(),
+    modelId: text("model_id")
+      .notNull()
+      .references(() => models.id, { onDelete: "cascade" }),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    input: doublePrecision("input").notNull(),
+    /** `null` = kein Tarif bekannt. */
+    cacheRead: doublePrecision("cache_read"),
+    cacheWrite: doublePrecision("cache_write"),
+    output: doublePrecision("output").notNull(),
+    source: text("source").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.modelId, table.validFrom)],
+);
+
+/** Preis pro Websuche in USD je Harness, gültig ab `validFrom`. */
+export const webSearchPrices = pgTable(
+  "web_search_prices",
+  {
+    id: serial("id").primaryKey(),
+    harness: text("harness", { enum: HARNESSES }).notNull(),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    perSearch: doublePrecision("per_search").notNull(),
+    source: text("source").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.harness, table.validFrom)],
 );
