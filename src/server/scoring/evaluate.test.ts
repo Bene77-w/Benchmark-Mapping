@@ -366,3 +366,131 @@ describe("Regelverstöße", () => {
     expect(evaluation.formatErrors).toBe(1);
   });
 });
+
+describe("Lauf-Score, Vollständigkeit und Kategorien", () => {
+  const A_POSITIV = (unitId: string, category: GoldUnit["category"] = "a") =>
+    gold([{ industryId: "a" }, { industryId: "b" }], { unitId, category });
+
+  test("Score ist der Mittelwert der Unit-Scores; Antworten außerhalb des Golds zählen nicht", () => {
+    const evaluation = evaluateRun(
+      input([A_POSITIV("u1"), A_POSITIV("u2"), gold([], { unitId: "u3", category: "c" })], {
+        u1: mapped(["a", "b"]),
+        u2: mapped(["a"]),
+        u3: mapped([]),
+        entfernt: mapped(["d"]),
+      }),
+    );
+    expect(evaluation.complete).toBe(true);
+    expect(evaluation.missingUnitIds).toEqual([]);
+    expect(evaluation.score).toBeCloseTo((1 + 2 / 3 + 1) / 3, 10);
+    expect(evaluation.units.map((unit) => unit.unitId)).toEqual(["u1", "u2", "u3"]);
+  });
+
+  test("fehlt einer Gold-Unit das Ergebnis, ist der Lauf unvollständig und hat keinen Score", () => {
+    const evaluation = evaluateRun(input([A_POSITIV("u2"), A_POSITIV("u1")], { u1: mapped(["a", "b"]) }));
+    expect(evaluation).toMatchObject({
+      complete: false,
+      missingUnitIds: ["u2"],
+      score: null,
+      interval: null,
+      categories: [{ category: "a", unitCount: 2, score: null }],
+    });
+    expect(evaluation.units.find((unit) => unit.unitId === "u2")).toMatchObject({
+      status: "missing",
+      score: null,
+    });
+    expect(evaluation.units.find((unit) => unit.unitId === "u1")?.score).toBe(1);
+  });
+
+  test("Harness-Fehler und Ratenlimit zählen 0, aber nicht als Format-Fehler", () => {
+    const evaluation = evaluateRun(
+      input([A_POSITIV("u1"), A_POSITIV("u2"), A_POSITIV("u3")], {
+        u1: { kind: "failed", errorKind: "harness_error" },
+        u2: { kind: "failed", errorKind: "rate_limit" },
+        u3: { kind: "failed", errorKind: "timeout" },
+      }),
+    );
+    expect(evaluation).toMatchObject({ complete: true, score: 0, formatErrors: 1, harnessFailures: 2 });
+    expect(evaluation.units.map((unit) => unit.status)).toEqual(["failed", "failed", "format_error"]);
+  });
+
+  test("Score je Kategorie in der Reihenfolge a–f, nur vorkommende Kategorien", () => {
+    const evaluation = evaluateRun(
+      input(
+        [
+          A_POSITIV("u1", "f"),
+          A_POSITIV("u2", "a"),
+          A_POSITIV("u3", "f"),
+          gold([], { unitId: "u4", category: "c" }),
+        ],
+        { u1: mapped(["a", "b"]), u2: mapped(["a"]), u3: mapped([]), u4: mapped([]) },
+      ),
+    );
+    expect(evaluation.categories).toEqual([
+      { category: "a", unitCount: 1, score: 2 / 3 },
+      { category: "c", unitCount: 1, score: 1 },
+      { category: "f", unitCount: 2, score: 0.5 },
+    ]);
+  });
+
+  test("Abweichungen nennen getroffene und fehlende positive, vertretbare und falsche Industries", () => {
+    const unit = gold([
+      { industryId: "a" },
+      { industryId: "b" },
+      { industryId: "c", webOnly: true },
+      { industryId: "d", class: "vertretbar" },
+    ]);
+    expect(evaluateUnit(unit, mapped(["a", "c", "d", "e"])).deviations).toEqual({
+      matchedPositive: ["a"],
+      missingPositive: ["b"],
+      namedAcceptable: ["c", "d"],
+      namedWrong: ["e"],
+    });
+    expect(evaluateUnit(unit, mapped(["a", "c", "d", "e"]), { mode: "web" }).deviations).toEqual({
+      matchedPositive: ["a", "c"],
+      missingPositive: ["b"],
+      namedAcceptable: ["d"],
+      namedWrong: ["e"],
+    });
+  });
+});
+
+describe("Bootstrap-Intervall über die Units", () => {
+  // 8 no_mapping-Units; jede dritte nennt trotzdem eine Industry: Unit-Scores 0,1,1,0,1,1,0,1 (Score 5/8).
+  const goldUnits = Array.from({ length: 8 }, (_, index) => gold([], { unitId: `u${index}`, category: "c" }));
+  const outcomes = Object.fromEntries(
+    goldUnits.map((unit, index) => [unit.unitId, mapped(index % 3 === 0 ? ["a"] : [])]),
+  );
+
+  test("mit festem Seed reproduzierbar, mit anderem Seed verschieden", () => {
+    const first = evaluateRun(input(goldUnits, outcomes, { seed: 7 }));
+    const second = evaluateRun(input([...goldUnits].reverse(), outcomes, { seed: 7 }));
+    expect(second.interval).toEqual(first.interval);
+    // Mit wenigen Stichproben hängen die (interpolierten) Quantile sichtbar vom Seed ab.
+    const few = (seed: number) =>
+      evaluateRun(input(goldUnits, outcomes, { seed, bootstrapSamples: 25 })).interval;
+    expect(few(7)).toEqual(few(7));
+    expect(few(8)).not.toEqual(few(7));
+    expect(first.bootstrap).toEqual({ seed: 7, samples: 2000, confidence: 0.95 });
+  });
+
+  test("Intervall liegt um den Score und innerhalb der Unit-Scores", () => {
+    const { score, interval } = evaluateRun(input(goldUnits, outcomes));
+    expect(score).toBe(5 / 8);
+    expect(interval?.low).toBeGreaterThanOrEqual(0);
+    expect(interval?.low).toBeLessThan(5 / 8);
+    expect(interval?.high).toBeGreaterThan(5 / 8);
+    expect(interval?.high).toBeLessThanOrEqual(1);
+  });
+
+  test("gleiche Unit-Scores ergeben ein Intervall der Breite 0", () => {
+    const same = Object.fromEntries(goldUnits.map((unit) => [unit.unitId, mapped([])]));
+    expect(evaluateRun(input(goldUnits, same)).interval).toEqual({ low: 1, high: 1 });
+  });
+
+  test("Standard-Seed liefert eingefrorene Werte (Regressionsschutz für gespeicherte Bewertungen)", () => {
+    expect(evaluateRun(input(goldUnits, outcomes)).interval).toEqual(FROZEN_INTERVAL);
+  });
+});
+
+const FROZEN_INTERVAL = { low: 0.25, high: 1 };
