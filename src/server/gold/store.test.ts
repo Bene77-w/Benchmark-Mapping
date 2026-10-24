@@ -1,6 +1,10 @@
 import { beforeAll, describe, expect, test } from "vitest";
 import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
+import { createFakeAdapter } from "@/server/harness/fake";
+import { buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
+import { processNextRun } from "@/server/runs/runner";
+import { getRun } from "@/server/runs/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
@@ -10,11 +14,14 @@ import {
   checkGoldDraft,
   finalizeGoldDraft,
   getGoldDraft,
+  getGoldProposalRuns,
+  getGoldUnitReview,
   getGoldVersion,
   getLatestGoldVersion,
   removeGoldUnit,
   saveGoldUnitDecision,
   setGoldUnitCategory,
+  startProposalRun,
 } from "./store";
 
 /**
@@ -188,5 +195,88 @@ describe("Gold-Review abschließen", { timeout: 30_000 }, () => {
     await expect(removeGoldUnit(db, ETHICS)).rejects.toThrow(/Entwurf/);
     await addGoldUnit(db, { unitId: ETHICS, category: "b" });
     expect((await getGoldVersion(db, "gold-v1"))?.units).toEqual(expectedUnits);
+  });
+});
+
+describe("Vorschlagsläufe und Review", { timeout: 30_000 }, () => {
+  const proposal = (model: string) => ({
+    configuration: { harness: "fake", model, effort: "max" } as const,
+    parallelism: 2,
+    timeoutMs: 60_000,
+  });
+
+  test("ein Vorschlagslauf nutzt Gold-Brief und Web über die Units des Entwurfs", async () => {
+    const db = await databaseWithSnapshot();
+    await expect(startProposalRun(db, proposal("vorschlag-a"))).rejects.toThrow(/Entwurf/);
+    await addGoldUnit(db, { unitId: AVIATION, category: "a" });
+    await addGoldUnit(db, { unitId: ETHICS, category: "c" });
+
+    const { runId } = await startProposalRun(db, proposal("vorschlag-a"));
+    const goldPrompt = await buildBenchmarkPrompt(snapshot, { runKind: "proposal", mode: "web" });
+    expect(await getRun(db, runId)).toMatchObject({
+      kind: "proposal",
+      configuration: { harness: "fake", model: "vorschlag-a", effort: "max", mode: "web" },
+      promptHash: goldPrompt.promptHash,
+      progress: { total: 2, pending: 2 },
+    });
+    expect((await getGoldProposalRuns(db)).map((run) => run.id)).toEqual([runId]);
+  });
+
+  test("die Review zeigt beliebig viele Vorschläge je Unit nebeneinander mit Unterschieden", async () => {
+    const db = await databaseWithSnapshot();
+    await addGoldUnit(db, { unitId: AVIATION, category: "a" });
+    await addGoldUnit(db, { unitId: ETHICS, category: "c" });
+    const adapters = { fake: createFakeAdapter() };
+    const runA = (await startProposalRun(db, proposal("vorschlag-a"))).runId;
+    const runB = (await startProposalRun(db, proposal("vorschlag-b"))).runId;
+    const runC = (await startProposalRun(db, proposal("vorschlag-a"))).runId;
+    while ((await processNextRun(db, { adapters })) !== null) {}
+
+    const review = await getGoldUnitReview(db, AVIATION);
+    expect(review?.unit.unitName).toBe("Subcommittee on Aviation");
+    expect(review?.unit.jurisdictionText).toBeTruthy();
+    expect(review?.gold).toMatchObject({ unitId: AVIATION, category: "a", industries: [] });
+    expect(review?.proposals.map((p) => [p.runId, p.answer?.decision])).toEqual([
+      [runA, "mapped"],
+      [runB, "mapped"],
+      [runC, "mapped"],
+    ]);
+    expect(review?.proposals[1]).toMatchObject({
+      configuration: { model: "vorschlag-b" },
+      answer: {
+        label_uncertain: true,
+        uncertainty_note: "Ob Flugzeughersteller direkt betroffen sind, ist strittig.",
+        sources: [{ url: "https://www.faa.gov/aircraft/air_cert" }],
+      },
+    });
+    expect(review?.decisionsDiffer).toBe(false);
+    expect(
+      review?.industries.map(({ industryId, proposedBy, unanimous }) => ({
+        industryId,
+        proposedBy,
+        unanimous,
+      })),
+    ).toEqual([
+      { industryId: "aerospace-defense", proposedBy: [runB], unanimous: false },
+      { industryId: "airlines", proposedBy: [runA, runB, runC], unanimous: true },
+      { industryId: "airports-air-services", proposedBy: [runA, runC], unanimous: false },
+    ]);
+    expect(review?.industries[1]).toMatchObject({ industryName: "Airlines", sectorName: "Industrials" });
+
+    // Zusätzlich hinzugefügte Gold-Industries erscheinen ohne Vorschlag; abweichende Entscheidungen werden markiert.
+    await saveGoldUnitDecision(db, AVIATION, {
+      category: "a",
+      noMapping: false,
+      note: null,
+      industries: [{ industryId: "travel-services", class: "vertretbar", webOnly: true }],
+    });
+    const edited = await getGoldUnitReview(db, AVIATION);
+    expect(edited?.industries.find((row) => row.industryId === "travel-services")).toMatchObject({
+      proposedBy: [],
+      gold: { class: "vertretbar", webOnly: true },
+    });
+    const ethics = await getGoldUnitReview(db, ETHICS);
+    expect(ethics?.decisionsDiffer).toBe(true);
+    expect(ethics?.proposals.map((p) => p.answer?.decision)).toEqual(["no_mapping", "mapped", "no_mapping"]);
   });
 });

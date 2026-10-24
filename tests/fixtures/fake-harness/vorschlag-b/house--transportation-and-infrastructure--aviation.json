@@ -1,0 +1,39 @@
+{
+  "delayMs": 200,
+  "tokens": {
+    "input": 4200,
+    "cacheRead": 30000,
+    "cacheWrite": 0,
+    "output": 420,
+    "reasoning": 150
+  },
+  "webSearches": 2,
+  "nativeCostUsd": 0.012,
+  "response": {
+    "unit_id": "house--transportation-and-infrastructure--aviation",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "airlines",
+        "evidence_excerpt": "Aviation",
+        "rationale_short": "Fluggesellschaften sind direkt reguliert."
+      },
+      {
+        "industry_id": "aerospace-defense",
+        "evidence_excerpt": "Aviation",
+        "rationale_short": "Flugzeughersteller unterliegen der FAA-Zulassung."
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://www.faa.gov/aircraft/air_cert",
+        "belegt": "FAA-Musterzulassung fuer Flugzeughersteller"
+      }
+    ],
+    "label_uncertain": true,
+    "uncertainty_note": "Ob Flugzeughersteller direkt betroffen sind, ist strittig."
+  }
+}
