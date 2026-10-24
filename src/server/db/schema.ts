@@ -130,6 +130,8 @@ export const runs = pgTable("runs", {
   rateLimitedUntil: timestamp("rate_limited_until", { withTimezone: true }),
   /** Lebenszeichen des Workers, der den Lauf ausführt; veraltet es, gilt der Lauf als verwaist. */
   heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+  /** Kennung der letzten Übernahme durch einen Worker; nur dieser darf den Lauf weiter ausführen. */
+  claimId: text("claim_id"),
 });
 
 /**

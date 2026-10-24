@@ -1,4 +1,5 @@
-import { and, asc, count, eq, inArray, sql } from "drizzle-orm";
+import { randomUUID } from "node:crypto";
+import { and, asc, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { configurations, runs, unitResults } from "@/server/db/schema";
 import type { AdapterRegistry, HarnessAdapter, HarnessResult, HarnessTask } from "@/server/harness/adapter";
@@ -24,30 +25,56 @@ export interface RunnerDeps extends PromptRootOption {
   rateLimitRetryMs?: number;
   /** Abstand, in dem der Runner sein Lebenszeichen schreibt und auf einen Abbruch prüft (Standard 2 s). */
   heartbeatMs?: number;
+  /**
+   * Ein laufender Lauf, dessen Lebenszeichen älter ist, gilt als verwaist (Worker abgestürzt oder beendet)
+   * und wird übernommen (Standard 60 s).
+   */
+  staleAfterMs?: number;
 }
 
 const DEFAULT_TIMEOUT_GRACE_MS = 30_000;
 const DEFAULT_RATE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 const DEFAULT_HEARTBEAT_MS = 2_000;
+const DEFAULT_STALE_AFTER_MS = 60_000;
 
 /**
- * Übernimmt den ältesten wartenden Lauf und führt ihn aus. Liefert seine ID oder `null`, wenn keiner wartet.
- * Mehrere Worker können parallel arbeiten: ein Lauf wird genau einmal übernommen.
+ * Übernimmt den ältesten wartenden oder verwaisten Lauf und führt ihn aus. Liefert seine ID oder `null`, wenn
+ * keiner ansteht. Mehrere Worker können parallel arbeiten: ein Lauf wird genau einmal übernommen. Bei einem
+ * verwaisten Lauf werden die Units, die beim Absturz liefen, wieder offen; fertige bleiben.
  */
 export async function processNextRun(db: Database, deps: RunnerDeps): Promise<number | null> {
-  const [claimed] = await db
-    .update(runs)
-    .set({ status: "running", startedAt: sql`coalesce(${runs.startedAt}, now())` })
+  const staleBefore = new Date(Date.now() - (deps.staleAfterMs ?? DEFAULT_STALE_AFTER_MS));
+  const next = db
+    .select({ id: runs.id })
+    .from(runs)
     .where(
-      eq(
-        runs.id,
-        sql`(select ${runs.id} from ${runs} where ${runs.status} = 'queued' order by ${runs.id} limit 1 for update skip locked)`,
+      or(
+        eq(runs.status, "queued"),
+        and(eq(runs.status, "running"), or(isNull(runs.heartbeatAt), lt(runs.heartbeatAt, staleBefore))),
       ),
     )
+    .orderBy(asc(runs.id))
+    .limit(1)
+    .for("update", { skipLocked: true });
+  const claimId = randomUUID();
+  const [claimed] = await db
+    .update(runs)
+    .set({
+      claimId,
+      status: "running",
+      startedAt: sql`coalesce(${runs.startedAt}, now())`,
+      heartbeatAt: new Date(),
+      rateLimitedUntil: null,
+    })
+    .where(inArray(runs.id, next))
     .returning({ id: runs.id });
   if (!claimed) return null;
+  await db
+    .update(unitResults)
+    .set({ status: "pending" })
+    .where(and(eq(unitResults.runId, claimed.id), eq(unitResults.status, "running")));
   try {
-    await executeRun(db, claimed.id, deps);
+    await executeRun(db, claimed.id, claimId, deps);
   } catch (error) {
     await db
       .update(runs)
@@ -57,7 +84,7 @@ export async function processNextRun(db: Database, deps: RunnerDeps): Promise<nu
   return claimed.id;
 }
 
-async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promise<void> {
+async function executeRun(db: Database, runId: number, claimId: string, deps: RunnerDeps): Promise<void> {
   const [row] = await db
     .select({ run: runs, configuration: configurations })
     .from(runs)
@@ -85,13 +112,17 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
     .where(and(eq(unitResults.runId, runId), eq(unitResults.status, "pending")))
     .orderBy(asc(unitResults.unitId));
   const stop = new AbortController();
-  /** Schreibt das Lebenszeichen; ist der Lauf nicht mehr `running` (abgebrochen), endet die Ausführung. */
+  const ownRun = and(eq(runs.id, runId), eq(runs.status, "running"), eq(runs.claimId, claimId));
+  /**
+   * Schreibt das Lebenszeichen. Läuft der Lauf nicht mehr (abgebrochen) oder hat ihn ein anderer Worker
+   * übernommen, endet die Ausführung.
+   */
   const heartbeat = async (): Promise<boolean> => {
     if (stop.signal.aborted) return false;
     const [alive] = await db
       .update(runs)
       .set({ heartbeatAt: new Date() })
-      .where(and(eq(runs.id, runId), eq(runs.status, "running")))
+      .where(ownRun)
       .returning({ id: runs.id });
     if (!alive) stop.abort();
     return Boolean(alive);
@@ -133,10 +164,7 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
     .from(unitResults)
     .where(and(eq(unitResults.runId, runId), inArray(unitResults.status, ["pending", "running"])));
   if (unfinished === 0) {
-    await db
-      .update(runs)
-      .set({ status: "completed", finishedAt: new Date() })
-      .where(and(eq(runs.id, runId), eq(runs.status, "running")));
+    await db.update(runs).set({ status: "completed", finishedAt: new Date() }).where(ownRun);
   }
 }
 
@@ -165,6 +193,9 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
   const { db, runId, prompt, rateLimit } = context;
   const unitPrompt = prompt.forUnit(unitId);
   const where = and(eq(unitResults.runId, runId), eq(unitResults.unitId, unitId));
+  // Ergebnisse nur für eine Unit, die (noch) als laufend gilt: hat ein anderer Worker den Lauf übernommen
+  // und die Unit fertig, verfällt das späte Ergebnis.
+  const whereRunning = and(where, eq(unitResults.status, "running"));
   const task: HarnessTask = {
     ...context.task,
     unitId,
@@ -186,14 +217,14 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     await rateLimit.whenOpen();
     let result = await call();
     if (result?.outcome.kind === "rate_limit") {
-      await db.update(unitResults).set({ status: "pending" }).where(where);
+      await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       result = await rateLimit.represent(call);
       if (!result && !(await context.proceed())) return;
       if (!result) continue;
     }
     if (!result) {
       // Abgebrochen: die Unit bleibt bzw. wird wieder offen (ein erster Fehlversuch verfällt).
-      await db.update(unitResults).set({ status: "pending" }).where(where);
+      await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       return;
     }
     attempts.push(result);
@@ -201,13 +232,13 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
       await db
         .update(unitResults)
         .set({ attempts: sql`${unitResults.attempts} + 1` })
-        .where(where);
+        .where(whereRunning);
       continue;
     }
     await db
       .update(unitResults)
       .set({ ...resultColumns(combineAttempts(attempts)), attempts: sql`${unitResults.attempts} + 1` })
-      .where(where);
+      .where(whereRunning);
     return;
   }
 }
