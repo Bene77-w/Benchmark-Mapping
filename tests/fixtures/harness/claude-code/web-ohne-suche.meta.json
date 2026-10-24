@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "command": "claude -p --system-prompt <9258 Zeichen> --json-schema <1341 Zeichen> --output-format json --verbose --model haiku --effort low --tools WebSearch,WebFetch --safe-mode --no-session-persistence --strict-mcp-config",
+  "task": {
+    "unitId": "senate--finance--energy-natural-resources-and-infrastructure",
+    "model": "haiku",
+    "effort": "low",
+    "mode": "web",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "durationMs": 9733
+}
