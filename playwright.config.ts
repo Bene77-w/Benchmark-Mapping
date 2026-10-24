@@ -11,7 +11,17 @@ export default defineConfig({
   fullyParallel: true,
   reporter: "list",
   use: { baseURL: `http://localhost:${port}`, trace: "retain-on-failure" },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /gold\.spec\.ts/ },
+    // Gold-Review nach den übrigen Tests: das Kompilieren der großen Gold-Seiten im Dev-Server bremst sonst
+    // parallele Navigationen über deren 5-s-Grenzen hinaus.
+    {
+      name: "gold",
+      use: { ...devices["Desktop Chrome"] },
+      testMatch: /gold\.spec\.ts/,
+      dependencies: ["chromium"],
+    },
+  ],
   webServer: [
     {
       command: "pnpm dev",

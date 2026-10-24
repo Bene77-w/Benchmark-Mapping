@@ -66,7 +66,8 @@ async function GoldContent() {
 
   return (
     <>
-      <AutoRefresh active={active} />
+      {/* Seltener als auf der Lauf-Seite: die Seite ist groß (alle Units des Snapshots zur Auswahl). */}
+      <AutoRefresh active={active} intervalMs={3000} />
       <section className="space-y-2">
         <h2 className="text-lg font-medium">Gold-Versionen</h2>
         {versions.length === 0 ? (
