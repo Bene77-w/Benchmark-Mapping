@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
-import { readTestGold } from "@/server/gold/test-gold";
+import { getActiveGold } from "@/server/gold/active";
 import { HARNESS_LABELS } from "@/server/harness/adapter";
 import { AVAILABLE_HARNESSES } from "@/server/harness/registry";
 import {
@@ -35,7 +35,7 @@ async function RunsContent() {
   await connection();
   const db = getDatabase();
   const [gold, configurations, runs] = await Promise.all([
-    readTestGold(),
+    getActiveGold(db),
     listConfigurations(db),
     listRuns(db),
   ]);
@@ -45,7 +45,13 @@ async function RunsContent() {
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Neuer Lauf</h2>
         <p className="text-sm text-muted-foreground">
-          Gold: <span data-testid="gold-version">{gold.version}</span> (Fixture, {gold.units.length} Units).
+          {gold ? (
+            <>
+              Gold: <span data-testid="gold-version">{gold.version}</span> ({gold.units.length} Units).
+            </>
+          ) : (
+            <>Noch keine Gold-Version – Läufe brauchen eine abgeschlossene Gold-Review unter „Gold“.</>
+          )}{" "}
           Läufe führt der Worker aus (<code>pnpm worker</code>), unabhängig von dieser Seite.
         </p>
         <NewRunForm

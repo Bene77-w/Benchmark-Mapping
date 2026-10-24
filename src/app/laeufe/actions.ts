@@ -1,11 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDatabase } from "@/server/db/client";
-import { readTestGold } from "@/server/gold/test-gold";
+import { requireActiveGold } from "@/server/gold/active";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
-import { createRun, createRunFromConfiguration } from "@/server/runs/store";
+import { cancelRun, createRun, createRunFromConfiguration, resumeRun } from "@/server/runs/store";
 
 export interface StartRunState {
   error: string | null;
@@ -25,7 +26,7 @@ export async function startRun(_previous: StartRunState, formData: FormData): Pr
   let runId: number;
   try {
     const form = formSchema.parse(Object.fromEntries(formData));
-    const gold = await readTestGold();
+    const gold = await requireActiveGold(getDatabase());
     ({ runId } = await createRun(getDatabase(), {
       configuration: configurationSchema.parse(form),
       parallelism: form.parallelism,
@@ -41,13 +42,27 @@ export async function startRun(_previous: StartRunState, formData: FormData): Pr
 /** Startet eine gespeicherte Konfiguration erneut. */
 export async function restartConfiguration(formData: FormData): Promise<void> {
   const configurationId = z.coerce.number().int().parse(formData.get("configurationId"));
-  const gold = await readTestGold();
+  const gold = await requireActiveGold(getDatabase());
   const { runId } = await createRunFromConfiguration(
     getDatabase(),
     configurationId,
     gold.units.map((unit) => unit.unitId),
   );
   redirect(`/laeufe/${runId}`);
+}
+
+/** Bricht einen Lauf ab; der Worker startet danach keine Units mehr. */
+export async function cancelRunAction(formData: FormData): Promise<void> {
+  const runId = z.coerce.number().int().parse(formData.get("runId"));
+  await cancelRun(getDatabase(), runId);
+  revalidatePath(`/laeufe/${runId}`);
+}
+
+/** Setzt einen abgebrochenen Lauf fort; nur offene Units werden noch aufgerufen. */
+export async function resumeRunAction(formData: FormData): Promise<void> {
+  const runId = z.coerce.number().int().parse(formData.get("runId"));
+  await resumeRun(getDatabase(), runId);
+  revalidatePath(`/laeufe/${runId}`);
 }
 
 function describe(error: unknown): string {
