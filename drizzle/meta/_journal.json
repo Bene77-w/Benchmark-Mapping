@@ -19,8 +19,29 @@
     {
       "idx": 2,
       "version": "7",
-      "when": 1792802171759,
-      "tag": "0002_pricing",
+      "when": 1792802430666,
+      "tag": "0002_evaluations",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792825829895,
+      "tag": "0003_robuster_runner",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792826609878,
+      "tag": "0004_preflight",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792827185733,
+      "tag": "0005_pricing",
       "breakpoints": true
     }
   ]

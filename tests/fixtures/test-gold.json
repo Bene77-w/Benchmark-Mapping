@@ -4,27 +4,60 @@
   "units": [
     {
       "unitId": "house--transportation-and-infrastructure--aviation",
+      "category": "b",
       "noMapping": false,
       "industries": [
-        { "industryId": "airlines", "class": "positiv" },
-        { "industryId": "airports-air-services", "class": "positiv" },
-        { "industryId": "aerospace-defense", "class": "vertretbar" }
+        {
+          "industryId": "airlines",
+          "class": "positiv"
+        },
+        {
+          "industryId": "airports-air-services",
+          "class": "positiv"
+        },
+        {
+          "industryId": "aerospace-defense",
+          "class": "vertretbar"
+        }
       ]
     },
     {
       "unitId": "house--agriculture--livestock-dairy-and-poultry",
+      "category": "a",
       "noMapping": false,
       "industries": [
-        { "industryId": "farm-products", "class": "positiv" },
-        { "industryId": "packaged-foods", "class": "positiv" }
+        {
+          "industryId": "farm-products",
+          "class": "positiv"
+        },
+        {
+          "industryId": "packaged-foods",
+          "class": "positiv"
+        }
       ]
     },
-    { "unitId": "house--ethics", "noMapping": true, "industries": [] },
+    {
+      "unitId": "house--ethics",
+      "category": "c",
+      "noMapping": true,
+      "industries": []
+    },
     {
       "unitId": "house--veterans-affairs--health",
+      "category": "b",
       "noMapping": false,
-      "industries": [{ "industryId": "medical-care-facilities", "class": "positiv" }]
+      "industries": [
+        {
+          "industryId": "medical-care-facilities",
+          "class": "positiv"
+        }
+      ]
     },
-    { "unitId": "joint--joint-economic-committee", "noMapping": true, "industries": [] }
+    {
+      "unitId": "joint--joint-economic-committee",
+      "category": "d",
+      "noMapping": true,
+      "industries": []
+    }
   ]
 }

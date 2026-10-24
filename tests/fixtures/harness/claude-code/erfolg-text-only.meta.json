@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "command": "claude -p --system-prompt <9385 Zeichen> --json-schema <1341 Zeichen> --output-format json --verbose --model haiku --effort low --tools \"\" --safe-mode --no-session-persistence --strict-mcp-config",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "haiku",
+    "effort": "low",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "durationMs": 5397
+}

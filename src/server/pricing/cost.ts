@@ -140,8 +140,9 @@ export function estimateRunCost(run: RunCostInput, table: PriceTable): RunCosts 
       unknownUnits += 1;
       reasons.add(cost.reason);
     }
-    if (unit.nativeCostUsd === null) unitsWithout += 1;
-    else nativeUsd = (nativeUsd ?? 0) + unit.nativeCostUsd;
+    const native = nativeCostOf(unit);
+    if (native === null) unitsWithout += 1;
+    else nativeUsd = (nativeUsd ?? 0) + native;
   }
   return {
     units,
@@ -151,4 +152,17 @@ export function estimateRunCost(run: RunCostInput, table: PriceTable): RunCosts 
         : { kind: "unknown", knownUsd, unknownUnits, reasons: [...reasons] },
     native: { usd: nativeUsd, unitsWithout },
   };
+}
+
+/**
+ * Native Kostenangabe einer Unit zur Gegenprobe. Bei einer fehlgeschlagenen Unit gilt 0 als keine Angabe
+ * (`null`): Claude Code meldet nach einem Fehler oft `total_cost_usd: 0`, obwohl Kosten angefallen sein
+ * können. Bei einer fertigen Unit bleibt 0 ein Wert (z. B. OpenCode bei Abo- oder Free-Modellen).
+ */
+export function nativeCostOf(unit: {
+  status: UnitResultStatus;
+  nativeCostUsd: number | null;
+}): number | null {
+  if (unit.nativeCostUsd === 0 && unit.status === "failed") return null;
+  return unit.nativeCostUsd;
 }
