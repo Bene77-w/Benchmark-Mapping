@@ -2,6 +2,7 @@ import { type AdapterRegistry, HARNESSES, type Harness, type HarnessAdapter } fr
 import { createClaudeCodeAdapter } from "./claude-code";
 import { createCodexAdapter } from "./codex";
 import { createFakeAdapter } from "./fake";
+import { createOpencodeAdapter } from "./opencode";
 
 /**
  * Die Adapter, mit denen der Worker Läufe ausführt; je Harness eine Fabrik. Ein Harness ohne Fabrik ist in
@@ -10,7 +11,10 @@ import { createFakeAdapter } from "./fake";
  * Umgebung: `FAKE_HARNESS_ROOT` (Szenario-Verzeichnis des Fake-Harness, Standard `tests/fixtures/fake-harness`),
  * `CLAUDE_CODE_COMMAND` (Name oder Pfad der Claude-Code-CLI, Standard `claude`), `CODEX_COMMAND` (Standard
  * `codex`), `CODEX_AUTH_HOME` (Verzeichnis, aus dem `auth.json` verlinkt wird; Standard `CODEX_HOME` bzw.
- * `~/.codex`) und `CODEX_EXPECTED_PLAN` (geforderter `plan_type` im Preflight, Standard `plus`).
+ * `~/.codex`), `CODEX_EXPECTED_PLAN` (geforderter `plan_type` im Preflight, Standard `plus`), `OPENCODE_COMMAND`
+ * (Standard `opencode`), `OPENCODE_DATA_HOME` (Basis des Datenverzeichnisses mit Anmeldung und Sitzungen, Standard
+ * `XDG_DATA_HOME` bzw. `~/.local/share`) und `OPENCODE_WEBSEARCH_PROVIDER` (Suchanbieter; ohne ihn keine
+ * OpenCode-Läufe mit Web).
  */
 const FACTORIES: Partial<Record<Harness, (env: NodeJS.ProcessEnv) => HarnessAdapter>> = {
   claude_code: (env) => createClaudeCodeAdapter({ command: env.CLAUDE_CODE_COMMAND, env }),
@@ -20,6 +24,7 @@ const FACTORIES: Partial<Record<Harness, (env: NodeJS.ProcessEnv) => HarnessAdap
       env,
       expectedPlan: env.CODEX_EXPECTED_PLAN || undefined,
     }),
+  opencode: (env) => createOpencodeAdapter({ command: env.OPENCODE_COMMAND, env }),
   fake: (env) => createFakeAdapter({ root: env.FAKE_HARNESS_ROOT }),
 };
 
