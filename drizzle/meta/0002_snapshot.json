@@ -1,5 +1,5 @@
 {
-  "id": "66dc7e60-e405-4cc5-8c0b-b0522c633b99",
+  "id": "d5e0f9bb-8d5e-440a-91a6-4a4f3cf454cc",
   "prevId": "7f2449f3-77c5-4a26-b970-9cf26456c799",
   "version": "7",
   "dialect": "postgresql",
@@ -61,6 +61,120 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.evaluations": {
+      "name": "evaluations",
+      "schema": "",
+      "columns": {
+        "run_id": {
+          "name": "run_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gold_version": {
+          "name": "gold_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "gold_hash": {
+          "name": "gold_hash",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "scoring_version": {
+          "name": "scoring_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "complete": {
+          "name": "complete",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "score": {
+          "name": "score",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval_low": {
+          "name": "interval_low",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "interval_high": {
+          "name": "interval_high",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "format_errors": {
+          "name": "format_errors",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "violation_count": {
+          "name": "violation_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evidence_fidelity": {
+          "name": "evidence_fidelity",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "result": {
+          "name": "result",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "evaluated_at": {
+          "name": "evaluated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "evaluations_run_id_runs_id_fk": {
+          "name": "evaluations_run_id_runs_id_fk",
+          "tableFrom": "evaluations",
+          "tableTo": "runs",
+          "columnsFrom": [
+            "run_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "evaluations_run_id_gold_version_pk": {
+          "name": "evaluations_run_id_gold_version_pk",
+          "columns": [
+            "run_id",
+            "gold_version"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -235,18 +349,6 @@
         },
         "finished_at": {
           "name": "finished_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rate_limited_until": {
-          "name": "rate_limited_until",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "heartbeat_at": {
-          "name": "heartbeat_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": false

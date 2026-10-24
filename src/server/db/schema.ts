@@ -14,6 +14,7 @@ import { HARNESS_ERROR_KINDS, HARNESSES } from "@/server/harness/adapter";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import { RUN_STATUSES, UNIT_RESULT_STATUSES } from "@/server/runs/model";
+import type { RunEvaluation } from "@/server/scoring/model";
 import type { SnapshotSource } from "@/server/snapshot/model";
 
 /** Ein geladener Snapshot. Läufe beziehen sich später auf ihn (über `id` bzw. `contentHash`). */
@@ -170,4 +171,32 @@ export const unitResults = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.runId, table.unitId] })],
+);
+
+/**
+ * Bewertung eines Laufs gegen eine Gold-Version (ein Eintrag je Lauf und Gold-Version). `result` ist die
+ * vollständige Bewertung; die Kennzahlen stehen zusätzlich als Spalten für Rangliste und Diagramme.
+ * `goldHash` und `scoringVersion` zeigen, ob die Bewertung zum aktuellen Gold-Inhalt und Regelstand passt.
+ */
+export const evaluations = pgTable(
+  "evaluations",
+  {
+    runId: integer("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    goldVersion: text("gold_version").notNull(),
+    goldHash: text("gold_hash").notNull(),
+    scoringVersion: text("scoring_version").notNull(),
+    /** Jede Unit der Gold-Version hat ein Ergebnis; sonst ist der Lauf für diese Gold-Version unvollständig. */
+    complete: boolean("complete").notNull(),
+    score: doublePrecision("score"),
+    intervalLow: doublePrecision("interval_low"),
+    intervalHigh: doublePrecision("interval_high"),
+    formatErrors: integer("format_errors").notNull(),
+    violationCount: integer("violation_count").notNull(),
+    evidenceFidelity: doublePrecision("evidence_fidelity"),
+    result: jsonb("result").$type<RunEvaluation>().notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.runId, table.goldVersion] })],
 );
