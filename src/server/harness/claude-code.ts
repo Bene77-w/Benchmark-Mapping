@@ -3,6 +3,7 @@ import type { HarnessAdapter, HarnessOutcome, HarnessResult, HarnessTask } from 
 import { buildClaudeArgs, describeArgs } from "./claude-code-command";
 import { looksRateLimited, readClaudeOutput } from "./claude-code-output";
 import {
+  type CliEnv,
   type CliInvocation,
   type CliOutcome,
   type CliRunner,
@@ -24,7 +25,7 @@ const CLAUDE_ENV = ["CLAUDE_CONFIG_DIR"];
 
 export interface ClaudeInvocationOptions {
   cwd: string;
-  env: NodeJS.ProcessEnv;
+  env: CliEnv;
   command?: string;
 }
 
@@ -60,7 +61,7 @@ export interface ClaudeCodeAdapterOptions {
   /** Name oder Pfad der CLI, Standard `claude`. */
   command?: string;
   /** Umgebung, aus der die erlaubten Variablen übernommen werden (Standard `process.env`). */
-  env?: NodeJS.ProcessEnv;
+  env?: CliEnv;
   /** Startet die CLI; in Tests ein abgespielter Runner (Seam 3). */
   runCli?: CliRunner;
 }
