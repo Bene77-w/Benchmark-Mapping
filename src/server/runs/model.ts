@@ -88,6 +88,8 @@ export interface RunSummary {
   createdAt: Date;
   startedAt: Date | null;
   finishedAt: Date | null;
+  /** Bei Ratenlimit: wann der Runner das nächste Mal stellvertretend nachfragt; sonst `null`. */
+  rateLimitedUntil: Date | null;
   progress: RunProgress;
 }
 

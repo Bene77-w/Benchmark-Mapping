@@ -437,6 +437,55 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
   });
 });
 
+describe("Ratenlimit", { timeout: 30_000 }, () => {
+  test("alle parallelen Aufrufe warten gemeinsam; nur eine Unit fragt im Takt stellvertretend nach, danach geht es weiter", async () => {
+    const db = await databaseWithSnapshot();
+    // Der Runner nimmt offene Units nach unit_id.
+    const [first, second, third, fourth] = [...STANDARD_UNITS].sort();
+    const root = await fakeScenario("ratenlimit", {
+      [first]: {
+        calls: [
+          { simulate: "rate_limit", resetAt: "2026-10-24T12:00:00Z" },
+          { simulate: "rate_limit" },
+          { response: noMappingAnswer(first) },
+        ],
+      },
+      [second]: { calls: [{ simulate: "rate_limit", delayMs: 50 }, { response: noMappingAnswer(second) }] },
+      [third]: { response: noMappingAnswer(third) },
+      [fourth]: { response: noMappingAnswer(fourth) },
+    });
+    const adapter = countingAdapter(createFakeAdapter({ root }));
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "ratenlimit" },
+      parallelism: 2,
+      unitIds: [first, second, third, fourth],
+    });
+
+    const started = Date.now();
+    const processing = processNextRun(db, { adapters: { fake: adapter }, rateLimitRetryMs: 400 });
+
+    // Während des Wartens zeigt der Lauf, bis wann gewartet wird; die wartenden Units sind wieder offen.
+    await expect.poll(async () => (await getRun(db, runId))?.rateLimitedUntil ?? null).toBeInstanceOf(Date);
+    const waiting = await getRun(db, runId);
+    expect(waiting?.status).toBe("running");
+    expect(waiting?.rateLimitedUntil?.getTime()).toBeGreaterThan(Date.now());
+    await processing;
+
+    expect(Date.now() - started).toBeGreaterThanOrEqual(800);
+    // Erst die beiden parallelen Aufrufe, dann nur die stellvertretenden Nachfragen, dann der Rest.
+    expect(new Set(adapter.calls.slice(0, 2))).toEqual(new Set([first, second]));
+    expect(adapter.calls.slice(2, 4)).toEqual([first, first]);
+    expect(new Set(adapter.calls.slice(4))).toEqual(new Set([second, third, fourth]));
+    expect(adapter.calls).toHaveLength(7);
+
+    const run = await getRun(db, runId);
+    expect(run).toMatchObject({ status: "completed", rateLimitedUntil: null });
+    expect(run?.progress).toMatchObject({ done: 4, failed: 0 });
+    // Aufrufe mit Ratenlimit zählen nicht als Versuch.
+    expect(run?.units.map((unit) => unit.attempts)).toEqual([1, 1, 1, 1]);
+  });
+});
+
 /** Legt ein Fake-Szenario `name` mit je einer Datei pro Unit an und liefert die Wurzel. */
 async function fakeScenario(name: string, files: Record<string, unknown>): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "fake-harness-"));

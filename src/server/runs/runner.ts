@@ -4,6 +4,7 @@ import { configurations, runs, unitResults } from "@/server/db/schema";
 import type { AdapterRegistry, HarnessAdapter, HarnessResult, HarnessTask } from "@/server/harness/adapter";
 import { type BenchmarkPrompt, buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { getSnapshotContent } from "@/server/snapshot/store";
+import { RateLimitWait } from "./rate-limit";
 import type { PromptRootOption } from "./store";
 
 /**
@@ -19,9 +20,12 @@ export interface RunnerDeps extends PromptRootOption {
    * Aufruf selbst als Timeout (Standard 30 s; Adapter erzwingen das Timeout eigentlich selbst).
    */
   timeoutGraceMs?: number;
+  /** Takt der stellvertretenden Nachfrage bei Ratenlimit (Standard 10 min; in Tests kürzer). */
+  rateLimitRetryMs?: number;
 }
 
 const DEFAULT_TIMEOUT_GRACE_MS = 30_000;
+const DEFAULT_RATE_LIMIT_RETRY_MS = 10 * 60 * 1000;
 
 /**
  * Übernimmt den ältesten wartenden Lauf und führt ihn aus. Liefert seine ID oder `null`, wenn keiner wartet.
@@ -89,6 +93,13 @@ async function executeRun(db: Database, runId: number, deps: RunnerDeps): Promis
       timeoutMs: run.timeoutMs,
     },
     timeoutGraceMs: deps.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS,
+    rateLimit: new RateLimitWait({
+      intervalMs: deps.rateLimitRetryMs ?? DEFAULT_RATE_LIMIT_RETRY_MS,
+      signal: new AbortController().signal,
+      onChange: async (until) => {
+        await db.update(runs).set({ rateLimitedUntil: until }).where(eq(runs.id, runId));
+      },
+    }),
   };
   await forEachLimited(
     open.map(({ unitId }) => unitId),
@@ -113,25 +124,21 @@ interface RunContext {
   prompt: BenchmarkPrompt;
   task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
   timeoutGraceMs: number;
+  rateLimit: RateLimitWait;
 }
 
 /** Fehlerarten, die genau einen Wiederholversuch auslösen; danach zählen sie als Format-Fehler. */
 const RETRYABLE = new Set<HarnessResult["outcome"]["kind"]>(["timeout", "invalid_json", "schema_violation"]);
 
+/**
+ * Führt eine Unit aus und schreibt ihr Ergebnis. Ein Ratenlimit zählt nicht als Versuch: die Unit wartet
+ * mit allen anderen (siehe `RateLimitWait`) und wird danach erneut aufgerufen. Timeout, ungültiges JSON und
+ * Schemaverstoß lösen genau einen Wiederholversuch aus.
+ */
 async function runUnit(context: RunContext, unitId: string): Promise<void> {
-  const { db, runId, prompt } = context;
+  const { db, runId, prompt, rateLimit } = context;
   const unitPrompt = prompt.forUnit(unitId);
   const where = and(eq(unitResults.runId, runId), eq(unitResults.unitId, unitId));
-  const startAttempt = () =>
-    db
-      .update(unitResults)
-      .set({
-        status: "running",
-        startedAt: new Date(),
-        unitPromptHash: unitPrompt.unitPromptHash,
-        attempts: sql`${unitResults.attempts} + 1`,
-      })
-      .where(where);
   const task: HarnessTask = {
     ...context.task,
     unitId,
@@ -139,14 +146,37 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     userPrompt: unitPrompt.userPrompt,
     outputSchema: prompt.outputSchema,
   };
+  const call = async () => {
+    await db
+      .update(unitResults)
+      .set({ status: "running", startedAt: new Date(), unitPromptHash: unitPrompt.unitPromptHash })
+      .where(where);
+    return callAdapter(context, task);
+  };
 
-  await startAttempt();
-  let result = await callAdapter(context, task);
-  if (RETRYABLE.has(result.outcome.kind)) {
-    await startAttempt();
-    result = combineAttempts([result, await callAdapter(context, task)]);
+  const attempts: HarnessResult[] = [];
+  for (;;) {
+    await rateLimit.whenOpen();
+    let result: HarnessResult | null = await call();
+    if (result.outcome.kind === "rate_limit") {
+      await db.update(unitResults).set({ status: "pending" }).where(where);
+      result = await rateLimit.represent(call);
+      if (!result) continue;
+    }
+    attempts.push(result);
+    if (attempts.length === 1 && RETRYABLE.has(result.outcome.kind)) {
+      await db
+        .update(unitResults)
+        .set({ attempts: sql`${unitResults.attempts} + 1` })
+        .where(where);
+      continue;
+    }
+    await db
+      .update(unitResults)
+      .set({ ...resultColumns(combineAttempts(attempts)), attempts: sql`${unitResults.attempts} + 1` })
+      .where(where);
+    return;
   }
-  await db.update(unitResults).set(resultColumns(result)).where(where);
 }
 
 /**
@@ -173,6 +203,7 @@ async function callAdapter(context: RunContext, task: HarnessTask): Promise<Harn
 function combineAttempts(attempts: HarnessResult[]): HarnessResult {
   const last = attempts[attempts.length - 1];
   const withTokens = attempts.flatMap((attempt) => (attempt.tokens ? [attempt.tokens] : []));
+  if (attempts.length === 1) return last;
   return {
     ...last,
     log: attempts.map((attempt, index) => `--- Versuch ${index + 1} ---\n${attempt.log}`).join("\n"),

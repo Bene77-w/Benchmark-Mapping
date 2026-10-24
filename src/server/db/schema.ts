@@ -125,6 +125,10 @@ export const runs = pgTable("runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  /** Bei Ratenlimit: Zeitpunkt der nächsten stellvertretenden Nachfrage; sonst `null`. */
+  rateLimitedUntil: timestamp("rate_limited_until", { withTimezone: true }),
+  /** Lebenszeichen des Workers, der den Lauf ausführt; veraltet es, gilt der Lauf als verwaist. */
+  heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
 });
 
 /**

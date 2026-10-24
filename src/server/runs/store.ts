@@ -199,6 +199,7 @@ async function selectRunSummaries(db: Database, runId?: number): Promise<RunSumm
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
+    rateLimitedUntil: run.rateLimitedUntil,
     progress: toProgress(counts.filter((row) => row.runId === run.id)),
   }));
 }
