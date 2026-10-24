@@ -195,3 +195,40 @@ describe("Hinzugefügte Units", { timeout: 60_000 }, () => {
     expect(await getReevaluationStatus(db, v2)).toMatchObject({ evaluated: 1, complete: 1, incomplete: 0 });
   });
 });
+
+describe("Entfernte Units", { timeout: 60_000 }, () => {
+  test("Antworten zu entfernten Units bleiben erhalten, zählen nicht und bei Wiederaufnahme wieder", async () => {
+    const db = await databaseWithSnapshot();
+    const { adapter, calls } = countingAdapter();
+    await freezeFirstGold(db, [AVIATION, LIVESTOCK, ETHICS, VETERANS, JEC]);
+    const runId = await runToCompletion(db, adapter, [AVIATION, LIVESTOCK, ETHICS, VETERANS, JEC]);
+    const v1Score = (1 + 2 / 3 + 1 + 0 + 0) / 5;
+    expect(
+      (await listCurrentEvaluations(db, await goldOf(db, "gold-v1"))).runs[0].evaluation.score,
+    ).toBeCloseTo(v1Score, 10);
+    const callsBefore = calls.length;
+
+    // gold-v2 ohne Veterans (invalid_json, Score 0).
+    await startGoldDraftFromVersion(db, "gold-v1");
+    await removeGoldUnit(db, VETERANS);
+    await finalizeGoldDraft(db);
+    const v2 = await listCurrentEvaluations(db, await goldOf(db, "gold-v2"));
+    expect(v2.runs.map((entry) => entry.run.id)).toEqual([runId]);
+    expect(v2.runs[0].evaluation.score).toBeCloseTo((1 + 2 / 3 + 1 + 0) / 4, 10);
+    expect(v2.runs[0].evaluation.units.map((unit) => unit.unitId)).not.toContain(VETERANS);
+    expect(v2.runs[0].evaluation.formatErrors).toBe(0);
+    const kept = (await getRun(db, runId))?.units.find((unit) => unit.unitId === VETERANS);
+    expect(kept).toMatchObject({ status: "failed", error: { kind: "invalid_json" } });
+    expect(kept?.rawResponse).toBeTruthy();
+
+    // gold-v3 nimmt Veterans wieder auf: das gespeicherte Ergebnis zählt wieder, ohne neuen Aufruf.
+    await startGoldDraftFromVersion(db, "gold-v2");
+    await addTestGoldUnit(db, VETERANS);
+    await finalizeGoldDraft(db);
+    const v3 = await listCurrentEvaluations(db, await goldOf(db, "gold-v3"));
+    expect(v3.incomplete).toEqual([]);
+    expect(v3.runs[0].evaluation.score).toBeCloseTo(v1Score, 10);
+    expect(v3.runs[0].evaluation.formatErrors).toBe(1);
+    expect(calls.length).toBe(callsBefore);
+  });
+});

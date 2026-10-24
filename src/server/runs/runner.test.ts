@@ -1,7 +1,7 @@
 import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { beforeAll, describe, expect, test } from "vitest";
+import { beforeAll, describe, expect, test, vi } from "vitest";
 import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
 import { readTestGold } from "@/server/gold/test-gold";
@@ -26,6 +26,7 @@ import {
   listConfigurations,
   listRuns,
   resumeRun,
+  supplementRun,
 } from "./store";
 
 /**
@@ -690,6 +691,111 @@ function countingAdapter(adapter: HarnessAdapter) {
     },
   };
 }
+
+describe("Ergänzen fehlender Units", { timeout: 30_000 }, () => {
+  const [aviation, livestock, ethics, veterans, jec] = STANDARD_UNITS;
+
+  async function completedRun(db: Database, unitIds: string[]): Promise<number> {
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds });
+    expect(await processNextRun(db, { adapters: { fake: createFakeAdapter() } })).toBe(runId);
+    return runId;
+  }
+
+  test("scheitert der Preflight der Ergänzung, lässt sie sich erneut anstoßen; Abbrechen und Fortsetzen wie bei jedem Lauf", async () => {
+    const db = await databaseWithSnapshot();
+    const runId = await completedRun(db, [aviation, ethics, livestock, veterans]);
+    const before = await getRun(db, runId);
+    const fake = createFakeAdapter();
+    const blocked: HarnessAdapter = {
+      ...countingAdapter(fake),
+      preflight: async () => ({
+        ok: false,
+        checkedAt: new Date().toISOString(),
+        cliVersion: null,
+        checks: [{ id: "cli", label: "CLI erreichbar", status: "failed", message: "nicht gefunden" }],
+      }),
+    };
+
+    expect(await supplementRun(db, runId, STANDARD_UNITS)).toEqual({ added: [jec] });
+    expect(await processNextRun(db, { adapters: { fake: blocked } })).toBe(runId);
+    const failed = await getRun(db, runId);
+    expect(failed).toMatchObject({
+      status: "failed",
+      progress: { total: 5, pending: 1, done: 3, failed: 1 },
+    });
+    expect(failed?.error).toMatch(/Preflight fehlgeschlagen/);
+    expect(failed?.units.filter((unit) => unit.unitId !== jec)).toEqual(before?.units);
+
+    // Erneut anstoßen: nichts mehr hinzuzufügen, die offene Unit wartet wieder auf den Worker.
+    expect(await supplementRun(db, runId, STANDARD_UNITS)).toEqual({ added: [] });
+    expect(await getRun(db, runId)).toMatchObject({ status: "queued", error: null, finishedAt: null });
+    await cancelRun(db, runId);
+    await expect(supplementRun(db, runId, STANDARD_UNITS)).rejects.toThrow(/ergänzen/);
+    expect(await processNextRun(db, { adapters: { fake } })).toBeNull();
+    await resumeRun(db, runId);
+
+    const resumed = countingAdapter(fake);
+    expect(await processNextRun(db, { adapters: { fake: { ...resumed, preflight: fake.preflight } } })).toBe(
+      runId,
+    );
+    expect(resumed.calls).toEqual([jec]);
+    const run = await getRun(db, runId);
+    expect(run).toMatchObject({
+      status: "completed",
+      progress: { total: 5, pending: 0, done: 4, failed: 1 },
+    });
+    expect(run?.preflight?.ok).toBe(true);
+  });
+
+  test("nach einem Worker-Absturz während der Ergänzung führt ein anderer Worker nur die noch offenen Units aus", async () => {
+    const db = await databaseWithSnapshot();
+    const runId = await completedRun(db, [aviation, ethics]);
+    expect(await supplementRun(db, runId, [aviation, ethics, livestock, jec])).toEqual({
+      added: [livestock, jec].sort(),
+    });
+
+    const crashed = gatedAdapter();
+    const crashedWorker = processNextRun(db, { adapters: { fake: crashed }, heartbeatMs: 3_600_000 });
+    await crashed.waitForCalls(2);
+    crashed.release(1);
+    await vi.waitFor(async () =>
+      expect((await getRun(db, runId))?.progress).toMatchObject({ done: 3, running: 1, pending: 0 }),
+    );
+
+    const other = countingAdapter(createFakeAdapter());
+    expect(await processNextRun(db, { adapters: { fake: other }, staleAfterMs: 0 })).toBe(runId);
+    expect(other.calls).toHaveLength(1);
+    expect([livestock, jec]).toContain(other.calls[0]);
+    expect(await getRun(db, runId)).toMatchObject({
+      status: "completed",
+      progress: { total: 4, pending: 0 },
+    });
+    crashed.releaseAll();
+    await crashedWorker;
+    expect(crashed.calls.sort()).toEqual([livestock, jec].sort());
+  });
+
+  test("nur abgeschlossene oder fehlgeschlagene Benchmark-Läufe mit Units ihres Snapshots lassen sich ergänzen", async () => {
+    const db = await databaseWithSnapshot();
+    const { runId: queued } = await createRun(db, { configuration: fakeConfiguration, unitIds: [aviation] });
+    await expect(supplementRun(db, queued, [aviation, ethics])).rejects.toThrow(/ergänzen/);
+    await processNextRun(db, { adapters: { fake: createFakeAdapter() } });
+
+    // Nichts fehlt: der Lauf bleibt abgeschlossen.
+    expect(await supplementRun(db, queued, [aviation])).toEqual({ added: [] });
+    expect((await getRun(db, queued))?.status).toBe("completed");
+    await expect(supplementRun(db, queued, ["gibt-es-nicht"])).rejects.toThrow(/gibt-es-nicht/);
+    expect((await getRun(db, queued))?.progress.total).toBe(1);
+
+    const { runId: proposal } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "vorschlag-a", mode: "web" },
+      kind: "proposal",
+      unitIds: [aviation],
+    });
+    await processNextRun(db, { adapters: { fake: createFakeAdapter() } });
+    await expect(supplementRun(db, proposal, [aviation, ethics])).rejects.toThrow(/kein Benchmark-Lauf/);
+  });
+});
 
 /** Adapter, dessen Aufrufe erst auf Freigabe mit einer gültigen no_mapping-Antwort enden. */
 function gatedAdapter() {
