@@ -415,6 +415,26 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
     expect(unit.durationMs).toBeGreaterThanOrEqual(100);
     expect(unit.log).toMatch(/Versuch 1[\s\S]*kein JSON[\s\S]*Versuch 2/);
   });
+
+  test("antwortet der Harness nicht innerhalb des Timeouts, bricht der Runner ab, wiederholt einmal und meldet Timeout", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("langsam", {
+      "house--ethics": { response: noMappingAnswer("house--ethics"), delayMs: 5_000 },
+    });
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "langsam" },
+      timeoutMs: 100,
+      unitIds: ["house--ethics"],
+    });
+
+    const started = Date.now();
+    await processNextRun(db, { adapters: { fake: createFakeAdapter({ root }) }, timeoutGraceMs: 0 });
+
+    expect(Date.now() - started).toBeLessThan(4_000);
+    const run = await getRun(db, runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.units[0]).toMatchObject({ status: "failed", attempts: 2, error: { kind: "timeout" } });
+  });
 });
 
 /** Legt ein Fake-Szenario `name` mit je einer Datei pro Unit an und liefert die Wurzel. */
