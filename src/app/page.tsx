@@ -20,6 +20,12 @@ export default function HomePage() {
         </Link>{" "}
         – Konfiguration zusammenstellen, Lauf starten, Fortschritt und Ergebnisse ansehen.
       </p>
+      <p>
+        <Link href="/gold" className="underline underline-offset-4">
+          Gold
+        </Link>{" "}
+        – Gold-Units wählen, Vorschlagsläufe starten, Vorschläge prüfen und eine Gold-Version abschließen.
+      </p>
     </div>
   );
 }

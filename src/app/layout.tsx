@@ -25,6 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/laeufe" className="text-muted-foreground hover:text-foreground">
               Läufe
             </Link>
+            <Link href="/gold" className="text-muted-foreground hover:text-foreground">
+              Gold
+            </Link>
           </nav>
         </header>
         <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-8">{children}</main>
