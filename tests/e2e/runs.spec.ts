@@ -45,6 +45,12 @@ test("Lauf mit Fake-Harness starten, bewerten und Konfiguration erneut starten",
   await expect(
     page.getByTestId("unit-row").filter({ hasText: "house--veterans-affairs--health" }),
   ).toContainText("invalid_json");
+  await expect(
+    page
+      .getByTestId("unit-row")
+      .filter({ hasText: "house--agriculture--livestock-dairy-and-poultry" })
+      .getByTestId("unit-effort"),
+  ).toContainText("(bestätigt)");
 
   // Unit-Detailansicht: Antwort, Gold, Abweichungen, Regelverstöße und Rohprotokoll.
   await page.getByRole("link", { name: "house--agriculture--livestock-dairy-and-poultry" }).click();

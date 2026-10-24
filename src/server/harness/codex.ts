@@ -1,3 +1,5 @@
+import { access } from "node:fs/promises";
+import path from "node:path";
 import {
   type HarnessAdapter,
   type HarnessOutcome,
@@ -6,7 +8,14 @@ import {
   parseAnswerText,
 } from "./adapter";
 import { looksRateLimited } from "./claude-code-output";
-import { type CliEnv, type CliRunner, formatCliLog, runCli } from "./cli-process";
+import {
+  type CliEnv,
+  type CliRunner,
+  formatCliLog,
+  isolatedEnv,
+  runCli,
+  withEmptyWorkdir,
+} from "./cli-process";
 import {
   type CodexRollout,
   type CodexStream,
@@ -14,7 +23,8 @@ import {
   readCodexRollout,
   readCodexStream,
 } from "./codex-output";
-import { type CodexCallResult, runCodexCall } from "./codex-sandbox";
+import { CODEX_COMMAND, type CodexCallResult, codexAuthHome, runCodexCall } from "./codex-sandbox";
+import { type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
 
 /**
  * Codex-Adapter: schickt eine Unit isoliert an `codex exec` (Aufruf: codex-command.ts, temporäres Verzeichnis
@@ -48,7 +58,177 @@ export function createCodexAdapter(options: CodexAdapterOptions = {}): HarnessAd
       const call = await runCodexCall(task, callOptions);
       return toResult(task, call);
     },
+    preflight: (request) => codexPreflight(request, { ...options, ...callOptions }),
   };
+}
+
+const PREFLIGHT_TIMEOUT_MS = 3 * 60_000;
+
+/** Probe des Preflights: kleinster Aufruf mit Modell, Effort und Websuche der Konfiguration. */
+const PROBE = {
+  text_only: {
+    systemPrompt: "Du bist ein Funktionstest. Antworte nur mit: ok",
+    userPrompt: "Funktionstest",
+  },
+  web: {
+    systemPrompt:
+      "Du bist ein Funktionstest der Websuche. Führe genau eine Websuche nach „United States Congress“ aus und antworte danach nur mit: ok",
+    userPrompt: "Funktionstest Websuche",
+  },
+} as const;
+
+async function codexPreflight(
+  request: PreflightRequest,
+  options: CodexAdapterOptions & { runCli: CliRunner; env: CliEnv },
+) {
+  const command = options.command ?? CODEX_COMMAND;
+  const timeoutMs = options.preflightTimeoutMs ?? PREFLIGHT_TIMEOUT_MS;
+  const authHome = options.authHome ?? codexAuthHome(options.env);
+  const expectedPlan = options.expectedPlan ?? "plus";
+  let cliVersion: string | null = null;
+  let probe: { stream: CodexStream; rollout: CodexRollout | null } | null = null;
+
+  const steps: PreflightStep[] = [
+    {
+      id: "cli",
+      label: "CLI erreichbar",
+      async run() {
+        const cli = await withEmptyWorkdir("benchmark-codex-version", (cwd) =>
+          options.runCli({ command, args: ["--version"], cwd, env: isolatedEnv(options.env), timeoutMs }),
+        );
+        if (cli.spawnError) return { status: "failed", message: cli.spawnError };
+        const version = /\d+\.\d+\.\d+/.exec(cli.stdout)?.[0] ?? null;
+        if (cli.exitCode !== 0 || !version) {
+          return {
+            status: "failed",
+            message: `${command} --version scheiterte (Exit-Code ${cli.exitCode ?? "–"}): ${(cli.stderr || cli.stdout).trim()}`,
+          };
+        }
+        cliVersion = version;
+        return { status: "ok", message: `Codex CLI ${version}` };
+      },
+    },
+    {
+      id: "auth",
+      label: "Anmeldung vorhanden",
+      async run() {
+        // Nur Existenz prüfen; die Datei wird nie gelesen.
+        try {
+          await access(path.join(authHome, "auth.json"));
+        } catch {
+          return { status: "failed", message: `keine auth.json in ${authHome} (CODEX_AUTH_HOME prüfen)` };
+        }
+        return { status: "ok", message: `auth.json aus ${authHome} wird verlinkt` };
+      },
+    },
+    {
+      id: "model",
+      label: "Modell, Effort und Anmeldung",
+      async run() {
+        const call = await runCodexCall(
+          { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs },
+          { ...options, authHome },
+        );
+        const stream = readCodexStream(call.cli.stdout);
+        const rollout = readCodexRollout(call.rollout);
+        probe = { stream, rollout };
+        const outcome = probeOutcome(call, stream, rollout, timeoutMs);
+        if (outcome) return { status: "failed", message: outcome };
+        return { status: "ok", message: `${rollout?.model ?? request.model} antwortet` };
+      },
+    },
+    {
+      id: "plan_type",
+      label: "Plan (plan_type)",
+      async run() {
+        const plan = probe?.rollout?.rateLimits?.planType ?? null;
+        if (!plan)
+          return {
+            status: "failed",
+            message: "plan_type nicht ermittelbar (kein rate_limits im Rollout-Log)",
+          };
+        if (plan !== expectedPlan) {
+          return {
+            status: "failed",
+            message: `plan_type ${plan}, erwartet ${expectedPlan} (CODEX_AUTH_HOME prüfen)`,
+          };
+        }
+        const quota = probe?.rollout?.rateLimits?.windows
+          .map((window) => `${window.name} ${window.usedPercent} %`)
+          .join(" / ");
+        return { status: "ok", message: `plan_type ${plan}${quota ? ` · Kontingent ${quota}` : ""}` };
+      },
+    },
+    {
+      id: "effort",
+      label: "Effort bestätigt",
+      async run() {
+        const effort = probe?.rollout?.effort ?? null;
+        if (!effort)
+          return { status: "warning", message: "kein Effort im Rollout-Log; Läufe bleiben unbestätigt" };
+        if (effort !== request.effort) {
+          return {
+            status: "failed",
+            message: `Codex wendet Effort ${effort} an, angefordert war ${request.effort}`,
+          };
+        }
+        return { status: "ok", message: `Effort ${effort} laut Rollout-Log angewendet` };
+      },
+    },
+    {
+      id: "isolation",
+      label: "Isolation",
+      async run() {
+        const rollout = probe?.rollout;
+        if (!rollout) return { status: "warning", message: "nicht prüfbar: kein Rollout-Log" };
+        const foreign = rollout.skillRoots.filter((root) => !root.includes("/codex-home/"));
+        if (rollout.sandbox !== "read-only" || foreign.length > 0) {
+          return {
+            status: "failed",
+            message: `Sandbox ${rollout.sandbox ?? "–"}, fremde Skill-Verzeichnisse: ${foreign.join(", ") || "keine"}`,
+          };
+        }
+        return {
+          status: "ok",
+          message: `Sandbox read-only; nur mitgelieferte Skills (${rollout.skillRoots.length} Verzeichnis(se) im temporären CODEX_HOME)`,
+        };
+      },
+    },
+    {
+      id: "web_search",
+      label: "Websuche",
+      async run() {
+        if (request.mode !== "web") return { status: "skipped", message: "nicht nötig im Modus ohne Web" };
+        const searches = probe?.stream.webSearches ?? 0;
+        if (searches < 1) {
+          return {
+            status: "failed",
+            message: "die Probe hat keine Websuche ausgeführt (0 web_search-Items)",
+          };
+        }
+        return { status: "ok", message: `${searches} Websuche(n) in der Probe ausgeführt` };
+      },
+    },
+  ];
+  return runPreflight(steps, () => cliVersion);
+}
+
+/** Fehlermeldung der Probe oder `null`, wenn sie geantwortet hat. */
+function probeOutcome(
+  call: CodexCallResult,
+  stream: CodexStream,
+  rollout: CodexRollout | null,
+  timeoutMs: number,
+): string | null {
+  const outcome = outcomeOf({ unitId: "preflight", timeoutMs }, call, stream, rollout);
+  if (outcome.kind === "rate_limit") {
+    const reset = outcome.resetAt ? `, Freigabe ${outcome.resetAt.toISOString()}` : "";
+    return `Ratenlimit erreicht${reset}: ${outcome.message}`;
+  }
+  // Die Probe antwortet frei („ok“); kein JSON ist hier kein Fehler.
+  if (outcome.kind === "invalid_json" || outcome.kind === "schema_violation" || outcome.kind === "answer")
+    return null;
+  return outcome.message;
 }
 
 export function toResult(task: HarnessTask, call: CodexCallResult): HarnessResult {
