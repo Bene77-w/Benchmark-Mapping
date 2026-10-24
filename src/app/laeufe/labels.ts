@@ -6,6 +6,7 @@ export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
   running: "läuft",
   completed: "abgeschlossen",
   failed: "nicht ausführbar",
+  cancelled: "abgebrochen",
 };
 
 export const UNIT_STATUS_LABELS: Record<UnitResultStatus, string> = {

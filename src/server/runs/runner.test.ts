@@ -16,7 +16,15 @@ import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
 import { processNextRun } from "./runner";
-import { createRun, createRunFromConfiguration, getRun, listConfigurations, listRuns } from "./store";
+import {
+  cancelRun,
+  createRun,
+  createRunFromConfiguration,
+  getRun,
+  listConfigurations,
+  listRuns,
+  resumeRun,
+} from "./store";
 
 /**
  * Seam 1 – Benchmark-Kern: Lauf über die Schnittstelle des Kerns anlegen und ausführen (wie der Worker),
@@ -486,6 +494,78 @@ describe("Ratenlimit", { timeout: 30_000 }, () => {
   });
 });
 
+describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
+  test("ein abgebrochener Lauf startet keine Units mehr; fortgesetzt ruft er nur die offenen auf und schließt ab", async () => {
+    const db = await databaseWithSnapshot();
+    const unitIds = [...STANDARD_UNITS].sort();
+    const gated = gatedAdapter();
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, parallelism: 1, unitIds });
+
+    const processing = processNextRun(db, { adapters: { fake: gated } });
+    await gated.waitForCalls(1);
+    gated.release(1);
+    await gated.waitForCalls(2);
+    await cancelRun(db, runId);
+    expect((await getRun(db, runId))?.status).toBe("cancelled");
+    // Der laufende Aufruf ist bezahlt: sein Ergebnis wird noch gespeichert, danach startet nichts mehr.
+    gated.releaseAll();
+    await processing;
+
+    const cancelled = await getRun(db, runId);
+    expect(cancelled).toMatchObject({ status: "cancelled", progress: { done: 2, pending: 3, running: 0 } });
+    expect(gated.calls).toEqual(unitIds.slice(0, 2));
+    expect(await processNextRun(db, { adapters: { fake: gated } })).toBeNull();
+
+    await resumeRun(db, runId);
+    expect((await getRun(db, runId))?.status).toBe("queued");
+    const resumed = countingAdapter(createFakeAdapter());
+    expect(await processNextRun(db, { adapters: { fake: resumed } })).toBe(runId);
+
+    // Nur die offenen Units (veterans-affairs--health zweimal: ungültiges JSON wird wiederholt).
+    expect(new Set(resumed.calls)).toEqual(new Set(unitIds.slice(2)));
+    const run = await getRun(db, runId);
+    expect(run).toMatchObject({ status: "completed", progress: { done: 4, failed: 1, pending: 0 } });
+    expect(run?.units.map((unit) => unit.attempts)).toEqual([1, 1, 1, 2, 1]);
+  });
+
+  test("nur wartende oder laufende Läufe lassen sich abbrechen, nur abgebrochene fortsetzen", async () => {
+    const db = await databaseWithSnapshot();
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: ["house--ethics"] });
+
+    await expect(resumeRun(db, runId)).rejects.toThrow(/fortsetzen/);
+    await cancelRun(db, runId);
+    expect((await getRun(db, runId))?.status).toBe("cancelled");
+    await expect(cancelRun(db, runId)).rejects.toThrow(/abbrechen/);
+    await resumeRun(db, runId);
+    await processNextRun(db, { adapters: { fake: createFakeAdapter() } });
+    expect((await getRun(db, runId))?.status).toBe("completed");
+    await expect(cancelRun(db, runId)).rejects.toThrow(/abbrechen/);
+  });
+
+  test("ein Abbruch beendet auch das Warten bei Ratenlimit", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("dauerlimit", { "house--ethics": { simulate: "rate_limit" } });
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "dauerlimit" },
+      unitIds: ["house--ethics"],
+    });
+
+    const processing = processNextRun(db, {
+      adapters: { fake: createFakeAdapter({ root }) },
+      heartbeatMs: 20,
+    });
+    await expect.poll(async () => (await getRun(db, runId))?.rateLimitedUntil ?? null).toBeInstanceOf(Date);
+    await cancelRun(db, runId);
+    await processing;
+
+    expect(await getRun(db, runId)).toMatchObject({
+      status: "cancelled",
+      rateLimitedUntil: null,
+      progress: { pending: 1 },
+    });
+  });
+});
+
 /** Legt ein Fake-Szenario `name` mit je einer Datei pro Unit an und liefert die Wurzel. */
 async function fakeScenario(name: string, files: Record<string, unknown>): Promise<string> {
   const root = await mkdtemp(path.join(tmpdir(), "fake-harness-"));
@@ -534,8 +614,11 @@ function gatedAdapter() {
   const adapter = {
     harness: "fake" as const,
     maxConcurrent: 0,
+    /** Aufgerufene Units in Reihenfolge. */
+    calls: [] as string[],
     async run(task: HarnessTask): Promise<HarnessResult> {
       calls += 1;
+      adapter.calls.push(task.unitId);
       active += 1;
       adapter.maxConcurrent = Math.max(adapter.maxConcurrent, active);
       for (const waiter of callWaiters.filter((entry) => calls >= entry.count)) waiter.resolve();
