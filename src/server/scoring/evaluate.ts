@@ -1,5 +1,7 @@
 import type { HarnessErrorKind } from "@/server/harness/adapter";
 import type { Mode } from "@/server/prompt/benchmark-prompt";
+import type { UnitAnswer } from "@/server/prompt/output-schema";
+import { isRecherche, isVerbatim, wordCount } from "./evidence";
 import {
   BOOTSTRAP_CONFIDENCE,
   DEFAULT_BOOTSTRAP_SAMPLES,
@@ -9,11 +11,18 @@ import {
   type RunEvaluation,
   SCORING_VERSION,
   type ScoringInput,
+  type ScoringUnit,
   type UnitEvaluation,
   type UnitOutcome,
   VIOLATION_KINDS,
+  type Violation,
   type ViolationKind,
 } from "./model";
+
+interface Context {
+  mode: Mode;
+  units: ReadonlyMap<string, ScoringUnit>;
+}
 
 /**
  * Vollständige Bewertung eines Laufs gegen eine Gold-Version (reine Funktion, deterministisch).
@@ -22,9 +31,13 @@ import {
  * no_mapping, sonst 0; ohne schemakonforme Antwort 0.
  */
 export function evaluateRun(input: ScoringInput): RunEvaluation {
+  const context: Context = {
+    mode: input.mode,
+    units: new Map(input.units.map((unit) => [unit.unitId, unit])),
+  };
   const goldUnits = [...input.gold.units].sort((a, b) => compareIds(a.unitId, b.unitId));
   const units = goldUnits.map((goldUnit) =>
-    evaluateUnit(goldUnit, input.outcomes.get(goldUnit.unitId), input.mode),
+    evaluateUnit(goldUnit, input.outcomes.get(goldUnit.unitId), context),
   );
   const missingUnitIds = units.filter((unit) => unit.status === "missing").map((unit) => unit.unitId);
   const complete = missingUnitIds.length === 0;
@@ -33,6 +46,9 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
     ViolationKind,
     number
   >;
+  for (const violation of units.flatMap((unit) => unit.violations)) violations[violation.kind] += 1;
+  const checked = units.reduce((sum, unit) => sum + unit.evidence.checked, 0);
+  const verbatim = units.reduce((sum, unit) => sum + unit.evidence.verbatim, 0);
   return {
     scoringVersion: SCORING_VERSION,
     goldVersion: input.gold.version,
@@ -49,7 +65,7 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
     formatErrors: units.filter((unit) => unit.status === "format_error").length,
     harnessFailures: units.filter((unit) => unit.status === "failed").length,
     violations,
-    evidenceFidelity: null,
+    evidenceFidelity: checked === 0 ? null : verbatim / checked,
     categories: [],
     units,
   };
@@ -57,7 +73,8 @@ export function evaluateRun(input: ScoringInput): RunEvaluation {
 
 const FORMAT_ERROR_KINDS: readonly HarnessErrorKind[] = ["invalid_json", "schema_violation", "timeout"];
 
-function evaluateUnit(gold: GoldUnit, outcome: UnitOutcome | undefined, mode: Mode): UnitEvaluation {
+function evaluateUnit(gold: GoldUnit, outcome: UnitOutcome | undefined, context: Context): UnitEvaluation {
+  const { mode } = context;
   const base = {
     unitId: gold.unitId,
     category: gold.category,
@@ -85,7 +102,37 @@ function evaluateUnit(gold: GoldUnit, outcome: UnitOutcome | undefined, mode: Mo
     errorKind: null,
     named,
     score: unitScore(gold, named, classes, positive),
+    ...checkRules(answer, sourceUnit(gold.unitId, context), context),
   };
+}
+
+function sourceUnit(unitId: string, context: Context): ScoringUnit {
+  const unit = context.units.get(unitId);
+  if (!unit) throw new Error(`Unit ${unitId} des Golds fehlt im Snapshot`);
+  return unit;
+}
+
+/** Regelverstöße einer schemakonformen Antwort und die Zahl wörtlicher Zitate. */
+function checkRules(
+  answer: UnitAnswer,
+  unit: ScoringUnit,
+  context: Context,
+): Pick<UnitEvaluation, "violations" | "evidence"> {
+  const violations: Violation[] = [];
+  const evidence = { checked: 0, verbatim: 0 };
+  answer.assignments.forEach((entry, assignmentIndex) => {
+    const add = (kind: ViolationKind) =>
+      violations.push({ kind, assignmentIndex, industryId: entry.industry_id });
+    if (isRecherche(entry.evidence_excerpt)) {
+      if (context.mode !== "web") add("recherche_without_web");
+      return;
+    }
+    evidence.checked += 1;
+    if (isVerbatim(entry.evidence_excerpt, [unit.unitName, unit.jurisdictionText])) evidence.verbatim += 1;
+    else add("evidence_not_verbatim");
+    if (wordCount(entry.evidence_excerpt) < 2) add("evidence_too_short");
+  });
+  return { violations, evidence };
 }
 
 function effectiveClass(goldClass: GoldClass, webOnly: boolean, mode: Mode): GoldClass {
