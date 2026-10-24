@@ -11,6 +11,7 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { HARNESS_ERROR_KINDS, HARNESSES } from "@/server/harness/adapter";
+import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import { RUN_STATUSES, UNIT_RESULT_STATUSES } from "@/server/runs/model";
@@ -122,6 +123,8 @@ export const runs = pgTable("runs", {
   outputSchemaHash: text("output_schema_hash").notNull(),
   parallelism: integer("parallelism").notNull(),
   timeoutMs: integer("timeout_ms").notNull(),
+  /** Ergebnis des letzten Preflights vor der Ausführung (`null`, solange keiner lief oder der Adapter keinen hat). */
+  preflight: jsonb("preflight").$type<PreflightResult>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),

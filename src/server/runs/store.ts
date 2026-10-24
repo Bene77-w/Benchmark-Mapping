@@ -196,6 +196,7 @@ async function selectRunSummaries(db: Database, runId?: number): Promise<RunSumm
     outputSchemaHash: run.outputSchemaHash,
     parallelism: run.parallelism,
     timeoutMs: run.timeoutMs,
+    preflight: run.preflight,
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
