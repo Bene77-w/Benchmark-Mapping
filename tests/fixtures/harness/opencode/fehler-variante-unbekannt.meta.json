@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "note": "Unbekannte Variante (#gibtsnicht): Fehler provider.no-route vor dem Modellaufruf, Exit 1.",
+  "command": "opencode run --standalone --format json --agent benchmark -m 'deepseek/deepseek-flash#gibtsnicht' --title benchmark-mapping-<id>",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "deepseek/deepseek-flash",
+    "effort": "gibtsnicht",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 1,
+  "timedOut": false,
+  "durationMs": 1022
+}

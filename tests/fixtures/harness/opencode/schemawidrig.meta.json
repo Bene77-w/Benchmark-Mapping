@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": true,
+  "note": "Konstruiert aus erfolg-text-only: decision \"vielleicht\" statt \"no_mapping\" (schemawidrig); eine echte schemawidrige Antwort war nicht gezielt erzeugbar.",
+  "command": "opencode run --standalone --format json --agent benchmark -m deepseek/deepseek-flash --title benchmark-mapping-<id>",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "deepseek/deepseek-flash",
+    "effort": "default",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "durationMs": 3802
+}
