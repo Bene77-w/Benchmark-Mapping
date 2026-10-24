@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "command": "codex exec --output-schema <tmp>/schema.json --output-last-message <tmp>/antwort.txt --json --sandbox read-only --skip-git-repo-check --ignore-user-config --ignore-rules --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable multi_agent --disable multi_agent_v2 --disable image_generation --disable browser_use --disable computer_use --disable hooks --disable view_image --disable memories --disable skill_search --disable tool_suggest -c tools.web_search=false --color never -C <tmp>/work -m gpt-gibtsnicht-9 -c 'model_reasoning_effort=\"low\"' -",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "gpt-gibtsnicht-9",
+    "effort": "low",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 1,
+  "timedOut": false,
+  "durationMs": 2016
+}
