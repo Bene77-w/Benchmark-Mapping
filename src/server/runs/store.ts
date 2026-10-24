@@ -1,6 +1,6 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
-import { configurations, runs, unitResults } from "@/server/db/schema";
+import { configurations, runs, unitResults, units } from "@/server/db/schema";
 import { RUN_SOURCE } from "@/server/pricing/model";
 import { ensureModel } from "@/server/pricing/store";
 import { buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
@@ -126,6 +126,54 @@ export async function resumeRun(db: Database, runId: number): Promise<void> {
     .where(and(eq(runs.id, runId), eq(runs.status, "cancelled")))
     .returning({ id: runs.id });
   if (!resumed) throw new Error(`Lauf ${runId} lässt sich nicht fortsetzen (nicht abgebrochen)`);
+}
+
+/**
+ * Ergänzt einen Benchmark-Lauf um Units, für die er noch kein Ergebnis hat (z. B. neu ins Gold-Set
+ * aufgenommene): je Unit ohne Unit-Ergebnis eine neue, offene Zeile; danach wartet der Lauf wieder auf den
+ * Worker, der wie beim Fortsetzen nur offene Units aufruft (mit Preflight). Möglich für abgeschlossene Läufe
+ * und für fehlgeschlagene (etwa wenn der Preflight einer Ergänzung scheiterte); bereits vorhandene Ergebnisse
+ * bleiben unverändert. Die Units müssen im Snapshot des Laufs vorkommen.
+ */
+export async function supplementRun(
+  db: Database,
+  runId: number,
+  unitIds: string[],
+): Promise<{ added: string[] }> {
+  return db.transaction(async (tx) => {
+    const [run] = await tx.select().from(runs).where(eq(runs.id, runId)).for("update");
+    if (!run) throw new Error(`Lauf ${runId} gibt es nicht`);
+    if (run.kind !== "benchmark") throw new Error(`Lauf ${runId} ist kein Benchmark-Lauf`);
+    if (run.status !== "completed" && run.status !== "failed") {
+      throw new Error(`Lauf ${runId} lässt sich nicht ergänzen (weder abgeschlossen noch fehlgeschlagen)`);
+    }
+    const existing = await tx
+      .select({ unitId: unitResults.unitId, status: unitResults.status })
+      .from(unitResults)
+      .where(eq(unitResults.runId, runId));
+    const present = new Set(existing.map((row) => row.unitId));
+    const added = [...new Set(unitIds)].filter((unitId) => !present.has(unitId)).sort();
+    if (added.length > 0) {
+      const known = await tx
+        .select({ unitId: units.unitId })
+        .from(units)
+        .where(and(eq(units.snapshotId, run.snapshotId), inArray(units.unitId, added)));
+      const unknown = added.filter((unitId) => !known.some((row) => row.unitId === unitId));
+      if (unknown.length > 0) {
+        throw new Error(`Units gibt es im Snapshot des Laufs nicht: ${unknown.join(", ")}`);
+      }
+      await tx.insert(unitResults).values(added.map((unitId) => ({ runId, unitId })));
+    }
+    const open =
+      added.length > 0 || existing.some((row) => row.status === "pending" || row.status === "running");
+    if (open) {
+      await tx
+        .update(runs)
+        .set({ status: "queued", error: null, finishedAt: null, rateLimitedUntil: null })
+        .where(eq(runs.id, runId));
+    }
+    return { added };
+  });
 }
 
 export async function getRun(db: Database, runId: number): Promise<RunView | null> {
