@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  date,
   doublePrecision,
   foreignKey,
   integer,
@@ -15,9 +16,11 @@ import {
 } from "drizzle-orm/pg-core";
 import { GOLD_CATEGORIES, GOLD_CLASSES, GOLD_VERSION_STATUSES } from "@/server/gold/model";
 import { HARNESS_ERROR_KINDS, HARNESSES } from "@/server/harness/adapter";
+import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import { RUN_STATUSES, UNIT_RESULT_STATUSES } from "@/server/runs/model";
+import type { RunEvaluation } from "@/server/scoring/model";
 import type { SnapshotSource } from "@/server/snapshot/model";
 
 /** Ein geladener Snapshot. Läufe beziehen sich später auf ihn (über `id` bzw. `contentHash`). */
@@ -126,9 +129,17 @@ export const runs = pgTable("runs", {
   outputSchemaHash: text("output_schema_hash").notNull(),
   parallelism: integer("parallelism").notNull(),
   timeoutMs: integer("timeout_ms").notNull(),
+  /** Ergebnis des letzten Preflights vor der Ausführung (`null`, solange keiner lief oder der Adapter keinen hat). */
+  preflight: jsonb("preflight").$type<PreflightResult>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   startedAt: timestamp("started_at", { withTimezone: true }),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  /** Bei Ratenlimit: Zeitpunkt der nächsten stellvertretenden Nachfrage; sonst `null`. */
+  rateLimitedUntil: timestamp("rate_limited_until", { withTimezone: true }),
+  /** Lebenszeichen des Workers, der den Lauf ausführt; veraltet es, gilt der Lauf als verwaist. */
+  heartbeatAt: timestamp("heartbeat_at", { withTimezone: true }),
+  /** Kennung der letzten Übernahme durch einen Worker; nur dieser darf den Lauf weiter ausführen. */
+  claimId: text("claim_id"),
 });
 
 /**
@@ -238,4 +249,77 @@ export const goldProposalRuns = pgTable(
       .references(() => runs.id, { onDelete: "cascade" }),
   },
   (table) => [primaryKey({ columns: [table.goldVersionId, table.runId] })],
+);
+
+/**
+ * Bewertung eines Laufs gegen eine Gold-Version (ein Eintrag je Lauf und Gold-Version). `result` ist die
+ * vollständige Bewertung; die Kennzahlen stehen zusätzlich als Spalten für Rangliste und Diagramme.
+ * `goldHash` und `scoringVersion` zeigen, ob die Bewertung zum aktuellen Gold-Inhalt und Regelstand passt.
+ */
+export const evaluations = pgTable(
+  "evaluations",
+  {
+    runId: integer("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+    goldVersion: text("gold_version").notNull(),
+    goldHash: text("gold_hash").notNull(),
+    scoringVersion: text("scoring_version").notNull(),
+    /** Jede Unit der Gold-Version hat ein Ergebnis; sonst ist der Lauf für diese Gold-Version unvollständig. */
+    complete: boolean("complete").notNull(),
+    score: doublePrecision("score"),
+    intervalLow: doublePrecision("interval_low"),
+    intervalHigh: doublePrecision("interval_high"),
+    formatErrors: integer("format_errors").notNull(),
+    violationCount: integer("violation_count").notNull(),
+    evidenceFidelity: doublePrecision("evidence_fidelity"),
+    result: jsonb("result").$type<RunEvaluation>().notNull(),
+    evaluatedAt: timestamp("evaluated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.runId, table.goldVersion] })],
+);
+
+/**
+ * Modell der Preistabelle, Schlüssel ist die Modell-ID wie in der Konfiguration. Ein Eintrag ohne Preise ist
+ * erlaubt: Läufe mit unbekanntem Modell legen ihn an, ihre Kosten sind „unbekannt“, bis ein Preis gepflegt ist.
+ */
+export const models = pgTable("models", {
+  id: text("id").primaryKey(),
+  /** Herkunft des Eintrags, z. B. „models.dev 2026-10-24“, „Lauf“ oder „manuell“. */
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Preise eines Modells in USD pro Million Tokens, gültig ab `validFrom` (bis zum nächsten Eintrag). */
+export const modelPrices = pgTable(
+  "model_prices",
+  {
+    id: serial("id").primaryKey(),
+    modelId: text("model_id")
+      .notNull()
+      .references(() => models.id, { onDelete: "cascade" }),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    input: doublePrecision("input").notNull(),
+    /** `null` = kein Tarif bekannt. */
+    cacheRead: doublePrecision("cache_read"),
+    cacheWrite: doublePrecision("cache_write"),
+    output: doublePrecision("output").notNull(),
+    source: text("source").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.modelId, table.validFrom)],
+);
+
+/** Preis pro Websuche in USD je Harness, gültig ab `validFrom`. */
+export const webSearchPrices = pgTable(
+  "web_search_prices",
+  {
+    id: serial("id").primaryKey(),
+    harness: text("harness", { enum: HARNESSES }).notNull(),
+    validFrom: date("valid_from", { mode: "string" }).notNull(),
+    perSearch: doublePrecision("per_search").notNull(),
+    source: text("source").notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [unique().on(table.harness, table.validFrom)],
 );

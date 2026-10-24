@@ -1,8 +1,9 @@
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { z } from "zod";
 import { type HarnessAdapter, type HarnessResult, type HarnessTask, parseAnswerText } from "./adapter";
+import { runPreflight } from "./preflight";
 
 /**
  * Fake-Harness für Tests und GUI ohne Kosten. Er liest vorbereitete Antworten aus einem Verzeichnis:
@@ -13,6 +14,8 @@ import { type HarnessAdapter, type HarnessResult, type HarnessTask, parseAnswerT
  * beschreibt einen Aufruf (siehe `fakeScenarioSchema`): entweder eine Antwort (`response`; ein Objekt wird
  * als JSON gesendet, ein String wörtlich – so entstehen auch Format-Fehler) oder ein simulierter Fehler
  * (`simulate`: timeout, rate_limit, harness_error), dazu Tokens, Websuchen, native Kosten und Wartezeit.
+ * Statt eines Aufrufs kann die Datei eine Folge `{ "calls": [...] }` enthalten: der n-te Aufruf derselben
+ * Unit im selben Szenario bekommt den n-ten Eintrag, danach immer den letzten (z. B. Fehler, dann Antwort).
  */
 export const FAKE_HARNESS_ROOT = "tests/fixtures/fake-harness";
 export const FAKE_CLI_VERSION = "fake-harness-1";
@@ -42,6 +45,12 @@ export const fakeScenarioSchema = z
   });
 export type FakeScenario = z.infer<typeof fakeScenarioSchema>;
 
+/** Inhalt einer Szenario-Datei: ein Aufruf oder eine Folge von Aufrufen. */
+export const fakeScenarioFileSchema = z.union([
+  fakeScenarioSchema,
+  z.strictObject({ calls: z.array(fakeScenarioSchema).min(1) }),
+]);
+
 const SAFE_NAME = /^[A-Za-z0-9_-]+$/;
 
 export interface FakeAdapterOptions {
@@ -51,6 +60,8 @@ export interface FakeAdapterOptions {
 
 export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdapter {
   const root = options.root ?? FAKE_HARNESS_ROOT;
+  /** Bisherige Aufrufe je Szenario-Datei (für Folgen). */
+  const callCounts = new Map<string, number>();
   return {
     harness: "fake",
     async run(task) {
@@ -68,9 +79,12 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
 
       let scenario: FakeScenario;
       try {
-        scenario = fakeScenarioSchema.parse(
+        const parsed = fakeScenarioFileSchema.parse(
           JSON.parse(await readFile(/*turbopackIgnore: true*/ file, "utf8")),
         );
+        const call = callCounts.get(file) ?? 0;
+        callCounts.set(file, call + 1);
+        scenario = "calls" in parsed ? parsed.calls[Math.min(call, parsed.calls.length - 1)] : parsed;
       } catch (error) {
         return failure(task, started, log, `Keine gültige vorbereitete Antwort für ${task.unitId}: ${error}`);
       }
@@ -139,6 +153,29 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
       }
       return { ...result, log: log.join("\n") };
     },
+    /** Preflight: das Szenario (Modell) muss als Verzeichnis existieren. */
+    preflight: ({ model }) =>
+      runPreflight(
+        [
+          {
+            id: "scenario",
+            label: "Szenario vorhanden",
+            async run() {
+              const dir = path.join(/*turbopackIgnore: true*/ root, model);
+              const exists =
+                SAFE_NAME.test(model) &&
+                (await stat(/*turbopackIgnore: true*/ dir).then(
+                  (info) => info.isDirectory(),
+                  () => false,
+                ));
+              return exists
+                ? { status: "ok", message: `Szenario ${model} in ${root}` }
+                : { status: "failed", message: `Szenario ${model} gibt es in ${root} nicht` };
+            },
+          },
+        ],
+        () => FAKE_CLI_VERSION,
+      ),
   };
 }
 

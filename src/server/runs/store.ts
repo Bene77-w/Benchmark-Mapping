@@ -1,6 +1,8 @@
 import { and, asc, count, desc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { configurations, runs, unitResults } from "@/server/db/schema";
+import { RUN_SOURCE } from "@/server/pricing/model";
+import { ensureModel } from "@/server/pricing/store";
 import { buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { getCurrentSnapshot, getSnapshotContent } from "@/server/snapshot/store";
 import {
@@ -48,6 +50,8 @@ export async function createRun(
 
   return db.transaction(async (tx) => {
     const configurationId = await ensureConfiguration(tx, parsed.configuration);
+    // Unbekanntes Modell: Eintrag ohne Preis in der Preistabelle, Kosten bleiben „unbekannt“ bis zur Pflege.
+    await ensureModel(tx, parsed.configuration.model, RUN_SOURCE);
     const [run] = await tx
       .insert(runs)
       .values({
@@ -99,6 +103,29 @@ export async function createRunFromConfiguration(
     },
     options,
   );
+}
+
+/**
+ * Bricht einen wartenden oder laufenden Lauf ab. Der Worker startet danach keine Units mehr; Aufrufe, die
+ * gerade laufen, werden noch gespeichert. Fortsetzen mit `resumeRun`.
+ */
+export async function cancelRun(db: Database, runId: number): Promise<void> {
+  const [cancelled] = await db
+    .update(runs)
+    .set({ status: "cancelled", rateLimitedUntil: null })
+    .where(and(eq(runs.id, runId), inArray(runs.status, ["queued", "running"])))
+    .returning({ id: runs.id });
+  if (!cancelled) throw new Error(`Lauf ${runId} lässt sich nicht abbrechen (wartet nicht und läuft nicht)`);
+}
+
+/** Setzt einen abgebrochenen Lauf fort: er wartet wieder auf den Worker, der nur offene Units aufruft. */
+export async function resumeRun(db: Database, runId: number): Promise<void> {
+  const [resumed] = await db
+    .update(runs)
+    .set({ status: "queued" })
+    .where(and(eq(runs.id, runId), eq(runs.status, "cancelled")))
+    .returning({ id: runs.id });
+  if (!resumed) throw new Error(`Lauf ${runId} lässt sich nicht fortsetzen (nicht abgebrochen)`);
 }
 
 export async function getRun(db: Database, runId: number): Promise<RunView | null> {
@@ -206,9 +233,11 @@ async function selectRunSummaries(db: Database, runId?: number): Promise<RunSumm
     outputSchemaHash: run.outputSchemaHash,
     parallelism: run.parallelism,
     timeoutMs: run.timeoutMs,
+    preflight: run.preflight,
     createdAt: run.createdAt,
     startedAt: run.startedAt,
     finishedAt: run.finishedAt,
+    rateLimitedUntil: run.rateLimitedUntil,
     progress: toProgress(counts.filter((row) => row.runId === run.id)),
   }));
 }

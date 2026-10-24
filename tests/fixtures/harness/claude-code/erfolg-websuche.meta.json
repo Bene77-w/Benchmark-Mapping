@@ -1,0 +1,15 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "command": "claude -p --system-prompt <9258 Zeichen> --json-schema <1341 Zeichen> --output-format json --verbose --model haiku --effort high --tools WebSearch,WebFetch --safe-mode --no-session-persistence --strict-mcp-config",
+  "task": {
+    "unitId": "senate--appropriations--department-of-homeland-security",
+    "model": "haiku",
+    "effort": "high",
+    "mode": "web",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "durationMs": 33743
+}

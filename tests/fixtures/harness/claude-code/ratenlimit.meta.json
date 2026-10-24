@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": true,
+  "command": "claude -p --system-prompt <9385 Zeichen> --json-schema <1341 Zeichen> --output-format json --verbose --model haiku --effort low --tools \"\" --safe-mode --no-session-persistence --strict-mcp-config",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "haiku",
+    "effort": "low",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 1,
+  "timedOut": false,
+  "durationMs": 900,
+  "note": "Konstruiert: kein echtes Ratenlimit erzeugbar. Aufbau aus erfolg-text-only (system/init, rate_limit_event) und fehler-modell-unbekannt (synthetische Fehlermeldung, Fehler-Result) mit status rejected, api_error_status 429 und der Meldung der CLI bei erreichtem Abo-Limit."
+}
