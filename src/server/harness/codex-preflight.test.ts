@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, test } from "vitest";
+import { rm } from "node:fs/promises";
+import { afterAll, beforeAll, describe, expect, test } from "vitest";
 import { cliOutcome } from "./cli-fixture";
 import { createCodexAdapter } from "./codex";
 import { type CodexFixture, codexFixture, codexFixtureRunner, fakeAuthHome } from "./codex-fixture";
@@ -14,6 +15,9 @@ const version = { outcome: cliOutcome({ stdout: "codex-cli 0.163.0\n" }), lastMe
 let authHome = "";
 beforeAll(async () => {
   authHome = await fakeAuthHome();
+});
+afterAll(async () => {
+  await rm(authHome, { recursive: true, force: true });
 });
 
 function preflight(...fixtures: Array<Pick<CodexFixture, "outcome" | "lastMessage" | "rollout">>) {
