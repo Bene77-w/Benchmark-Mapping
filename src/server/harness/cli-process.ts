@@ -8,6 +8,9 @@ import path from "node:path";
  * (Claude Code, Codex, OpenCode): Timeout mit Abbruch, Eingabe über stdin, gefilterte Umgebung.
  */
 
+/** Umgebung eines Kindprozesses (Teilmenge von `process.env`). */
+export type CliEnv = Record<string, string | undefined>;
+
 export interface CliInvocation {
   command: string;
   args: string[];
@@ -15,7 +18,7 @@ export interface CliInvocation {
   cwd: string;
   stdin?: string;
   /** Vollständige Umgebung des Kindprozesses (siehe `isolatedEnv`). */
-  env: NodeJS.ProcessEnv;
+  env: CliEnv;
   timeoutMs: number;
 }
 
@@ -46,7 +49,7 @@ export const runCli: CliRunner = (invocation) =>
 
     const child = spawn(invocation.command, invocation.args, {
       cwd: invocation.cwd,
-      env: invocation.env,
+      env: invocation.env as NodeJS.ProcessEnv,
       stdio: ["pipe", "pipe", "pipe"],
       detached: process.platform !== "win32",
     });
@@ -123,12 +126,8 @@ const BASE_ENV = [
 ];
 
 /** Umgebung aus der Positivliste plus `extra` (adapterspezifisch, z. B. `CODEX_HOME`). */
-export function isolatedEnv(
-  source: NodeJS.ProcessEnv,
-  allowed: readonly string[] = [],
-  extra: NodeJS.ProcessEnv = {},
-): NodeJS.ProcessEnv {
-  const env: NodeJS.ProcessEnv = {};
+export function isolatedEnv(source: CliEnv, allowed: readonly string[] = [], extra: CliEnv = {}): CliEnv {
+  const env: CliEnv = {};
   for (const name of [...BASE_ENV, ...allowed]) {
     if (source[name] !== undefined) env[name] = source[name];
   }
