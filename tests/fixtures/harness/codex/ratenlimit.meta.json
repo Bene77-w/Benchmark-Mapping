@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": true,
+  "command": "codex exec --output-schema <tmp>/schema.json --output-last-message <tmp>/antwort.txt --json --sandbox read-only --skip-git-repo-check --ignore-user-config --ignore-rules --disable shell_tool --disable unified_exec --disable apps --disable plugins --disable multi_agent --disable image_generation --disable browser_use --disable computer_use --disable hooks --disable view_image --disable memories --disable skill_search --disable tool_suggest -c tools.web_search=false --color never -C <tmp>/work -m gpt-6-luna -c 'model_reasoning_effort=\"low\"' -",
+  "task": {
+    "unitId": "house--ethics",
+    "model": "gpt-6-luna",
+    "effort": "low",
+    "mode": "text_only",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 1,
+  "timedOut": false,
+  "durationMs": 1500,
+  "note": "Konstruiert: kein echtes Ratenlimit erzeugbar. stdout aus thread.started/turn.started plus error und turn.failed mit der Meldung der CLI bei erreichtem Abo-Limit (UsageLimitReached); Rollout aus erfolg-text-only (session_meta, turn_context, thread_settings_applied, task_started) und dessen token_count mit primary.used_percent 100, rate_limit_reached_type primary und ohne Token-Info."
+}
