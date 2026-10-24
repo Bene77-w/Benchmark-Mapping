@@ -1,0 +1,122 @@
+import { and, asc, eq } from "drizzle-orm";
+import type { Database } from "@/server/db/database";
+import { evaluations } from "@/server/db/schema";
+import type { RunView } from "@/server/runs/model";
+import { getRun } from "@/server/runs/store";
+import { hashCanonical } from "@/server/snapshot/hash";
+import { getSnapshotContent } from "@/server/snapshot/store";
+import { evaluateRun } from "./evaluate";
+import { type GoldVersion, type RunEvaluation, SCORING_VERSION, type UnitOutcome } from "./model";
+
+/**
+ * Bewertungen in der Datenbank: je (Lauf, Gold-Version) eine gespeicherte Bewertung. Gespeichert wird nur
+ * für abgeschlossene Läufe; passt die gespeicherte Bewertung nicht mehr zum Gold-Inhalt oder Regelstand,
+ * wird sie neu berechnet und ersetzt.
+ */
+
+export interface StoredEvaluation {
+  goldVersion: string;
+  goldHash: string;
+  scoringVersion: string;
+  complete: boolean;
+  score: number | null;
+  interval: { low: number; high: number } | null;
+  formatErrors: number;
+  violationCount: number;
+  evidenceFidelity: number | null;
+  evaluatedAt: Date;
+}
+
+/**
+ * Bewertung des Laufs gegen die Gold-Version; `null`, wenn es den Lauf nicht gibt. Abgeschlossene Läufe
+ * werden einmal bewertet und gespeichert, laufende nur berechnet.
+ */
+export async function ensureEvaluation(
+  db: Database,
+  runId: number,
+  gold: GoldVersion,
+): Promise<RunEvaluation | null> {
+  const run = await getRun(db, runId);
+  if (!run) return null;
+  const goldHash = hashCanonical(gold);
+  if (run.status === "completed") {
+    const [stored] = await db
+      .select({
+        result: evaluations.result,
+        goldHash: evaluations.goldHash,
+        scoringVersion: evaluations.scoringVersion,
+      })
+      .from(evaluations)
+      .where(and(eq(evaluations.runId, runId), eq(evaluations.goldVersion, gold.version)));
+    if (stored && stored.goldHash === goldHash && stored.scoringVersion === SCORING_VERSION)
+      return stored.result;
+  }
+
+  const evaluation = await evaluate(db, run, gold);
+  if (run.status === "completed") {
+    const values = {
+      runId,
+      goldVersion: gold.version,
+      goldHash,
+      scoringVersion: evaluation.scoringVersion,
+      complete: evaluation.complete,
+      score: evaluation.score,
+      intervalLow: evaluation.interval?.low ?? null,
+      intervalHigh: evaluation.interval?.high ?? null,
+      formatErrors: evaluation.formatErrors,
+      violationCount: Object.values(evaluation.violations).reduce((sum, count) => sum + count, 0),
+      evidenceFidelity: evaluation.evidenceFidelity,
+      result: evaluation,
+      evaluatedAt: new Date(),
+    };
+    await db
+      .insert(evaluations)
+      .values(values)
+      .onConflictDoUpdate({ target: [evaluations.runId, evaluations.goldVersion], set: values });
+  }
+  return evaluation;
+}
+
+/** Gespeicherte Bewertungen eines Laufs, nach Gold-Version sortiert. */
+export async function listEvaluations(db: Database, runId: number): Promise<StoredEvaluation[]> {
+  const rows = await db
+    .select()
+    .from(evaluations)
+    .where(eq(evaluations.runId, runId))
+    .orderBy(asc(evaluations.goldVersion));
+  return rows.map((row) => ({
+    goldVersion: row.goldVersion,
+    goldHash: row.goldHash,
+    scoringVersion: row.scoringVersion,
+    complete: row.complete,
+    score: row.score,
+    interval:
+      row.intervalLow === null || row.intervalHigh === null
+        ? null
+        : { low: row.intervalLow, high: row.intervalHigh },
+    formatErrors: row.formatErrors,
+    violationCount: row.violationCount,
+    evidenceFidelity: row.evidenceFidelity,
+    evaluatedAt: row.evaluatedAt,
+  }));
+}
+
+async function evaluate(db: Database, run: RunView, gold: GoldVersion): Promise<RunEvaluation> {
+  const snapshot = await getSnapshotContent(db, run.snapshotId);
+  if (!snapshot) throw new Error(`Snapshot ${run.snapshotId} fehlt`);
+  const outcomes = new Map<string, UnitOutcome>();
+  for (const unit of run.units) {
+    if (unit.status === "done" && unit.answer)
+      outcomes.set(unit.unitId, { kind: "answer", answer: unit.answer });
+    if (unit.status === "failed" && unit.error) {
+      outcomes.set(unit.unitId, { kind: "failed", errorKind: unit.error.kind });
+    }
+  }
+  return evaluateRun({
+    mode: run.configuration.mode,
+    gold,
+    outcomes,
+    units: snapshot.units,
+    industryIds: snapshot.industries.map((industry) => industry.industryId),
+  });
+}
