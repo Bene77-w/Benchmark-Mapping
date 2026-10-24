@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { evaluations } from "@/server/db/schema";
 import type { RunView } from "@/server/runs/model";
@@ -40,16 +40,8 @@ export async function ensureEvaluation(
   if (!run) return null;
   const goldHash = hashCanonical(gold);
   if (run.status === "completed") {
-    const [stored] = await db
-      .select({
-        result: evaluations.result,
-        goldHash: evaluations.goldHash,
-        scoringVersion: evaluations.scoringVersion,
-      })
-      .from(evaluations)
-      .where(and(eq(evaluations.runId, runId), eq(evaluations.goldVersion, gold.version)));
-    if (stored && stored.goldHash === goldHash && stored.scoringVersion === SCORING_VERSION)
-      return stored.result;
+    const stored = (await currentStoredEvaluations(db, [runId], gold)).get(runId);
+    if (stored) return stored;
   }
 
   const evaluation = await evaluate(db, run, gold);
@@ -75,6 +67,51 @@ export async function ensureEvaluation(
       .onConflictDoUpdate({ target: [evaluations.runId, evaluations.goldVersion], set: values });
   }
   return evaluation;
+}
+
+/**
+ * Wie `ensureEvaluation` für mehrere abgeschlossene Läufe: gespeicherte, noch gültige Bewertungen kommen aus
+ * wenigen Abfragen, nur die übrigen Läufe werden (neu) bewertet. Läufe, die es nicht gibt, fehlen im Ergebnis.
+ */
+export async function ensureEvaluations(
+  db: Database,
+  runIds: number[],
+  gold: GoldVersion,
+): Promise<Map<number, RunEvaluation>> {
+  const stored = await currentStoredEvaluations(db, runIds, gold);
+  const result = new Map<number, RunEvaluation>();
+  for (const runId of runIds) {
+    const evaluation = stored.get(runId) ?? (await ensureEvaluation(db, runId, gold));
+    if (evaluation) result.set(runId, evaluation);
+  }
+  return result;
+}
+
+/**
+ * Gespeicherte Bewertungen der Läufe gegen die Gold-Version, die zum Gold-Inhalt (Hash) und Regelstand
+ * passen; je Lauf höchstens eine.
+ */
+export async function currentStoredEvaluations(
+  db: Database,
+  runIds: number[],
+  gold: GoldVersion,
+): Promise<Map<number, RunEvaluation>> {
+  if (runIds.length === 0) return new Map();
+  const goldHash = hashCanonical(gold);
+  const rows = await db
+    .select({
+      runId: evaluations.runId,
+      result: evaluations.result,
+      goldHash: evaluations.goldHash,
+      scoringVersion: evaluations.scoringVersion,
+    })
+    .from(evaluations)
+    .where(and(inArray(evaluations.runId, runIds), eq(evaluations.goldVersion, gold.version)));
+  return new Map(
+    rows
+      .filter((row) => row.goldHash === goldHash && row.scoringVersion === SCORING_VERSION)
+      .map((row) => [row.runId, row.result]),
+  );
 }
 
 /** Gespeicherte Bewertungen eines Laufs, nach Gold-Version sortiert. */

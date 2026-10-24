@@ -1,5 +1,6 @@
 import type { Database } from "@/server/db/database";
 import type { GoldVersion } from "@/server/scoring/model";
+import { toScoringGold } from "./model";
 import { getLatestGoldVersion } from "./store";
 import { readTestGold } from "./test-gold";
 
@@ -12,7 +13,7 @@ export async function getActiveGold(db: Database): Promise<GoldVersion | null> {
   const testGoldPath = process.env.TEST_GOLD_PATH;
   if (testGoldPath) return readTestGold(testGoldPath);
   const latest = await getLatestGoldVersion(db);
-  return latest?.label ? { version: latest.label, units: latest.units } : null;
+  return latest ? toScoringGold(latest) : null;
 }
 
 /** Wie `getActiveGold`, aber ohne Gold-Version ein Fehler (zum Starten von Läufen). */

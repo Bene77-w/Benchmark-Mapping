@@ -2,6 +2,7 @@ import { z } from "zod";
 import type { HarnessErrorKind } from "@/server/harness/adapter";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import type { ConfigurationView, UnitResultStatus } from "@/server/runs/model";
+import type { GoldVersion } from "@/server/scoring/model";
 import type { SnapshotUnit } from "@/server/snapshot/model";
 
 /**
@@ -74,6 +75,13 @@ export interface GoldVersionView {
   frozenAt: Date | null;
   /** Sortiert nach unit_id. */
   units: GoldUnit[];
+}
+
+/** Eingefrorene Gold-Version in der Form der Bewertung (Label als Version). */
+export function toScoringGold(view: GoldVersionView): GoldVersion {
+  if (view.status !== "frozen" || !view.label)
+    throw new Error("Nur eingefrorene Gold-Versionen sind bewertbar");
+  return { version: view.label, units: view.units };
 }
 
 export const GOLD_ISSUE_KINDS = [

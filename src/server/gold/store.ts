@@ -13,6 +13,7 @@ import {
 } from "@/server/db/schema";
 import type { Configuration, RunSummary } from "@/server/runs/model";
 import { createRun, listRuns, type PromptRootOption } from "@/server/runs/store";
+import { type ReevaluationStatus, reevaluateAllRuns } from "@/server/scoring/current";
 import { hashCanonical } from "@/server/snapshot/hash";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
 import { readGoldCandidates } from "./candidates";
@@ -28,6 +29,7 @@ import {
   type GoldVersionView,
   goldUnitDecisionSchema,
   MAX_GOLD_UNITS,
+  toScoringGold,
   validateGold,
 } from "./model";
 
@@ -212,13 +214,16 @@ export async function checkGoldDraft(db: Database): Promise<GoldIssue[]> {
 }
 
 /**
- * Schließt die Gold-Review ab: friert den Entwurf als nächste Gold-Version (`gold-vN`) ein. Wirft
+ * Schließt die Gold-Review ab: friert den Entwurf als nächste Gold-Version (`gold-vN`) ein und bewertet
+ * danach alle abgeschlossenen Benchmark-Läufe gegen sie neu (ohne Modellaufruf). Wirft
  * `GoldValidationError`, wenn die Prüfung Befunde hat.
  */
-export async function finalizeGoldDraft(db: Database): Promise<{ id: number; label: string }> {
+export async function finalizeGoldDraft(
+  db: Database,
+): Promise<{ id: number; label: string; reevaluation: ReevaluationStatus }> {
   const issues = await checkGoldDraft(db);
   if (issues.length > 0) throw new GoldValidationError(issues);
-  return db.transaction(async (tx) => {
+  const frozen = await db.transaction(async (tx) => {
     const draft = await requireDraft(tx);
     const [{ value: frozen }] = await tx
       .select({ value: count() })
@@ -231,6 +236,9 @@ export async function finalizeGoldDraft(db: Database): Promise<{ id: number; lab
       .where(eq(goldVersions.id, draft.id));
     return { id: draft.id, label };
   });
+  const version = await getGoldVersion(db, frozen.label);
+  if (!version) throw new Error(`Gold-Version ${frozen.label} fehlt`);
+  return { ...frozen, reevaluation: await reevaluateAllRuns(db, toScoringGold(version)) };
 }
 
 /** Eine eingefrorene Gold-Version über ihr Label (`gold-v1`, …). */
