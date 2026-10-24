@@ -142,6 +142,9 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
               <TableHead>Kategorie</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Versuche</TableHead>
+              <TableHead title="Effort laut Harness; bestätigt nur, wenn der Harness die angeforderte Stufe gemeldet hat">
+                Effort
+              </TableHead>
               <TableHead>Antwort</TableHead>
               <TableHead className="text-right">Unit-Score</TableHead>
               <TableHead className="text-right">Regelverstöße</TableHead>
@@ -171,6 +174,7 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
                   <TableCell className="text-right" data-testid="unit-attempts">
                     {unit.attempts}
                   </TableCell>
+                  <TableCell data-testid="unit-effort">{effortLabel(unit)}</TableCell>
                   <TableCell className="max-w-md truncate">{answerLabel(unit)}</TableCell>
                   <TableCell className="text-right" data-testid="unit-score">
                     {formatScore(scored?.score, 2)}
@@ -317,4 +321,9 @@ function tokensLabel(unit: UnitResultView): string {
   if (!unit.tokens) return "–";
   const { inputTokens, cacheReadTokens, cacheWriteTokens, outputTokens } = unit.tokens;
   return `${inputTokens} / ${cacheReadTokens + cacheWriteTokens} / ${outputTokens}`;
+}
+
+function effortLabel(unit: UnitResultView): string {
+  if (!unit.effort) return "–";
+  return `${unit.effort.reported ?? "–"} (${unit.effort.confirmed ? "bestätigt" : "unbestätigt"})`;
 }
