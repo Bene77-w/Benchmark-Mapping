@@ -1,6 +1,8 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   doublePrecision,
+  foreignKey,
   integer,
   jsonb,
   pgTable,
@@ -9,7 +11,9 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { GOLD_CATEGORIES, GOLD_CLASSES, GOLD_VERSION_STATUSES } from "@/server/gold/model";
 import { HARNESS_ERROR_KINDS, HARNESSES } from "@/server/harness/adapter";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
@@ -166,4 +170,72 @@ export const unitResults = pgTable(
     finishedAt: timestamp("finished_at", { withTimezone: true }),
   },
   (table) => [primaryKey({ columns: [table.runId, table.unitId] })],
+);
+
+/**
+ * Gold-Version: höchstens ein Entwurf (`draft`, ohne Label), den die Gold-Review bearbeitet; der Abschluss
+ * friert ihn als `gold-vN` ein (`frozen`, danach unveränderlich). Bezieht sich auf einen Snapshot.
+ */
+export const goldVersions = pgTable(
+  "gold_versions",
+  {
+    id: serial("id").primaryKey(),
+    label: text("label").unique(),
+    status: text("status", { enum: GOLD_VERSION_STATUSES }).notNull().default("draft"),
+    snapshotId: integer("snapshot_id")
+      .notNull()
+      .references(() => snapshots.id),
+    snapshotHash: text("snapshot_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    frozenAt: timestamp("frozen_at", { withTimezone: true }),
+  },
+  (table) => [uniqueIndex("gold_versions_one_draft").on(table.status).where(sql`status = 'draft'`)],
+);
+
+/** Gold-Unit: Unit des Gold-Sets mit Kategorie, no_mapping und Begründungsnotiz. */
+export const goldUnits = pgTable(
+  "gold_units",
+  {
+    goldVersionId: integer("gold_version_id")
+      .notNull()
+      .references(() => goldVersions.id, { onDelete: "cascade" }),
+    unitId: text("unit_id").notNull(),
+    category: text("category", { enum: GOLD_CATEGORIES }).notNull(),
+    noMapping: boolean("no_mapping").notNull().default(false),
+    note: text("note"),
+  },
+  (table) => [primaryKey({ columns: [table.goldVersionId, table.unitId] })],
+);
+
+/** Gold-Industry: Industry einer Gold-Unit mit Klasse und web_only. */
+export const goldIndustries = pgTable(
+  "gold_industries",
+  {
+    goldVersionId: integer("gold_version_id").notNull(),
+    unitId: text("unit_id").notNull(),
+    industryId: text("industry_id").notNull(),
+    class: text("class", { enum: GOLD_CLASSES }).notNull(),
+    webOnly: boolean("web_only").notNull().default(false),
+  },
+  (table) => [
+    primaryKey({ columns: [table.goldVersionId, table.unitId, table.industryId] }),
+    foreignKey({
+      columns: [table.goldVersionId, table.unitId],
+      foreignColumns: [goldUnits.goldVersionId, goldUnits.unitId],
+    }).onDelete("cascade"),
+  ],
+);
+
+/** Vorschlagsläufe, die für eine Gold-Version gestartet wurden (Quelle der Vorschläge in der Gold-Review). */
+export const goldProposalRuns = pgTable(
+  "gold_proposal_runs",
+  {
+    goldVersionId: integer("gold_version_id")
+      .notNull()
+      .references(() => goldVersions.id, { onDelete: "cascade" }),
+    runId: integer("run_id")
+      .notNull()
+      .references(() => runs.id, { onDelete: "cascade" }),
+  },
+  (table) => [primaryKey({ columns: [table.goldVersionId, table.runId] })],
 );
