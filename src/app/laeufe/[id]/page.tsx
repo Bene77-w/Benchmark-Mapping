@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { readTestGold } from "@/server/gold/test-gold";
@@ -8,6 +9,7 @@ import type { UnitResultView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import { type RunEvaluation, VIOLATION_KINDS } from "@/server/scoring/model";
 import { ensureEvaluation, listEvaluations, type StoredEvaluation } from "@/server/scoring/store";
+import { cancelRunAction, resumeRunAction } from "../actions";
 import {
   CATEGORY_LABELS,
   configurationLabel,
@@ -57,10 +59,34 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
         <dt className="text-muted-foreground">Konfiguration</dt>
         <dd data-testid="run-configuration">{configurationLabel(run.configuration)}</dd>
         <dt className="text-muted-foreground">Status</dt>
-        <dd data-testid="run-status">
-          {RUN_STATUS_LABELS[run.status]}
-          {run.error && <span className="text-destructive"> – {run.error}</span>}
+        <dd className="flex flex-wrap items-center gap-3">
+          <span data-testid="run-status">{RUN_STATUS_LABELS[run.status]}</span>
+          {run.error && <span className="text-destructive">{run.error}</span>}
+          {active && (
+            <form action={cancelRunAction}>
+              <input type="hidden" name="runId" value={run.id} />
+              <Button type="submit" variant="outline" size="sm">
+                Abbrechen
+              </Button>
+            </form>
+          )}
+          {run.status === "cancelled" && (
+            <form action={resumeRunAction}>
+              <input type="hidden" name="runId" value={run.id} />
+              <Button type="submit" variant="outline" size="sm">
+                Fortsetzen
+              </Button>
+            </form>
+          )}
         </dd>
+        {run.rateLimitedUntil && (
+          <>
+            <dt className="text-muted-foreground">Ratenlimit</dt>
+            <dd data-testid="run-rate-limit">
+              Alle Aufrufe warten; nächste Nachfrage um {formatDateTime(run.rateLimitedUntil)}
+            </dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Parallelität / Timeout</dt>
         <dd>
           {run.parallelism} / {run.timeoutMs / 60_000} min pro Unit
@@ -103,6 +129,7 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
               <TableHead>Unit</TableHead>
               <TableHead>Kategorie</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Versuche</TableHead>
               <TableHead>Antwort</TableHead>
               <TableHead className="text-right">Unit-Score</TableHead>
               <TableHead className="text-right">Regelverstöße</TableHead>
@@ -125,6 +152,9 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
                   </TableCell>
                   <TableCell>{scored ? scored.category : "nicht im Gold"}</TableCell>
                   <TableCell>{UNIT_STATUS_LABELS[unit.status]}</TableCell>
+                  <TableCell className="text-right" data-testid="unit-attempts">
+                    {unit.attempts}
+                  </TableCell>
                   <TableCell className="max-w-md truncate">{answerLabel(unit)}</TableCell>
                   <TableCell className="text-right" data-testid="unit-score">
                     {formatScore(scored?.score, 2)}

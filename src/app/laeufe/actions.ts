@@ -1,11 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDatabase } from "@/server/db/client";
 import { readTestGold } from "@/server/gold/test-gold";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
-import { createRun, createRunFromConfiguration } from "@/server/runs/store";
+import { cancelRun, createRun, createRunFromConfiguration, resumeRun } from "@/server/runs/store";
 
 export interface StartRunState {
   error: string | null;
@@ -48,6 +49,20 @@ export async function restartConfiguration(formData: FormData): Promise<void> {
     gold.units.map((unit) => unit.unitId),
   );
   redirect(`/laeufe/${runId}`);
+}
+
+/** Bricht einen Lauf ab; der Worker startet danach keine Units mehr. */
+export async function cancelRunAction(formData: FormData): Promise<void> {
+  const runId = z.coerce.number().int().parse(formData.get("runId"));
+  await cancelRun(getDatabase(), runId);
+  revalidatePath(`/laeufe/${runId}`);
+}
+
+/** Setzt einen abgebrochenen Lauf fort; nur offene Units werden noch aufgerufen. */
+export async function resumeRunAction(formData: FormData): Promise<void> {
+  const runId = z.coerce.number().int().parse(formData.get("runId"));
+  await resumeRun(getDatabase(), runId);
+  revalidatePath(`/laeufe/${runId}`);
 }
 
 function describe(error: unknown): string {
