@@ -4,6 +4,7 @@ import path from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
+import { readTestGold } from "@/server/gold/test-gold";
 import {
   type HarnessAdapter,
   type HarnessResult,
@@ -12,6 +13,7 @@ import {
 } from "@/server/harness/adapter";
 import { createFakeAdapter } from "@/server/harness/fake";
 import { buildBenchmarkPrompt, PROMPT_ROOT, PROMPT_VERSION } from "@/server/prompt/benchmark-prompt";
+import { ensureEvaluation, listEvaluations } from "@/server/scoring/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
@@ -558,6 +560,30 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     await crashedWorker;
     expect(await getRun(db, runId)).toEqual(resumed);
     expect(crashed.calls).toHaveLength(3);
+  });
+
+  test("ein abgebrochener Lauf erscheint nicht in der Auswertung, nach Fortsetzen und Abschluss schon", async () => {
+    const db = await databaseWithSnapshot();
+    const gold = await readTestGold();
+    const gated = gatedAdapter();
+    const { runId } = await createRun(db, {
+      configuration: fakeConfiguration,
+      parallelism: 1,
+      unitIds: gold.units.map((unit) => unit.unitId),
+    });
+    const processing = processNextRun(db, { adapters: { fake: gated } });
+    await gated.waitForCalls(1);
+    await cancelRun(db, runId);
+    gated.releaseAll();
+    await processing;
+
+    expect((await ensureEvaluation(db, runId, gold))?.complete).toBe(false);
+    expect(await listEvaluations(db, runId)).toEqual([]);
+
+    await resumeRun(db, runId);
+    await processNextRun(db, { adapters: { fake: createFakeAdapter() } });
+    expect((await ensureEvaluation(db, runId, gold))?.complete).toBe(true);
+    expect(await listEvaluations(db, runId)).toMatchObject([{ goldVersion: gold.version, complete: true }]);
   });
 
   test("nur wartende oder laufende Läufe lassen sich abbrechen, nur abgebrochene fortsetzen", async () => {
