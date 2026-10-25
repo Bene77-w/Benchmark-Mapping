@@ -136,6 +136,13 @@ describe("fehlender Preis → unbekannt", () => {
     });
   });
 
+  test("nicht gemeldete Websuchen sind unbekannt, sobald der Harness einen Websuchpreis hat", () => {
+    expect(estimateUnitCost({ ...base, webSearches: null }, table())).toEqual({
+      kind: "unknown",
+      reason: "Websuchen nicht gemeldet (claude_code)",
+    });
+  });
+
   test("Cache-Tokens ohne Cache-Tarif sind unbekannt; ohne Cache-Tokens stört der fehlende Tarif nicht", () => {
     const noCachePrices = table({
       models: {

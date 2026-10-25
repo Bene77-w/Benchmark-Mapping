@@ -195,6 +195,28 @@ describe("Claude-Code-Adapter: Isolation", () => {
   });
 });
 
+describe("Claude-Code-Ausgabe: konstruierte Sonderfälle", () => {
+  /** Ein einzelnes `result`-Objekt mit dem angegebenen `modelUsage`. */
+  function resultWith(modelUsage: Record<string, unknown>): string {
+    return JSON.stringify({
+      type: "result",
+      subtype: "success",
+      is_error: false,
+      result: "{}",
+      modelUsage,
+    });
+  }
+
+  test("ohne Websuchzähler in modelUsage ist die Zahl der Websuchen unbekannt, nicht 0", () => {
+    const output = readClaudeOutput(
+      resultWith({ "claude-haiku-5-5": { inputTokens: 5, outputTokens: 2 } }),
+      "house--ethics",
+    );
+    expect(output.tokens).not.toBeNull();
+    expect(output.webSearches).toBeNull();
+  });
+});
+
 function task(overrides: Partial<HarnessTask> = {}): HarnessTask {
   return {
     unitId: "house--ethics",
