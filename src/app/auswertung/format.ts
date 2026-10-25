@@ -33,3 +33,8 @@ export function entryAxisLabel(entry: AnalysisEntry, axis: XAxis): string {
   if (axis === "tokens") return tokensLabel(entry.tokensPerUnit);
   return durationLabel(entry.durationPerUnitMs);
 }
+
+/** Farbe eines gewählten Laufs im Kategorie-Diagramm: Slot nach Position in der Auswahl (höchstens vier). */
+export function seriesColor(index: number): string {
+  return `var(--viz-series-${index + 1})`;
+}

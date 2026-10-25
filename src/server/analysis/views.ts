@@ -84,7 +84,7 @@ export interface CategoryChart {
  * Score je Kategorie für ausgewählte Läufe. Wählbar sind nur Läufe der Rangliste (also unter denselben
  * Filtern); Unbekanntes, Doppeltes und Überzähliges entfällt, ohne gültige Auswahl gelten die besten Läufe.
  */
-export function buildCategoryChart(entries: AnalysisEntry[], requested: number[]): CategoryChart {
+export function buildCategoryChart(entries: AnalysisEntry[], requested: readonly number[]): CategoryChart {
   const byId = new Map(entries.map((entry) => [entry.runId, entry]));
   let selected = [...new Set(requested)]
     .map((runId) => byId.get(runId))
