@@ -98,6 +98,16 @@ describe("Vergleichbarkeit", () => {
     expect(new Set(groups.map((group) => group.key)).size).toBe(3);
   });
 
+  test("trennt Hashes, die sich erst nach den ersten Zeichen unterscheiden", () => {
+    const { groups } = analyse([
+      { id: 1, score: 0.5, promptHash: PROMPT_A },
+      { id: 2, score: 0.6, promptHash: `${"a".repeat(12)}${"f".repeat(52)}` },
+      { id: 3, score: 0.7, snapshotHash: `${"5".repeat(12)}${"f".repeat(52)}` },
+    ]);
+    expect(groups.map((group) => group.runCount)).toEqual([1, 1, 1]);
+    expect(new Set(groups.map((group) => group.key)).size).toBe(3);
+  });
+
   test("zeigt ohne Auswahl nur die Gruppe des neuesten Laufs, nie gemischt", () => {
     const analysis = analyse(specs);
     expect(analysis.filters.group).toBe(analysis.groups[0].key);

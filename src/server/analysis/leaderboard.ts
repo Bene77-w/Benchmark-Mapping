@@ -182,8 +182,9 @@ function scored({ run, evaluation }: EvaluatedRunView) {
   return { score: evaluation.score ?? 0, createdAt: run.createdAt };
 }
 
+/** Schlüssel der Vergleichsgruppe: die vollständigen Hashes (ein Präfix könnte verschiedene Prompts vereinen). */
 function groupKey(run: RunView): string {
-  return `${run.promptHash.slice(0, 12)}-${run.snapshotHash.slice(0, 12)}`;
+  return `${run.promptHash}-${run.snapshotHash}`;
 }
 
 function comparabilityGroups(runs: EvaluatedRunView[]): ComparabilityGroup[] {
