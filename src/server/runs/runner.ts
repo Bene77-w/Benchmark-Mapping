@@ -77,17 +77,26 @@ export async function processNextRun(db: Database, deps: RunnerDeps): Promise<nu
     .where(inArray(runs.id, next))
     .returning({ id: runs.id });
   if (!claimed) return null;
+  // Jeder Laufstatus-Wechsel dieses Workers nur, solange er den Lauf hält (gleiche claimId): ein überholter
+  // Worker darf den Lauf des neuen weder zurücksetzen noch auf „fehlgeschlagen“ setzen.
+  const ownRun = and(eq(runs.id, claimed.id), eq(runs.claimId, claimId));
   await db
     .update(unitResults)
     .set({ status: "pending" })
-    .where(and(eq(unitResults.runId, claimed.id), eq(unitResults.status, "running")));
+    .where(
+      and(
+        eq(unitResults.runId, claimed.id),
+        eq(unitResults.status, "running"),
+        inArray(unitResults.runId, db.select({ id: runs.id }).from(runs).where(ownRun)),
+      ),
+    );
   try {
     await executeRun(db, claimed.id, claimId, deps);
   } catch (error) {
     await db
       .update(runs)
       .set({ status: "failed", error: error instanceof Error ? error.message : String(error) })
-      .where(eq(runs.id, claimed.id));
+      .where(ownRun);
   }
   return claimed.id;
 }
@@ -120,10 +129,14 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
     .where(and(eq(unitResults.runId, runId), eq(unitResults.status, "pending")))
     .orderBy(asc(unitResults.unitId));
   const stop = new AbortController();
+  // Eigenes Signal für den Verlust des Laufs: es beendet laufende Adapter-Aufrufe (keine doppelten CLI-Aufrufe
+  // neben dem neuen Worker). Ein Nutzerabbruch löst es nicht aus; dort laufen begonnene Aufrufe zu Ende.
+  const lost = new AbortController();
   const ownRun = and(eq(runs.id, runId), eq(runs.claimId, claimId));
   /**
    * Schreibt das Lebenszeichen und meldet den Zustand: `active`, `cancelled` (abgebrochen) oder `lost` (ein
-   * anderer Worker hat den Lauf übernommen). Außer bei `active` endet auch ein Warten bei Ratenlimit.
+   * anderer Worker hat den Lauf übernommen). Außer bei `active` endet auch ein Warten bei Ratenlimit; bei
+   * `lost` werden zudem laufende Adapter-Aufrufe abgebrochen.
    */
   const heartbeat = async (): Promise<RunState> => {
     const [row] = await db
@@ -133,6 +146,7 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
       .returning({ status: runs.status });
     const state: RunState = !row ? "lost" : row.status === "running" ? "active" : "cancelled";
     if (state !== "active") stop.abort();
+    if (state === "lost") lost.abort(new Error("Lauf von einem anderen Worker übernommen"));
     return state;
   };
   const timer = setInterval(() => void heartbeat().catch(() => {}), deps.heartbeatMs ?? DEFAULT_HEARTBEAT_MS);
@@ -148,13 +162,14 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
       mode: configuration.mode,
       timeoutMs: run.timeoutMs,
     },
+    lostSignal: lost.signal,
     timeoutGraceMs: deps.timeoutGraceMs ?? DEFAULT_TIMEOUT_GRACE_MS,
     state: heartbeat,
     rateLimit: new RateLimitWait({
       intervalMs: deps.rateLimitRetryMs ?? DEFAULT_RATE_LIMIT_RETRY_MS,
       signal: stop.signal,
       onChange: async (until) => {
-        await db.update(runs).set({ rateLimitedUntil: until }).where(eq(runs.id, runId));
+        await db.update(runs).set({ rateLimitedUntil: until }).where(ownRun);
       },
     }),
   };
@@ -196,6 +211,8 @@ interface RunContext {
   adapter: HarnessAdapter;
   prompt: BenchmarkPrompt;
   task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
+  /** Wird ausgelöst, sobald ein anderer Worker den Lauf übernommen hat; bricht laufende Adapter-Aufrufe ab. */
+  lostSignal: AbortSignal;
   timeoutGraceMs: number;
   /** Zustand des Laufs vor jedem Aufruf (schreibt zugleich das Lebenszeichen). */
   state: () => Promise<RunState>;
@@ -292,12 +309,13 @@ const RATE_LIMITED = { status: "pending", attempts: sql`${unitResults.attempts} 
 /**
  * Ein Aufruf des Adapters. Wirft er, ist das ein Harness-Fehler; meldet er sich nicht bis Timeout plus
  * Spielraum, ein Timeout: der Runner löst dann das Abbruchsignal der Aufgabe aus, damit der Adapter seinen
- * CLI-Prozess beendet; ein spätes Ergebnis verfällt.
+ * CLI-Prozess beendet; ein spätes Ergebnis verfällt. Dasselbe Signal folgt dem Verlust des Laufs
+ * (`lostSignal`) und einem Signal der Aufgabe.
  */
 async function callAdapter(context: RunContext, task: HarnessTask): Promise<HarnessResult> {
   const limitMs = task.timeoutMs + context.timeoutGraceMs;
   const abort = new AbortController();
-  const signal = task.signal ? AbortSignal.any([task.signal, abort.signal]) : abort.signal;
+  const signal = AbortSignal.any([abort.signal, context.lostSignal, ...(task.signal ? [task.signal] : [])]);
   let timer: NodeJS.Timeout | undefined;
   const guard = new Promise<HarnessResult>((resolve) => {
     timer = setTimeout(() => {
