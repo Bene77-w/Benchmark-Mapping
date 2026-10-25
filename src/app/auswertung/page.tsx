@@ -51,7 +51,7 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
     })),
   );
   const analysis = buildAnalysis({ runs, prices, filters: requested.filters });
-  const state = { filters: analysis.filters, xAxis: requested.xAxis };
+  const state = { ...requested, filters: analysis.filters };
 
   return (
     <>

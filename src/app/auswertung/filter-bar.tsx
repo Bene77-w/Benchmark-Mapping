@@ -20,12 +20,15 @@ const EFFORT_LABELS: Record<EffortFilter, string> = {
 /** Adresse der Auswertungsseite mit geändertem Zustand; Filter bleiben beim Umschalten erhalten. */
 export function analysisHref(
   state: AnalysisState,
-  change: Partial<AnalysisState["filters"]> & { xAxis?: AnalysisState["xAxis"] },
+  change: Partial<AnalysisState["filters"]> & Partial<Omit<AnalysisState, "filters">>,
 ) {
-  const { xAxis, ...filters } = change;
+  const { xAxis, categoryRuns, historyConfiguration, ...filters } = change;
   return `/auswertung?${analysisSearch({
     filters: { ...state.filters, ...filters },
     xAxis: xAxis ?? state.xAxis,
+    categoryRuns: categoryRuns ?? state.categoryRuns,
+    historyConfiguration:
+      historyConfiguration === undefined ? state.historyConfiguration : historyConfiguration,
   })}`;
 }
 
