@@ -35,7 +35,8 @@ const BROAD_SCOPE_LIMIT = 5;
  * Vollständige Bewertung eines Laufs gegen eine Gold-Version (reine Funktion, deterministisch).
  *
  * Unit-Score: F1 aus Recall auf positiv und Präzision auf positiv ∪ vertretbar; no_mapping-Units 1 bei
- * no_mapping, sonst 0; ohne schemakonforme Antwort 0.
+ * `decision: "no_mapping"`, sonst 0; ohne schemakonforme Antwort 0. Maßgeblich ist `decision`: Zuordnungen
+ * zählen nur bei `mapped`; `mapped` ohne Zuordnung ist kein no_mapping (Widerspruch, keine Industry genannt).
  */
 export function evaluateRun(input: ScoringInput): RunEvaluation {
   const context: Context = {
@@ -113,7 +114,7 @@ function evaluateUnit(gold: GoldUnit, outcome: UnitOutcome | undefined, context:
       namedAcceptable: named.filter((id) => classes.get(id) === "vertretbar"),
       namedWrong: named.filter((id) => !classes.has(id)),
     },
-    score: unitScore(gold, named, classes, positive),
+    score: unitScore(gold, answer.decision, named, classes, positive),
     ...checkRules(answer, sourceUnit(gold.unitId, context), context),
   };
 }
@@ -168,14 +169,19 @@ function effectiveClass(goldClass: GoldClass, webOnly: boolean, mode: Mode): Gol
 
 function unitScore(
   gold: GoldUnit,
+  decision: UnitAnswer["decision"],
   named: string[],
   classes: ReadonlyMap<string, GoldClass>,
   positive: string[],
 ): number {
-  if (gold.noMapping) return named.length === 0 ? 1 : 0;
+  const saysNoMapping = decision === "no_mapping";
+  if (gold.noMapping) return saysNoMapping ? 1 : 0;
   // Ohne Web sind alle positiven web_only-Industries vertretbar: no_mapping ist richtig, Nennungen zählen
   // nur über die Präzision.
-  if (positive.length === 0) return named.length === 0 ? 1 : precisionOf(named, classes);
+  if (positive.length === 0) {
+    if (saysNoMapping) return 1;
+    return named.length === 0 ? 0 : precisionOf(named, classes);
+  }
   if (named.length === 0) return 0;
   const recall = positive.filter((id) => named.includes(id)).length / positive.length;
   const precision = precisionOf(named, classes);
