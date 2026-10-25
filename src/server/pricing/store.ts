@@ -11,7 +11,7 @@ import {
   type WebSearchPriceView,
   webSearchPriceInputSchema,
 } from "./model";
-import { type ModelsDevSnapshot, pricesFromModelsDev } from "./models-dev";
+import { type ModelsDevSnapshot, pricesFromModelsDev, webSearchPricesFromModelsDev } from "./models-dev";
 
 /**
  * Preistabelle in der Datenbank: Modelle (auch ohne Preis), Preise je Modell und Websuchpreise je Harness,
@@ -20,8 +20,9 @@ import { type ModelsDevSnapshot, pricesFromModelsDev } from "./models-dev";
  */
 
 /**
- * Lädt die Preise eines models.dev-Auszugs. Idempotent; bestehende Einträge (auch von Hand geänderte
- * Preise mit demselben Gültig-ab-Datum) bleiben unverändert.
+ * Lädt die Preise eines models.dev-Auszugs samt vorbefüllter Websuchpreise. Idempotent. Ein Preis, der
+ * noch aus demselben Auszug stammt, wird auf dessen aktuelle Ableitung gebracht (z. B. Cache-Write für
+ * Claude Code); von Hand geänderte Preise und Websuchpreise bleiben unverändert.
  */
 export async function loadModelsDevSnapshot(
   db: Database,
@@ -38,9 +39,25 @@ export async function loadModelsDevSnapshot(
     const inserted = await tx
       .insert(modelPrices)
       .values(entries.map(({ modelId, price }) => ({ modelId, ...price, source })))
-      .onConflictDoNothing()
-      .returning({ id: modelPrices.id });
-    return { prices: inserted.length };
+      .onConflictDoUpdate({
+        target: [modelPrices.modelId, modelPrices.validFrom],
+        set: {
+          input: sql`excluded.input`,
+          cacheRead: sql`excluded.cache_read`,
+          cacheWrite: sql`excluded.cache_write`,
+          output: sql`excluded.output`,
+        },
+        setWhere: sql`${modelPrices.source} = excluded.source`,
+      })
+      .returning({ id: modelPrices.id, isNew: sql<boolean>`xmax = 0` });
+    const searchPrices = webSearchPricesFromModelsDev(snapshot);
+    if (searchPrices.length > 0) {
+      await tx
+        .insert(webSearchPrices)
+        .values(searchPrices.map(({ harness, price }) => ({ harness, ...price, source })))
+        .onConflictDoNothing();
+    }
+    return { prices: inserted.filter((row) => row.isNew).length };
   });
 }
 
