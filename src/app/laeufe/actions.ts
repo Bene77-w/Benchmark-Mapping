@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDatabase } from "@/server/db/client";
-import { requireActiveGold } from "@/server/gold/active";
+import { requireActiveGold, requireGold } from "@/server/gold/active";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
 import {
   cancelRun,
@@ -25,18 +25,23 @@ const formSchema = z.object({
   mode: z.string(),
   parallelism: z.coerce.number().int().min(MIN_PARALLELISM).max(MAX_PARALLELISM),
   timeoutMinutes: z.coerce.number().positive(),
+  goldVersion: z.string().optional(),
 });
 
-/** Legt einen Lauf über die Units der aktuellen Gold-Version an; der Worker führt ihn aus. */
+/**
+ * Legt einen Lauf über die Units der gewählten Gold-Version an (ohne Wahl die neueste) und merkt sie am Lauf;
+ * der Worker führt ihn aus.
+ */
 export async function startRun(_previous: StartRunState, formData: FormData): Promise<StartRunState> {
   let runId: number;
   try {
     const form = formSchema.parse(Object.fromEntries(formData));
-    const gold = await requireActiveGold(getDatabase());
+    const gold = await requireGold(getDatabase(), form.goldVersion);
     ({ runId } = await createRun(getDatabase(), {
       configuration: configurationSchema.parse(form),
       parallelism: form.parallelism,
       timeoutMs: Math.round(form.timeoutMinutes * 60_000),
+      goldVersion: gold.version,
       unitIds: gold.units.map((unit) => unit.unitId),
     }));
   } catch (error) {
@@ -45,7 +50,7 @@ export async function startRun(_previous: StartRunState, formData: FormData): Pr
   redirect(`/laeufe/${runId}`);
 }
 
-/** Startet eine gespeicherte Konfiguration erneut. */
+/** Startet eine gespeicherte Konfiguration erneut über die Units der neuesten Gold-Version. */
 export async function restartConfiguration(formData: FormData): Promise<void> {
   const configurationId = z.coerce.number().int().parse(formData.get("configurationId"));
   const gold = await requireActiveGold(getDatabase());
@@ -53,6 +58,7 @@ export async function restartConfiguration(formData: FormData): Promise<void> {
     getDatabase(),
     configurationId,
     gold.units.map((unit) => unit.unitId),
+    { goldVersion: gold.version },
   );
   redirect(`/laeufe/${runId}`);
 }

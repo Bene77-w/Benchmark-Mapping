@@ -65,6 +65,7 @@ export async function createRun(
         outputSchemaHash: prompt.outputSchemaHash,
         parallelism: parsed.parallelism,
         timeoutMs: parsed.timeoutMs,
+        goldVersion: parsed.goldVersion,
       })
       .returning({ id: runs.id });
     await tx.insert(unitResults).values(parsed.unitIds.map((unitId) => ({ runId: run.id, unitId })));
@@ -74,13 +75,13 @@ export async function createRun(
 
 /**
  * Startet eine gespeicherte Konfiguration erneut: neuer Lauf mit Parallelität und Timeout ihres letzten
- * Laufs (sonst Standardwerte) über die angegebenen Units.
+ * Laufs (sonst Standardwerte) über die angegebenen Units (aus der Gold-Version `goldVersion`).
  */
 export async function createRunFromConfiguration(
   db: Database,
   configurationId: number,
   unitIds: string[],
-  options: PromptRootOption = {},
+  options: PromptRootOption & { goldVersion?: string | null } = {},
 ): Promise<{ runId: number }> {
   const [configuration] = await db
     .select()
@@ -99,9 +100,10 @@ export async function createRunFromConfiguration(
       configuration: toConfiguration(configuration),
       parallelism: latest?.parallelism ?? DEFAULT_PARALLELISM,
       timeoutMs: latest?.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+      goldVersion: options.goldVersion ?? null,
       unitIds,
     },
-    options,
+    { promptRoot: options.promptRoot },
   );
 }
 
@@ -281,6 +283,7 @@ async function selectRunSummaries(db: Database, runId?: number): Promise<RunSumm
     outputSchemaHash: run.outputSchemaHash,
     parallelism: run.parallelism,
     timeoutMs: run.timeoutMs,
+    goldVersion: run.goldVersion,
     preflight: run.preflight,
     createdAt: run.createdAt,
     startedAt: run.startedAt,

@@ -106,6 +106,12 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
             </dd>
           </>
         )}
+        {run.goldVersion && (
+          <>
+            <dt className="text-muted-foreground">Gold-Version beim Start</dt>
+            <dd data-testid="run-gold-version">{run.goldVersion}</dd>
+          </>
+        )}
         <dt className="text-muted-foreground">Parallelität / Timeout</dt>
         <dd>
           {run.parallelism} / {run.timeoutMs / 60_000} min pro Unit
