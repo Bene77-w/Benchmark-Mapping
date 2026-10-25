@@ -11,6 +11,7 @@ import {
   type HarnessTask,
   parseAnswerText,
 } from "@/server/harness/adapter";
+import { type CliOutcome, runCli } from "@/server/harness/cli-process";
 import { createFakeAdapter } from "@/server/harness/fake";
 import { buildBenchmarkPrompt, PROMPT_ROOT, PROMPT_VERSION } from "@/server/prompt/benchmark-prompt";
 import { ensureEvaluation, listEvaluations } from "@/server/scoring/store";
@@ -552,6 +553,45 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
     expect(unit.warnings).toEqual(["Vermerk 1", "Vermerk 0"]);
   });
 
+  test("nach dem Runner-Timeout beendet das Abbruchsignal den CLI-Prozess des Adapters", async () => {
+    const db = await databaseWithSnapshot();
+    // Stellvertreter-CLI (Node), die sich nicht von selbst beendet; der Adapter wartet auf sie.
+    const processes: Promise<CliOutcome>[] = [];
+    const adapter: HarnessAdapter = {
+      harness: "fake",
+      run: async (task) => {
+        const cli = runCli({
+          command: process.execPath,
+          args: ["-e", "setTimeout(() => {}, 20000)"],
+          cwd: tmpdir(),
+          env: { PATH: process.env.PATH },
+          timeoutMs: 60_000,
+          signal: task.signal,
+        });
+        processes.push(cli);
+        await cli;
+        return parseFailure(task.unitId);
+      },
+    };
+    const { runId } = await createRun(db, {
+      configuration: fakeConfiguration,
+      timeoutMs: 100,
+      unitIds: ["house--ethics"],
+    });
+
+    await processNextRun(db, { adapters: { fake: adapter }, timeoutGraceMs: 0 });
+
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ attempts: 2, error: { kind: "timeout" } });
+    const ended = await Promise.race([
+      Promise.all(processes),
+      new Promise<"läuft noch">((resolve) => setTimeout(() => resolve("läuft noch"), 5_000)),
+    ]);
+    expect(ended).toEqual([
+      expect.objectContaining({ aborted: true }),
+      expect.objectContaining({ aborted: true }),
+    ]);
+  });
+
   test("antwortet der Harness nicht innerhalb des Timeouts, bricht der Runner ab, wiederholt einmal und meldet Timeout", async () => {
     const db = await databaseWithSnapshot();
     const root = await fakeScenario("langsam", {
@@ -815,6 +855,23 @@ async function fakeScenario(name: string, files: Record<string, unknown>): Promi
     await writeFile(path.join(root, name, `${unitId}.json`), JSON.stringify(file));
   }
   return root;
+}
+
+/** Ergebnis ohne Antwort (Harness-Fehler) für eigene Test-Adapter. */
+function parseFailure(unitId: string): HarnessResult {
+  return {
+    outcome: { kind: "harness_error", message: `abgebrochen (${unitId})` },
+    rawResponse: null,
+    log: "",
+    tokens: null,
+    webSearches: null,
+    effort: { reported: null, confirmed: false },
+    nativeCostUsd: null,
+    durationMs: 0,
+    exitCode: null,
+    cliVersion: null,
+    modelReported: null,
+  };
 }
 
 function noMappingAnswer(unitId: string) {

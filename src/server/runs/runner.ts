@@ -291,16 +291,22 @@ const RATE_LIMITED = { status: "pending", attempts: sql`${unitResults.attempts} 
 
 /**
  * Ein Aufruf des Adapters. Wirft er, ist das ein Harness-Fehler; meldet er sich nicht bis Timeout plus
- * Spielraum, ein Timeout (der Aufruf selbst lässt sich nicht abbrechen, sein spätes Ergebnis verfällt).
+ * Spielraum, ein Timeout: der Runner löst dann das Abbruchsignal der Aufgabe aus, damit der Adapter seinen
+ * CLI-Prozess beendet; ein spätes Ergebnis verfällt.
  */
 async function callAdapter(context: RunContext, task: HarnessTask): Promise<HarnessResult> {
   const limitMs = task.timeoutMs + context.timeoutGraceMs;
+  const abort = new AbortController();
+  const signal = task.signal ? AbortSignal.any([task.signal, abort.signal]) : abort.signal;
   let timer: NodeJS.Timeout | undefined;
   const guard = new Promise<HarnessResult>((resolve) => {
-    timer = setTimeout(() => resolve(runnerTimeout(limitMs)), limitMs);
+    timer = setTimeout(() => {
+      abort.abort(new Error(`Runner-Timeout nach ${limitMs} ms`));
+      resolve(runnerTimeout(limitMs));
+    }, limitMs);
   });
   try {
-    return await Promise.race([context.adapter.run(task).catch(adapterFailure), guard]);
+    return await Promise.race([context.adapter.run({ ...task, signal }).catch(adapterFailure), guard]);
   } finally {
     clearTimeout(timer);
   }
