@@ -215,6 +215,47 @@ describe("Claude-Code-Ausgabe: konstruierte Sonderfälle", () => {
     expect(output.tokens).not.toBeNull();
     expect(output.webSearches).toBeNull();
   });
+
+  test("Tokens mehrerer Modelle bleiben je Modell erhalten, zusätzlich zur Summe", () => {
+    const output = readClaudeOutput(
+      resultWith({
+        "claude-opus-5-5": {
+          inputTokens: 100,
+          outputTokens: 50,
+          cacheReadInputTokens: 10,
+          cacheCreationInputTokens: 20,
+          webSearchRequests: 1,
+          thinkingTokens: 30,
+        },
+        "claude-haiku-5-5": { inputTokens: 5, outputTokens: 2, webSearchRequests: 0 },
+      }),
+      "house--ethics",
+    );
+    expect(output.tokensByModel).toEqual({
+      "claude-opus-5-5": {
+        inputTokens: 100,
+        cacheReadTokens: 10,
+        cacheWriteTokens: 20,
+        outputTokens: 50,
+        reasoningTokens: 30,
+      },
+      "claude-haiku-5-5": {
+        inputTokens: 5,
+        cacheReadTokens: 0,
+        cacheWriteTokens: 0,
+        outputTokens: 2,
+        reasoningTokens: null,
+      },
+    });
+    expect(output.tokens).toEqual({
+      inputTokens: 105,
+      cacheReadTokens: 10,
+      cacheWriteTokens: 20,
+      outputTokens: 52,
+      reasoningTokens: 30,
+    });
+    expect(output.webSearches).toBe(1);
+  });
 });
 
 function task(overrides: Partial<HarnessTask> = {}): HarnessTask {

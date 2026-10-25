@@ -16,7 +16,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { GOLD_CATEGORIES, GOLD_CLASSES, GOLD_VERSION_STATUSES } from "@/server/gold/model";
-import { HARNESS_ERROR_KINDS, HARNESSES } from "@/server/harness/adapter";
+import { HARNESS_ERROR_KINDS, HARNESSES, type TokensByModel } from "@/server/harness/adapter";
 import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
@@ -175,6 +175,8 @@ export const unitResults = pgTable(
     cacheWriteTokens: integer("cache_write_tokens"),
     outputTokens: integer("output_tokens"),
     reasoningTokens: integer("reasoning_tokens"),
+    /** Tokens je Modell, wenn der Harness sie getrennt meldet (Summe in den Spalten davor). */
+    tokensByModel: jsonb("tokens_by_model").$type<TokensByModel>(),
     webSearches: integer("web_searches"),
     effortReported: text("effort_reported"),
     effortConfirmed: boolean("effort_confirmed"),

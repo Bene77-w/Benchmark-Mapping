@@ -1,4 +1,4 @@
-import { type HarnessOutcome, parseAnswerText, type TokenUsage } from "./adapter";
+import { type HarnessOutcome, parseAnswerText, type TokensByModel, type TokenUsage } from "./adapter";
 
 /**
  * Auslesen der Ausgabe von `claude -p --output-format json` (nach docs/research/kosten-claude-code.md).
@@ -14,6 +14,8 @@ export interface ClaudeOutput {
   outcome: HarnessOutcome | null;
   rawResponse: string | null;
   tokens: TokenUsage | null;
+  /** Tokens je Eintrag von `modelUsage` (Schlüssel = Modell-ID); `null` ohne `modelUsage`. */
+  tokensByModel: TokensByModel | null;
   webSearches: number | null;
   nativeCostUsd: number | null;
   cliVersion: string | null;
@@ -57,7 +59,8 @@ export function readClaudeOutput(stdout: string, expectedUnitId: string): Claude
   const modelUsage = isObject(result?.modelUsage) ? result.modelUsage : null;
 
   const base = {
-    tokens: modelUsage ? readTokens(modelUsage) : null,
+    tokens: modelUsage ? readTokens(Object.values(modelUsage).filter(isObject)) : null,
+    tokensByModel: modelUsage ? readTokensByModel(modelUsage) : null,
     webSearches: modelUsage ? readWebSearches(modelUsage) : null,
     nativeCostUsd: typeof result?.total_cost_usd === "number" ? result.total_cost_usd : null,
     cliVersion: typeof init?.claude_code_version === "string" ? init.claude_code_version : null,
@@ -83,8 +86,15 @@ export function readClaudeOutput(stdout: string, expectedUnitId: string): Claude
   return { ...base, outcome: parseAnswerText(rawResponse, expectedUnitId), rawResponse };
 }
 
-function readTokens(modelUsage: Json): TokenUsage | null {
-  const models = Object.values(modelUsage).filter(isObject);
+function readTokensByModel(modelUsage: Json): TokensByModel | null {
+  const entries = Object.entries(modelUsage).flatMap(([model, usage]) => {
+    const tokens = isObject(usage) ? readTokens([usage]) : null;
+    return tokens ? [[model, tokens] as const] : [];
+  });
+  return entries.length > 0 ? Object.fromEntries(entries) : null;
+}
+
+function readTokens(models: Json[]): TokenUsage | null {
   if (models.length === 0) return null;
   const sum = (field: string) => models.reduce((total, model) => total + number(model[field]), 0);
   const hasThinking = models.some((model) => typeof model.thinkingTokens === "number");

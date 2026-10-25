@@ -7,6 +7,7 @@ import type {
   HarnessAdapter,
   HarnessResult,
   HarnessTask,
+  TokensByModel,
   TokenUsage,
 } from "@/server/harness/adapter";
 import { describePreflightFailure } from "@/server/harness/preflight";
@@ -326,10 +327,35 @@ function combineAttempts(attempts: HarnessResult[]): HarnessResult {
       outputTokens: sumAll(allTokens.map((entry) => entry.outputTokens)) ?? 0,
       reasoningTokens: sumAll(allTokens.map((entry) => entry.reasoningTokens)),
     },
+    tokensByModel: sumTokensByModel(attempts.map((attempt) => attempt.tokensByModel ?? null)),
     webSearches: sumAll(attempts.map((attempt) => attempt.webSearches)),
     nativeCostUsd: sumAll(attempts.map((attempt) => attempt.nativeCostUsd)),
     durationMs: sumAll(attempts.map((attempt) => attempt.durationMs)) ?? 0,
   };
+}
+
+/** Tokens zweier Versuche; Reasoning `null`, sobald einer es nicht meldet. */
+function addTokens(a: TokenUsage, b: TokenUsage): TokenUsage {
+  return {
+    inputTokens: a.inputTokens + b.inputTokens,
+    cacheReadTokens: a.cacheReadTokens + b.cacheReadTokens,
+    cacheWriteTokens: a.cacheWriteTokens + b.cacheWriteTokens,
+    outputTokens: a.outputTokens + b.outputTokens,
+    reasoningTokens: sumAll([a.reasoningTokens, b.reasoningTokens]),
+  };
+}
+
+/** Tokens je Modell über alle Versuche; `null`, sobald ein Versuch keine Aufteilung meldet. */
+function sumTokensByModel(perAttempt: (TokensByModel | null)[]): TokensByModel | null {
+  if (perAttempt.some((entry) => entry === null)) return null;
+  const total: TokensByModel = {};
+  for (const byModel of perAttempt as TokensByModel[]) {
+    for (const [model, tokens] of Object.entries(byModel)) {
+      const current = total[model];
+      total[model] = current ? addTokens(current, tokens) : tokens;
+    }
+  }
+  return total;
 }
 
 /** Summe aller Werte; `null`, sobald einer unbekannt ist. */
@@ -353,6 +379,7 @@ function resultColumns(result: HarnessResult): Partial<typeof unitResults.$infer
     cacheWriteTokens: result.tokens?.cacheWriteTokens ?? null,
     outputTokens: result.tokens?.outputTokens ?? null,
     reasoningTokens: result.tokens?.reasoningTokens ?? null,
+    tokensByModel: result.tokensByModel ?? null,
     webSearches: result.webSearches,
     effortReported: result.effort.reported,
     effortConfirmed: result.effort.confirmed,

@@ -220,6 +220,7 @@ function toResult(task: HarnessTask, cli: CliOutcome, commandLine: string): Harn
       `Arbeitsverzeichnis: leer, temporär · User-Prompt über stdin (${task.userPrompt.length} Zeichen)`,
     ]),
     tokens: output.tokens,
+    tokensByModel: output.tokensByModel,
     webSearches: output.webSearches,
     effort: { reported: null, confirmed: false },
     nativeCostUsd: output.nativeCostUsd,
