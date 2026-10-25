@@ -18,6 +18,7 @@ import {
   formatDateTime,
   formatPercent,
   formatScore,
+  missingMeasurementLabel,
   RUN_STATUS_LABELS,
   UNIT_STATUS_LABELS,
   VIOLATION_LABELS,
@@ -332,7 +333,7 @@ function answerLabel(unit: UnitResultView): string {
 }
 
 function tokensLabel(unit: UnitResultView): string {
-  if (!unit.tokens) return "–";
+  if (!unit.tokens) return missingMeasurementLabel(unit);
   const { inputTokens, cacheReadTokens, cacheWriteTokens, outputTokens } = unit.tokens;
   return `${inputTokens} / ${cacheReadTokens + cacheWriteTokens} / ${outputTokens}`;
 }

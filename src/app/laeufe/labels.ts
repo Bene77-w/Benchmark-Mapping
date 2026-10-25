@@ -1,5 +1,11 @@
 import { HARNESS_LABELS } from "@/server/harness/adapter";
-import type { Configuration, RunProgress, RunStatus, UnitResultStatus } from "@/server/runs/model";
+import type {
+  Configuration,
+  RunProgress,
+  RunStatus,
+  UnitResultStatus,
+  UnitResultView,
+} from "@/server/runs/model";
 import type { Category, UnitEvaluationStatus, ViolationKind } from "@/server/scoring/model";
 
 export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
@@ -66,4 +72,12 @@ export function formatScore(value: number | null | undefined, digits = 3): strin
 
 export function formatPercent(value: number | null): string {
   return value === null ? "–" : `${(value * 100).toFixed(1)} %`;
+}
+
+/**
+ * Fehlender Messwert einer Unit: „unbekannt“, wenn die Unit fertig ist (der Harness hat ihn nicht gemeldet
+ * oder ein Versuch ohne Angabe macht die Summe unbekannt), sonst „–“ (noch kein Ergebnis).
+ */
+export function missingMeasurementLabel(unit: Pick<UnitResultView, "status">): string {
+  return unit.status === "done" || unit.status === "failed" ? "unbekannt" : "–";
 }

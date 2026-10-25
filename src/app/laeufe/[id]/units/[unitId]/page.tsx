@@ -17,6 +17,7 @@ import {
   formatDateTime,
   formatScore,
   MODE_LABELS,
+  missingMeasurementLabel,
   UNIT_EVALUATION_STATUS_LABELS,
   UNIT_STATUS_LABELS,
   VIOLATION_LABELS,
@@ -326,9 +327,9 @@ function Metadata({ result }: { result: UnitResultView }) {
       "Tokens (input / cache read / cache write / output / reasoning)",
       result.tokens
         ? `${result.tokens.inputTokens} / ${result.tokens.cacheReadTokens} / ${result.tokens.cacheWriteTokens} / ${result.tokens.outputTokens} / ${result.tokens.reasoningTokens ?? "–"}`
-        : "–",
+        : missingMeasurementLabel(result),
     ],
-    ["Websuchen", result.webSearches === null ? "–" : String(result.webSearches)],
+    ["Websuchen", result.webSearches === null ? missingMeasurementLabel(result) : String(result.webSearches)],
     ["Native Kosten", result.nativeCostUsd === null ? "–" : `${result.nativeCostUsd} USD`],
     ["Dauer", result.durationMs === null ? "–" : `${(result.durationMs / 1000).toFixed(1)} s`],
     ["Exit-Code", result.exitCode === null ? "–" : String(result.exitCode)],

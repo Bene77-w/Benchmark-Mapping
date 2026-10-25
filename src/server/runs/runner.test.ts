@@ -394,7 +394,7 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
           },
           {
             response: noMappingAnswer("house--ethics"),
-            tokens: { input: 200, cacheRead: 2000, cacheWrite: 0, output: 40 },
+            tokens: { input: 200, cacheRead: 2000, cacheWrite: 0, output: 40, reasoning: 7 },
             webSearches: 2,
             nativeCostUsd: 0.02,
             delayMs: 50,
@@ -418,13 +418,46 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
         cacheReadTokens: 3000,
         cacheWriteTokens: 10,
         outputTokens: 60,
-        reasoningTokens: 5,
+        reasoningTokens: 12,
       },
       webSearches: 3,
     });
     expect(unit.nativeCostUsd).toBeCloseTo(0.03);
     expect(unit.durationMs).toBeGreaterThanOrEqual(100);
     expect(unit.log).toMatch(/Versuch 1[\s\S]*kein JSON[\s\S]*Versuch 2/);
+  });
+
+  test("meldet ein Versuch keine Tokens oder Kosten, sind Tokens und Kosten der Unit unbekannt statt nur teilweise gezählt", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("teilweise", {
+      "house--ethics": {
+        calls: [
+          { simulate: "timeout", webSearches: 0, delayMs: 10 },
+          {
+            response: noMappingAnswer("house--ethics"),
+            tokens: { input: 200, cacheRead: 2000, cacheWrite: 0, output: 40, reasoning: 3 },
+            webSearches: 2,
+            nativeCostUsd: 0.02,
+            delayMs: 10,
+          },
+        ],
+      },
+    });
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "teilweise" },
+      unitIds: ["house--ethics"],
+    });
+
+    await processNextRun(db, { adapters: { fake: createFakeAdapter({ root }) } });
+
+    const [unit] = (await getRun(db, runId))?.units ?? [];
+    expect(unit).toMatchObject({
+      status: "done",
+      attempts: 2,
+      tokens: null,
+      webSearches: 2,
+      nativeCostUsd: null,
+    });
   });
 
   test("antwortet der Harness nicht innerhalb des Timeouts, bricht der Runner ab, wiederholt einmal und meldet Timeout", async () => {
@@ -554,6 +587,10 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     expect(other.callsOf(first)).toBe(0);
     const resumed = await getRun(db, runId);
     expect(resumed).toMatchObject({ status: "completed", progress: { done: 3, failed: 1, running: 0 } });
+    // Die beim Absturz laufenden Aufrufe (second, third) zählen als Versuch: begonnen ist begonnen. fourth ist
+    // im Szenario `standard` ungültiges JSON und wird einmal wiederholt.
+    const attemptsOf = (unitId: string) => resumed?.units.find((unit) => unit.unitId === unitId)?.attempts;
+    expect([first, second, third, fourth].map(attemptsOf)).toEqual([1, 2, 2, 2]);
 
     // Kehren die Aufrufe des totgeglaubten Workers doch noch zurück, überschreiben sie nichts, und er startet
     // keine weiteren.
@@ -561,6 +598,30 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     await crashedWorker;
     expect(await getRun(db, runId)).toEqual(resumed);
     expect(crashed.calls).toHaveLength(3);
+  });
+
+  test("ein totgeglaubter Worker überschreibt keine Unit, die der übernehmende Worker gerade ausführt", async () => {
+    const db = await databaseWithSnapshot();
+    const [unitId] = STANDARD_UNITS;
+    const crashed = gatedAdapter("alter Worker");
+    const current = gatedAdapter("neuer Worker");
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: [unitId] });
+
+    const crashedWorker = processNextRun(db, { adapters: { fake: crashed }, heartbeatMs: 3_600_000 });
+    await crashed.waitForCalls(1);
+    const currentWorker = processNextRun(db, { adapters: { fake: current }, staleAfterMs: 0 });
+    await current.waitForCalls(1);
+
+    // Der alte Aufruf kehrt zurück, während der neue Worker dieselbe Unit ausführt: sein Ergebnis verfällt.
+    crashed.releaseAll();
+    await crashedWorker;
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ status: "running", log: null });
+
+    current.releaseAll();
+    expect(await currentWorker).toBe(runId);
+    const run = await getRun(db, runId);
+    expect(run?.status).toBe("completed");
+    expect(run?.units[0]).toMatchObject({ status: "done", log: "neuer Worker", attempts: 2 });
   });
 
   test("ein abgebrochener Lauf erscheint nicht in der Auswertung, nach Fortsetzen und Abschluss schon", async () => {
@@ -797,8 +858,8 @@ describe("Ergänzen fehlender Units", { timeout: 30_000 }, () => {
   });
 });
 
-/** Adapter, dessen Aufrufe erst auf Freigabe mit einer gültigen no_mapping-Antwort enden. */
-function gatedAdapter() {
+/** Adapter, dessen Aufrufe erst auf Freigabe mit einer gültigen no_mapping-Antwort enden (Protokoll `log`). */
+function gatedAdapter(log = "") {
   const waiting: (() => void)[] = [];
   let calls = 0;
   let active = 0;
@@ -832,7 +893,7 @@ function gatedAdapter() {
       return {
         outcome: parseAnswerText(rawResponse, task.unitId),
         rawResponse,
-        log: "",
+        log,
         tokens: null,
         webSearches: null,
         effort: { reported: null, confirmed: false },
