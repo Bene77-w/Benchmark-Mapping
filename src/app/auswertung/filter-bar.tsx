@@ -88,7 +88,7 @@ export function FilterBar({ analysis, state }: { analysis: Analysis; state: Anal
   );
 }
 
-function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+export function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     // biome-ignore lint/a11y/useSemanticElements: Gruppe von Links, kein Formular
     <div role="group" aria-label={label} className="space-y-1">
@@ -98,18 +98,21 @@ function FilterGroup({ label, children }: { label: string; children: React.React
   );
 }
 
-function FilterLink({
+/** Umschalter als Link (Filter und Auswahl der Ansichten); `data-*`-Attribute werden durchgereicht. */
+export function FilterLink({
   href,
   active,
   disabled = false,
   title,
   children,
+  ...data
 }: {
   href: string;
   active: boolean;
   disabled?: boolean;
   title?: string;
   children: React.ReactNode;
+  [attribute: `data-${string}`]: string | number | undefined;
 }) {
   const className = cn(
     "rounded-md border px-2.5 py-1",
@@ -118,7 +121,7 @@ function FilterLink({
   );
   if (disabled) {
     return (
-      <span className={className} title={title} aria-disabled="true">
+      <span className={className} title={title} aria-disabled="true" {...data}>
         {children}
       </span>
     );
@@ -130,6 +133,7 @@ function FilterLink({
       aria-current={active ? "true" : undefined}
       title={title}
       scroll={false}
+      {...data}
     >
       {children}
     </Link>

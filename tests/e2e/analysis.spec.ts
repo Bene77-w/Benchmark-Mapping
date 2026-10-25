@@ -1,4 +1,5 @@
-import { expect, type Locator, type Page, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+import { runIds, startRun } from "./helpers";
 
 /**
  * Auswertung: Rangliste und Scatter-Plot mit Fake-Läufen. Szenario `rangliste-a` hat einen Preis (gültig ab
@@ -17,27 +18,6 @@ async function savePrice(page: Page) {
   await form.getByLabel("Output").fill("12");
   await form.getByRole("button", { name: "Preis speichern" }).click();
   await expect(form.getByRole("status")).toContainText("gespeichert");
-}
-
-async function startRun(page: Page, model: string, effort: string): Promise<string> {
-  await page.goto("/laeufe");
-  await page.getByLabel("Harness").selectOption("fake");
-  await page.getByLabel("Modell").fill(model);
-  await page.getByLabel("Effort").fill(effort);
-  await page.getByLabel("Modus").selectOption("text_only");
-  await page.getByRole("button", { name: "Lauf starten" }).click();
-  await expect(page).toHaveURL(/\/laeufe\/\d+$/);
-  const id = page.url().split("/").at(-1) ?? "";
-  await expect(page.getByTestId("run-status").filter({ visible: true })).toHaveText("abgeschlossen", {
-    timeout: 60_000,
-  });
-  return id;
-}
-
-async function runIds(locator: Locator): Promise<string[]> {
-  return (
-    await locator.evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-run-id") ?? ""))
-  ).sort();
 }
 
 test("Rangliste und Scatter-Plot zeigen dieselben Läufe, reagieren auf Filter und führen zur Lauf-Detailansicht", async ({

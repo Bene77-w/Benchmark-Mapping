@@ -1,6 +1,20 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { buildAnalysis, parseAnalysisParams, xValue } from "@/server/analysis/leaderboard";
+import {
+  type Analysis,
+  type AnalysisState,
+  buildAnalysis,
+  parseAnalysisParams,
+  xValue,
+} from "@/server/analysis/leaderboard";
+import {
+  buildCategoryChart,
+  buildHeatmap,
+  buildScoreHistory,
+  type CategoryChart,
+  MAX_CATEGORY_RUNS,
+  type ScoreHistory,
+} from "@/server/analysis/views";
 import { getDatabase } from "@/server/db/client";
 import { getActiveGold } from "@/server/gold/active";
 import { HARNESS_LABELS } from "@/server/harness/adapter";
@@ -9,10 +23,14 @@ import type { RunView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import { listCurrentEvaluations } from "@/server/scoring/current";
 import { ESTIMATE_NOTE } from "../laeufe/[id]/costs";
-import { MODE_LABELS } from "../laeufe/labels";
-import { FilterBar } from "./filter-bar";
+import { configurationLabel, MODE_LABELS } from "../laeufe/labels";
+import { CategoryChartView } from "./category-chart";
+import { analysisHref, FilterBar, FilterGroup, FilterLink } from "./filter-bar";
+import { seriesColor } from "./format";
+import { HeatmapView } from "./heatmap";
 import { LeaderboardTable } from "./leaderboard-table";
 import { ScatterPlot } from "./scatter-plot";
+import { ScoreHistoryChart } from "./score-history";
 
 export const metadata = { title: "Auswertung – Benchmark-Mapping" };
 
@@ -52,6 +70,8 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
   );
   const analysis = buildAnalysis({ runs, prices, filters: requested.filters });
   const state = { ...requested, filters: analysis.filters };
+  const categoryChart = buildCategoryChart(analysis.entries, requested.categoryRuns);
+  const history = buildScoreHistory(analysis, requested.historyConfiguration);
 
   return (
     <>
@@ -102,8 +122,88 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
             <LeaderboardTable entries={analysis.entries} />
             <p className="text-xs text-muted-foreground">* {ESTIMATE_NOTE}</p>
           </section>
+          <section className="space-y-3">
+            <h2 className="text-lg font-medium">Score je Kategorie</h2>
+            <CategorySelection analysis={analysis} state={state} chart={categoryChart} />
+            <CategoryChartView chart={categoryChart} />
+          </section>
+          <section className="space-y-3">
+            <h2 className="text-lg font-medium">Heatmap Läufe × Units</h2>
+            <HeatmapView heatmap={buildHeatmap(analysis.entries)} />
+          </section>
+          <section className="space-y-3">
+            <h2 className="text-lg font-medium">Verlauf je Konfiguration</h2>
+            <HistorySelection state={state} history={history} />
+            {history.configuration && (
+              <ScoreHistoryChart points={history.points} label={configurationLabel(history.configuration)} />
+            )}
+          </section>
         </>
       )}
     </>
+  );
+}
+
+/** Auswahl der Läufe des Kategorie-Diagramms aus der Rangliste (höchstens vier); die Farbe folgt der Auswahl. */
+function CategorySelection({
+  analysis,
+  state,
+  chart,
+}: {
+  analysis: Analysis;
+  state: AnalysisState;
+  chart: CategoryChart;
+}) {
+  const selected = chart.series.map((series) => series.runId);
+  return (
+    <FilterGroup label={`Läufe (höchstens ${MAX_CATEGORY_RUNS})`}>
+      {analysis.entries.map((entry) => {
+        const index = selected.indexOf(entry.runId);
+        const isSelected = index >= 0;
+        const next = isSelected ? selected.filter((id) => id !== entry.runId) : [...selected, entry.runId];
+        const disabled = isSelected ? next.length === 0 : selected.length >= MAX_CATEGORY_RUNS;
+        return (
+          <FilterLink
+            key={entry.runId}
+            href={analysisHref(state, { categoryRuns: next })}
+            active={isSelected}
+            disabled={disabled}
+            title={`${configurationLabel(entry.configuration)}, Lauf #${entry.runId}`}
+            data-testid="category-toggle"
+            data-run-id={entry.runId}
+            data-selected={String(isSelected)}
+          >
+            {isSelected && (
+              <span
+                aria-hidden="true"
+                className="mr-1.5 inline-block size-2.5 rounded-sm align-middle"
+                style={{ background: seriesColor(index) }}
+              />
+            )}
+            {entry.configuration.model} · {entry.configuration.effort}
+          </FilterLink>
+        );
+      })}
+    </FilterGroup>
+  );
+}
+
+/** Auswahl der Konfiguration des Verlaufs: die Konfigurationen der Rangliste. */
+function HistorySelection({ state, history }: { state: AnalysisState; history: ScoreHistory }) {
+  return (
+    <FilterGroup label="Konfiguration">
+      {history.configurations.map(({ configuration, runCount }) => (
+        <FilterLink
+          key={configuration.id}
+          href={analysisHref(state, { historyConfiguration: configuration.id })}
+          active={configuration.id === history.configuration?.id}
+          title={configurationLabel(configuration)}
+          data-testid="history-configuration"
+          data-configuration-id={configuration.id}
+        >
+          {configuration.model} · {configuration.effort} ({runCount} {runCount === 1 ? "Lauf" : "Läufe"})
+        </FilterLink>
+      ))}
+    </FilterGroup>
   );
 }
