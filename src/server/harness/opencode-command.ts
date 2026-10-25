@@ -9,8 +9,8 @@ import type { JsonSchema } from "@/server/prompt/output-schema";
  *   Umgebung des ersten Aufrufs weiterlaufen und den festen Port belegen).
  * - `--agent benchmark`: eigener Agent aus der temporären Konfiguration. Sein `system` ersetzt den Basis-Prompt
  *   von OpenCode; er enthält den Benchmark-Prompt, den versionierten Formatierungsauftrag
- *   (`format-instruction.md`) und das Ausgabeschema (OpenCode kennt in v2 keine Schema-Option). Der Zusatz
- *   gehört nicht zum gemeinsamen Prompt-Hash, aber zum Unit-Hash (`withInlineSchema`).
+ *   (`format-instruction.md`) und das Ausgabeschema (OpenCode kennt in v2 keine Schema-Option). Der Auftrag
+ *   steht im gemeinsamen Prompt-Hash, der ganze Text im Unit-Hash (`withInlineSchema`).
  * - Berechtigungen: alles verboten (`*`), im Modus mit Web nur `websearch` erlaubt; `websearch: false` nimmt
  *   das Suchwerkzeug im Modus ohne Web ganz aus den Anfragen.
  * - Modell `provider/model#variant`: der Effort ist die Variante; Effort `default` ruft ohne Variante auf
