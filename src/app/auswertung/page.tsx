@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { Suspense } from "react";
+import { PrototypeSwitcher } from "@/components/prototype-switcher";
 import {
   type Analysis,
   type AnalysisState,
@@ -29,8 +31,26 @@ import { analysisHref, FilterBar, FilterGroup, FilterLink } from "./filter-bar";
 import { seriesColor } from "./format";
 import { HeatmapView } from "./heatmap";
 import { LeaderboardTable } from "./leaderboard-table";
+import { PrototypeRechartsCategoryChart } from "./prototype-recharts-category-chart";
+import { PrototypeRechartsScatterPlot } from "./prototype-recharts-scatter-plot";
+import { PrototypeRechartsScoreHistory } from "./prototype-recharts-score-history";
 import { ScatterPlot } from "./scatter-plot";
 import { ScoreHistoryChart } from "./score-history";
+
+// PROTOTYP (Branch prototyp/diagramme): zwei Varianten der Diagramme, umschaltbar über `?variant=svg|recharts`
+// auf der bestehenden Route; Datenabruf unverändert, nur die Diagramm-Komponenten wechseln.
+const PROTOTYPE_VARIANTS = [
+  { key: "svg", name: "handgeschriebenes SVG" },
+  { key: "recharts", name: "Recharts" },
+];
+const CHARTS = {
+  svg: { Scatter: ScatterPlot, Category: CategoryChartView, History: ScoreHistoryChart },
+  recharts: {
+    Scatter: PrototypeRechartsScatterPlot,
+    Category: PrototypeRechartsCategoryChart,
+    History: PrototypeRechartsScoreHistory,
+  },
+};
 
 export const metadata = { title: "Auswertung – Benchmark-Mapping" };
 
@@ -46,7 +66,11 @@ export default function AnalysisPage({ searchParams }: PageProps<"/auswertung">)
 }
 
 async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, "searchParams">) {
-  const requested = parseAnalysisParams(await searchParams);
+  const params = await searchParams;
+  const requested = parseAnalysisParams(params);
+  const requestedVariant = [params.variant].flat()[0] ?? (await cookies()).get("prototype-variant")?.value;
+  const variant = requestedVariant === "recharts" ? "recharts" : "svg";
+  const Charts = CHARTS[variant];
   const db = getDatabase();
   const gold = await getActiveGold(db);
   if (!gold) {
@@ -104,7 +128,7 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
           <FilterBar analysis={analysis} state={state} />
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Score gegen Aufwand</h2>
-            <ScatterPlot
+            <Charts.Scatter
               axis={state.xAxis}
               efficient={analysis.efficient[state.xAxis]}
               points={analysis.entries.map((entry) => ({
@@ -125,7 +149,7 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Score je Kategorie</h2>
             <CategorySelection analysis={analysis} state={state} chart={categoryChart} />
-            <CategoryChartView chart={categoryChart} />
+            <Charts.Category chart={categoryChart} />
           </section>
           <section className="space-y-3">
             <h2 className="text-lg font-medium">Heatmap Läufe × Units</h2>
@@ -135,11 +159,12 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
             <h2 className="text-lg font-medium">Verlauf je Konfiguration</h2>
             <HistorySelection state={state} history={history} />
             {history.configuration && (
-              <ScoreHistoryChart points={history.points} label={configurationLabel(history.configuration)} />
+              <Charts.History points={history.points} label={configurationLabel(history.configuration)} />
             )}
           </section>
         </>
       )}
+      <PrototypeSwitcher variants={PROTOTYPE_VARIANTS} current={variant} />
     </>
   );
 }
