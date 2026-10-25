@@ -37,7 +37,10 @@ export interface UnitCostInput {
   /** Laufdatum: maßgeblich ist der Preis mit dem jüngsten Gültig-ab-Datum bis zu diesem Zeitpunkt. */
   at: Date;
   tokens: TokenUsage | null;
-  /** `null` = vom Harness nicht gemeldet, zählt als keine Suche. */
+  /**
+   * `null` = vom Harness nicht gemeldet: unbekannt, sobald der Harness einen Websuchpreis hat (es könnten
+   * Suchen angefallen sein); ohne Websuchpreis zählt es wie keine Suche.
+   */
   webSearches: number | null;
 }
 
@@ -63,11 +66,13 @@ export function estimateUnitCost(input: UnitCostInput, table: PriceTable): CostE
       tokens.cacheWriteTokens * (price.cacheWrite ?? 0) +
       tokens.outputTokens * price.output) /
     PER_MILLION;
-  const searches = input.webSearches ?? 0;
-  if (searches === 0) return { kind: "estimated", usd };
   const searchPrice = validAt(table.webSearch[input.harness] ?? [], input.at);
+  if (input.webSearches === null) {
+    return searchPrice ? unknown(`Websuchen nicht gemeldet (${input.harness})`) : { kind: "estimated", usd };
+  }
+  if (input.webSearches === 0) return { kind: "estimated", usd };
   if (!searchPrice) return unknown(`kein Websuchpreis für ${input.harness}`);
-  return { kind: "estimated", usd: usd + searches * searchPrice.perSearch };
+  return { kind: "estimated", usd: usd + input.webSearches * searchPrice.perSearch };
 }
 
 function validAt<T extends { validFrom: string }>(prices: T[], at: Date): T | null {

@@ -97,9 +97,10 @@ function readTokens(modelUsage: Json): TokenUsage | null {
   };
 }
 
+/** Websuchen aus `webSearchRequests`; fehlt der Zähler in jedem Eintrag, ist die Zahl unbekannt (`null`). */
 function readWebSearches(modelUsage: Json): number | null {
   const models = Object.values(modelUsage).filter(isObject);
-  if (!models.some((model) => typeof model.webSearchRequests === "number")) return models.length ? 0 : null;
+  if (!models.some((model) => typeof model.webSearchRequests === "number")) return null;
   return models.reduce((total, model) => total + number(model.webSearchRequests), 0);
 }
 
