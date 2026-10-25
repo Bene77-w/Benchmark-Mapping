@@ -74,6 +74,10 @@ Vor jedem Lauf (auch beim Fortsetzen) führt der Worker den Preflight des Harnes
 
 **Fake-Harness** (Preflight: das Szenario-Verzeichnis muss existieren): Er liest vorbereitete Antworten aus `tests/fixtures/fake-harness/<Szenario>/<unit_id>.json` (Umgebung `FAKE_HARNESS_ROOT`); das Modell der Konfiguration ist der Szenarioname, z. B. `standard` oder `langsam` (dieselben Antworten mit 3 s je Aufruf, zum Zusehen und Abbrechen). Eine Datei enthält entweder eine Antwort (`response`, ein String wird wörtlich gesendet, so entstehen Format-Fehler) oder einen simulierten Fehler (`simulate`: `timeout`, `rate_limit`, `harness_error`), dazu `tokens`, `webSearches`, `nativeCostUsd` und `delayMs`. Statt eines Aufrufs kann die Datei eine Folge `{ "calls": [ … ] }` enthalten: der n-te Aufruf der Unit bekommt den n-ten Eintrag, danach immer den letzten.
 
+## Auswertung
+
+`/auswertung` zeigt Rangliste und Scatter-Plot der abgeschlossenen Benchmark-Läufe gegen die neueste Gold-Version (unvollständige Läufe und Vorschlagsläufe nie). Verglichen werden nur Läufe mit gleichem Prompt- und Snapshot-Hash (Auswahl „Prompt und Snapshot“, Standard: die Gruppe des neuesten Laufs) und gleichem Modus; je Konfiguration zählt ihr neuester Lauf. Filter: Modus, Effort („alle Stufen“ oder „beste Stufe je Modell“ = je Harness und Modell die Stufe mit dem höchsten Score) und die x-Achse des Plots (geschätzte Kosten, Tokens oder Dauer pro Unit, gemittelt über die Units der Gold-Version). Der Plot markiert die Effizienzgrenze (Läufe, die kein anderer bei höchstens gleichem Aufwand im Score übertrifft); Läufe mit unbekanntem Wert stehen in einem eigenen Streifen „unbekannt“, nie bei 0. Die Filter stehen in der Adresse (`gruppe`, `modus`, `effort=alle|beste`, `x=kosten|tokens|dauer`); Klick auf Zeile oder Punkt öffnet den Lauf. Die Fake-Szenarien `rangliste-a` und `rangliste-b` dienen dem GUI-Test.
+
 ## Prüfungen
 
 ```sh
