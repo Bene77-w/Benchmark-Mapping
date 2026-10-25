@@ -756,6 +756,128 @@ describe("Abbrechen und Fortsetzen", { timeout: 30_000 }, () => {
     expect(run?.units[0]).toMatchObject({ status: "done", log: "neuer Worker", attempts: 2 });
   });
 
+  test("ein überholter Worker, dessen Preflight scheitert, setzt den Lauf des neuen Workers nicht auf fehlgeschlagen", async () => {
+    const db = await databaseWithSnapshot();
+    const [unitId] = STANDARD_UNITS;
+    let releasePreflight = () => {};
+    let preflightStarted = () => {};
+    const started = new Promise<void>((resolve) => {
+      preflightStarted = resolve;
+    });
+    const stale: HarnessAdapter = {
+      ...gatedAdapter("alter Worker"),
+      preflight: async () => {
+        preflightStarted();
+        await new Promise<void>((resolve) => {
+          releasePreflight = resolve;
+        });
+        return {
+          ok: false,
+          checkedAt: new Date().toISOString(),
+          cliVersion: null,
+          checks: [{ id: "cli", label: "CLI erreichbar", status: "failed", message: "nicht gefunden" }],
+        };
+      },
+    };
+    const current = gatedAdapter("neuer Worker");
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: [unitId] });
+
+    const staleWorker = processNextRun(db, { adapters: { fake: stale }, heartbeatMs: 3_600_000 });
+    await started;
+    const currentWorker = processNextRun(db, { adapters: { fake: current }, staleAfterMs: 0 });
+    await current.waitForCalls(1);
+
+    // Der Preflight des alten Workers scheitert erst jetzt: sein Fehler betrifft den Lauf nicht mehr.
+    releasePreflight();
+    expect(await staleWorker).toBe(runId);
+    expect(await getRun(db, runId)).toMatchObject({ status: "running", error: null });
+
+    current.releaseAll();
+    expect(await currentWorker).toBe(runId);
+    expect((await getRun(db, runId))?.status).toBe("completed");
+  });
+
+  test("verliert ein Worker den Lauf, beendet ein eigenes Abbruchsignal seinen laufenden CLI-Prozess", async () => {
+    const db = await databaseWithSnapshot();
+    const [unitId] = STANDARD_UNITS;
+    // Stellvertreter-CLI (Node), die sich nicht von selbst beendet; der alte Adapter wartet auf sie.
+    const processes: Promise<CliOutcome>[] = [];
+    const stale: HarnessAdapter = {
+      harness: "fake",
+      run: async (task) => {
+        const cli = runCli({
+          command: process.execPath,
+          args: ["-e", "setTimeout(() => {}, 20000)"],
+          cwd: tmpdir(),
+          env: { PATH: process.env.PATH },
+          timeoutMs: 60_000,
+          signal: task.signal,
+        });
+        processes.push(cli);
+        await cli;
+        return parseFailure(task.unitId);
+      },
+    };
+    const current = gatedAdapter("neuer Worker");
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: [unitId] });
+
+    const staleWorker = processNextRun(db, { adapters: { fake: stale }, heartbeatMs: 50 });
+    await vi.waitFor(() => expect(processes).toHaveLength(1));
+    const currentWorker = processNextRun(db, { adapters: { fake: current }, staleAfterMs: 0 });
+    await current.waitForCalls(1);
+
+    // Das nächste Lebenszeichen des alten Workers bemerkt die Übernahme und bricht seinen Aufruf ab.
+    const ended = await Promise.race([
+      processes[0],
+      new Promise<"läuft noch">((resolve) => setTimeout(() => resolve("läuft noch"), 5_000)),
+    ]);
+    expect(ended).toEqual(expect.objectContaining({ aborted: true }));
+    await staleWorker;
+    expect(processes).toHaveLength(1);
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ status: "running", log: null });
+
+    current.releaseAll();
+    expect(await currentWorker).toBe(runId);
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ status: "done", log: "neuer Worker" });
+  });
+
+  test("ein überholter Worker setzt die Unit, die der neue Worker ausführt, nicht auf wartend zurück", async () => {
+    const db = await databaseWithSnapshot();
+    const [unitId] = STANDARD_UNITS;
+    // Der alte Worker bekommt ungültiges JSON (Wiederholversuch fällig); vor dem zweiten Versuch merkt er, dass
+    // der Lauf übernommen ist, und gibt die Unit auf – das Zurücksetzen auf „wartend“ darf nicht greifen.
+    let releaseStale = () => {};
+    let staleCalled = () => {};
+    const staleStarted = new Promise<void>((resolve) => {
+      staleCalled = resolve;
+    });
+    const stale: HarnessAdapter = {
+      harness: "fake",
+      run: async (task) => {
+        staleCalled();
+        await new Promise<void>((resolve) => {
+          releaseStale = resolve;
+        });
+        return { ...parseFailure(task.unitId), outcome: parseAnswerText("kein JSON", task.unitId) };
+      },
+    };
+    const current = gatedAdapter("neuer Worker");
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: [unitId] });
+
+    const staleWorker = processNextRun(db, { adapters: { fake: stale }, heartbeatMs: 3_600_000 });
+    await staleStarted;
+    const currentWorker = processNextRun(db, { adapters: { fake: current }, staleAfterMs: 0 });
+    await current.waitForCalls(1);
+
+    releaseStale();
+    await staleWorker;
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ status: "running" });
+
+    current.releaseAll();
+    expect(await currentWorker).toBe(runId);
+    expect((await getRun(db, runId))?.units[0]).toMatchObject({ status: "done", log: "neuer Worker" });
+  });
+
   test("ein abgebrochener Lauf erscheint nicht in der Auswertung, nach Fortsetzen und Abschluss schon", async () => {
     const db = await databaseWithSnapshot();
     const gold = await readTestGold();
