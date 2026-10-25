@@ -92,6 +92,11 @@ export interface HarnessResult {
   tokensByModel?: TokensByModel | null;
   /** Zahl der Websuchen; `null`, wenn unbekannt. */
   webSearches: number | null;
+  /**
+   * Vermerke, die das Ergebnis nicht ungültig machen, aber sichtbar bleiben sollen (z. B. eine nicht
+   * gelöschte OpenCode-Sitzung); die GUI zeigt sie an der Unit.
+   */
+  warnings?: string[];
   /** Effort laut Harness; `confirmed` nur, wenn der Harness die angeforderte Stufe selbst gemeldet hat. */
   effort: { reported: string | null; confirmed: boolean };
   /** Native Kostenangabe des Harness in USD zur Gegenprobe (`null`, wenn keine). */

@@ -509,7 +509,7 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
     });
   });
 
-  test("Tokens je Modell werden über die Versuche summiert und gespeichert", async () => {
+  test("Tokens je Modell und Vermerke werden über die Versuche zusammengefasst und gespeichert", async () => {
     const db = await databaseWithSnapshot();
     const usage = (input: number) => ({
       inputTokens: input,
@@ -528,6 +528,7 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
         tokens: usage(30),
         tokensByModel: { "modell-a": usage(10), "modell-b": usage(20) },
         webSearches: 0,
+        warnings: [`Vermerk ${responses.length}`],
         effort: { reported: null, confirmed: false },
         nativeCostUsd: null,
         durationMs: 1,
@@ -547,6 +548,8 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
       "modell-a": { ...usage(20), outputTokens: 2 },
       "modell-b": { ...usage(40), outputTokens: 2 },
     });
+    // Vermerke aller Versuche bleiben an der Unit (z. B. nicht gelöschte OpenCode-Sitzungen).
+    expect(unit.warnings).toEqual(["Vermerk 1", "Vermerk 0"]);
   });
 
   test("antwortet der Harness nicht innerhalb des Timeouts, bricht der Runner ab, wiederholt einmal und meldet Timeout", async () => {

@@ -298,14 +298,39 @@ describe("OpenCode-Adapter: Isolation und Sitzung", () => {
     expect(flag(runner.runs[0].args, "-m")).toBe("deepseek/deepseek-flash");
   });
 
-  test("scheitert das Löschen der Sitzung, steht das im Protokoll", async () => {
+  test("scheitert das Löschen der Sitzung einmal, wird es wiederholt; ohne Vermerk, wenn es dann gelingt", async () => {
+    const fixture = await opencodeFixture("erfolg-text-only");
+    const runner = opencodeFixtureRunner([fixture], {
+      deleteOutcome: [cliOutcome({ exitCode: 1, stderr: "database is locked" }), cliOutcome()],
+    });
+    const result = await createOpencodeAdapter({ runCli: runner, env: {}, sessionRetryDelayMs: 0 }).run(
+      task(),
+    );
+    expect(result.outcome.kind).toBe("answer");
+    expect(sessionCalls(runner).filter(([sub]) => sub === "delete")).toHaveLength(2);
+    expect(result.log).toContain(
+      "session delete ses_000000 scheiterte (Versuch 1 von 3, Exit-Code 1): database is locked",
+    );
+    expect(result.log).toContain("Sitzung ses_000000 gelöscht");
+    expect(result.warnings ?? []).toEqual([]);
+  });
+
+  test("scheitert das Löschen der Sitzung jedes Mal, bleibt die Antwort gültig, aber mit Vermerk", async () => {
     const fixture = await opencodeFixture("erfolg-text-only");
     const runner = opencodeFixtureRunner([fixture], {
       deleteOutcome: cliOutcome({ exitCode: 1, stderr: "database is locked" }),
     });
-    const result = await createOpencodeAdapter({ runCli: runner, env: {} }).run(task());
+    const result = await createOpencodeAdapter({ runCli: runner, env: {}, sessionRetryDelayMs: 0 }).run(
+      task(),
+    );
     expect(result.outcome.kind).toBe("answer");
-    expect(result.log).toContain("session delete ses_000000 scheiterte (Exit-Code 1): database is locked");
+    expect(sessionCalls(runner).filter(([sub]) => sub === "delete")).toHaveLength(3);
+    expect(result.log).toContain(
+      "session delete ses_000000 scheiterte (Versuch 3 von 3, Exit-Code 1): database is locked",
+    );
+    expect(result.warnings).toEqual([
+      "OpenCode-Sitzung ses_000000 nicht gelöscht: liegt noch im Datenverzeichnis des Nutzers",
+    ]);
   });
 
   test("ohne Sitzungs-ID im Stream wird die Sitzung über den Titel gefunden und gelöscht", async () => {

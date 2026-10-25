@@ -178,6 +178,8 @@ export const unitResults = pgTable(
     /** Tokens je Modell, wenn der Harness sie getrennt meldet (Summe in den Spalten davor). */
     tokensByModel: jsonb("tokens_by_model").$type<TokensByModel>(),
     webSearches: integer("web_searches"),
+    /** Vermerke des Harness, die das Ergebnis nicht ungültig machen (z. B. nicht gelöschte Sitzung). */
+    warnings: jsonb("warnings").$type<string[]>(),
     effortReported: text("effort_reported"),
     effortConfirmed: boolean("effort_confirmed"),
     nativeCostUsd: doublePrecision("native_cost_usd"),

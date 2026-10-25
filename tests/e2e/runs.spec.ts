@@ -53,6 +53,14 @@ test("Lauf mit Fake-Harness starten, bewerten und Konfiguration erneut starten",
       .filter({ hasText: "house--agriculture--livestock-dairy-and-poultry" })
       .getByTestId("unit-effort"),
   ).toContainText("(bestätigt)");
+  // Vermerk des Harness (z. B. nicht gelöschte Sitzung): Ergebnis gültig, aber sichtbar markiert.
+  await expect(page.getByTestId("run-warnings")).toContainText("1 Unit mit Vermerk");
+  await expect(
+    page
+      .getByTestId("unit-row")
+      .filter({ hasText: "house--agriculture--livestock-dairy-and-poultry" })
+      .getByTestId("unit-warning"),
+  ).toBeVisible();
 
   // Unit-Detailansicht: Antwort, Gold, Abweichungen, Regelverstöße und Rohprotokoll.
   await page.getByRole("link", { name: "house--agriculture--livestock-dairy-and-poultry" }).click();
@@ -69,6 +77,7 @@ test("Lauf mit Fake-Harness starten, bewerten und Konfiguration erneut starten",
   await expect(page.getByTestId("deviation-missing")).toContainText("packaged-foods");
   await expect(page.getByTestId("unit-detail-raw")).toContainText('"unit_id"');
   await expect(page.getByTestId("unit-detail-meta")).toContainText("4800 / 31000 / 1200 / 410 / 120");
+  await expect(page.getByTestId("unit-detail-warnings")).toContainText("Sitzung nicht gelöscht (simuliert)");
   await page.getByRole("link", { name: /Lauf #/ }).click();
   await expect(page).toHaveURL(runUrl);
 

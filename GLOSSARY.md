@@ -75,7 +75,10 @@ Die einmalige Ausführung einer Konfiguration über alle Units einer Gold-Versio
 _Avoid_: Run (in Texten), Durchgang
 
 **Benchmark-Prompt**:
-Der versionierte Modellvertrag samt Brief, den jedes Modell eines Laufs unverändert erhält.
+Der versionierte Modellvertrag samt Brief, den jedes Modell eines Laufs unverändert erhält; Harnesses ohne Schema-Option (OpenCode) erhalten zusätzlich den versionierten Formatierungsauftrag samt Ausgabeschema.
+
+**Vermerk**:
+Ein Hinweis des Harness an einem Unit-Ergebnis, der die Antwort nicht ungültig macht, aber sichtbar bleiben soll, etwa eine OpenCode-Sitzung, die sich nicht löschen ließ.
 
 **Snapshot**:
 Die eingefrorene, gehashte Kopie von Units, bereinigten Zuständigkeitstexten und Taxonomie.
@@ -92,4 +95,4 @@ Eine Antwort, die auch nach dem Wiederholversuch nicht dem Ausgabeschema entspri
 Eine schemakonforme Antwort, die eine Regel des Benchmark-Prompts bricht, etwa ein nicht wörtliches Zitat oder zu viele Zuordnungen; wird gezählt, nicht wiederholt.
 
 **Geschätzte Kosten**:
-Tokens eines Laufs × Preis aus der Preistabelle zum API-Listenpreis, unabhängig davon, ob über Abo oder API abgerechnet wurde.
+Tokens eines Laufs × Preis aus der Preistabelle zum API-Listenpreis (je Modell laut Harness), unabhängig davon, ob über Abo oder API abgerechnet wurde.

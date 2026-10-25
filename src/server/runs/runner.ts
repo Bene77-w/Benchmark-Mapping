@@ -329,6 +329,7 @@ function combineAttempts(attempts: HarnessResult[]): HarnessResult {
     },
     tokensByModel: sumTokensByModel(attempts.map((attempt) => attempt.tokensByModel ?? null)),
     webSearches: sumAll(attempts.map((attempt) => attempt.webSearches)),
+    warnings: attempts.flatMap((attempt) => attempt.warnings ?? []),
     nativeCostUsd: sumAll(attempts.map((attempt) => attempt.nativeCostUsd)),
     durationMs: sumAll(attempts.map((attempt) => attempt.durationMs)) ?? 0,
   };
@@ -381,6 +382,7 @@ function resultColumns(result: HarnessResult): Partial<typeof unitResults.$infer
     reasoningTokens: result.tokens?.reasoningTokens ?? null,
     tokensByModel: result.tokensByModel ?? null,
     webSearches: result.webSearches,
+    warnings: result.warnings?.length ? result.warnings : null,
     effortReported: result.effort.reported,
     effortConfirmed: result.effort.confirmed,
     nativeCostUsd: result.nativeCostUsd,

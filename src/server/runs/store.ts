@@ -334,6 +334,7 @@ function toUnitResultView(row: typeof unitResults.$inferSelect): UnitResultView 
       : null,
     tokensByModel: row.tokensByModel,
     webSearches: row.webSearches,
+    warnings: row.warnings ?? [],
     effort:
       row.effortConfirmed === null ? null : { reported: row.effortReported, confirmed: row.effortConfirmed },
     nativeCostUsd: row.nativeCostUsd,

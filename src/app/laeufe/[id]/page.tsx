@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
@@ -54,6 +55,7 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
   const stored = await listEvaluations(db, run.id);
   const unitEvaluations = new Map((evaluation?.units ?? []).map((unit) => [unit.unitId, unit]));
   const active = run.status === "queued" || run.status === "running";
+  const warned = run.units.filter((unit) => unit.warnings.length > 0).length;
   // Ergänzen mit derselben Konfiguration: nur die Units der aktuellen Gold-Version ohne Ergebnis werden aufgerufen.
   const canSupplement =
     run.kind === "benchmark" &&
@@ -144,6 +146,12 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
           <Count label="offen" value={progress.pending} testId="progress-pending" />
           <Count label="gesamt" value={progress.total} testId="progress-total" />
         </dl>
+        {warned > 0 && (
+          <p className="text-sm text-amber-700 dark:text-amber-400" data-testid="run-warnings">
+            {warned === 1 ? "1 Unit mit Vermerk" : `${warned} Units mit Vermerk`} (Ergebnis gültig, Details an
+            der Unit), z. B. eine nicht gelöschte OpenCode-Sitzung.
+          </p>
+        )}
       </section>
 
       {evaluation ? (
@@ -191,7 +199,19 @@ async function RunDetail({ params }: Pick<PageProps<"/laeufe/[id]">, "params">) 
                     </Link>
                   </TableCell>
                   <TableCell>{scored ? scored.category : "nicht im Gold"}</TableCell>
-                  <TableCell>{UNIT_STATUS_LABELS[unit.status]}</TableCell>
+                  <TableCell>
+                    {UNIT_STATUS_LABELS[unit.status]}
+                    {unit.warnings.length > 0 && (
+                      <Badge
+                        variant="outline"
+                        className="ml-1"
+                        title={unit.warnings.join("\n")}
+                        data-testid="unit-warning"
+                      >
+                        Vermerk
+                      </Badge>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right" data-testid="unit-attempts">
                     {unit.attempts}
                   </TableCell>

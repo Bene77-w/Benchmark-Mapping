@@ -83,6 +83,7 @@ function unitResult(spec: UnitSpec): UnitResultView {
     log: null,
     tokens: spec.tokens === undefined ? tokens(1000, 100) : spec.tokens,
     tokensByModel: null,
+    warnings: [],
     webSearches: spec.webSearches ?? 0,
     effort: null,
     nativeCostUsd: null,
