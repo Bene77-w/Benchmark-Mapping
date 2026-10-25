@@ -24,6 +24,7 @@ describe("geschätzte Kosten einer Unit", () => {
     const cost = estimateUnitCost(
       {
         harness: "claude_code",
+        mode: "web",
         model: "claude-haiku-5-5",
         at: runDate,
         tokens: {
@@ -53,7 +54,14 @@ describe("geschätzte Kosten einer Unit", () => {
     });
     const at = (iso: string) =>
       estimateUnitCost(
-        { harness: "fake", model: "m", at: new Date(iso), tokens: million, webSearches: 0 },
+        {
+          harness: "fake",
+          mode: "text_only",
+          model: "m",
+          at: new Date(iso),
+          tokens: million,
+          webSearches: 0,
+        },
         prices,
       );
 
@@ -68,6 +76,7 @@ describe("geschätzte Kosten einer Unit", () => {
     const cost = estimateUnitCost(
       {
         harness: "claude_code",
+        mode: "web",
         model: "claude-haiku-5-5",
         at: runDate,
         tokens: {
@@ -97,7 +106,7 @@ describe("geschätzte Kosten einer Unit", () => {
     });
     const searches = (iso: string) =>
       estimateUnitCost(
-        { harness: "codex", model: "m", at: new Date(iso), tokens: million, webSearches: 4 },
+        { harness: "codex", mode: "web", model: "m", at: new Date(iso), tokens: million, webSearches: 4 },
         prices,
       );
     expect(searches("2026-10-22T23:00:00Z")).toEqual({ kind: "estimated", usd: 0.1 });
@@ -108,6 +117,7 @@ describe("geschätzte Kosten einer Unit", () => {
 describe("fehlender Preis → unbekannt", () => {
   const base = {
     harness: "claude_code",
+    mode: "web",
     model: "claude-haiku-5-5",
     at: runDate,
     tokens: million,
@@ -130,17 +140,18 @@ describe("fehlender Preis → unbekannt", () => {
       kind: "estimated",
       usd: 0.1,
     });
-    expect(estimateUnitCost({ ...base, webSearches: null }, withoutSearchPrice)).toEqual({
-      kind: "estimated",
-      usd: 0.1,
-    });
   });
 
-  test("nicht gemeldete Websuchen sind unbekannt, sobald der Harness einen Websuchpreis hat", () => {
-    expect(estimateUnitCost({ ...base, webSearches: null }, table())).toEqual({
-      kind: "unknown",
-      reason: "Websuchen nicht gemeldet (claude_code)",
-    });
+  test("im Modus mit Websuche sind nicht gemeldete Websuchen unbekannt, mit oder ohne Websuchpreis", () => {
+    const notReported = { kind: "unknown", reason: "Websuchen nicht gemeldet (claude_code)" };
+    expect(estimateUnitCost({ ...base, webSearches: null }, table())).toEqual(notReported);
+    expect(estimateUnitCost({ ...base, webSearches: null }, table({ webSearch: {} }))).toEqual(notReported);
+  });
+
+  test("im Modus ohne Websuche sind nicht gemeldete Websuchen kostenneutral", () => {
+    const textOnly = { ...base, mode: "text_only", webSearches: null } as const;
+    expect(estimateUnitCost(textOnly, table())).toEqual({ kind: "estimated", usd: 0.1 });
+    expect(estimateUnitCost(textOnly, table({ webSearch: {} }))).toEqual({ kind: "estimated", usd: 0.1 });
   });
 
   test("Cache-Tokens ohne Cache-Tarif sind unbekannt; ohne Cache-Tokens stört der fehlende Tarif nicht", () => {
@@ -170,7 +181,7 @@ describe("Modell laut Harness", () => {
       haiku: [],
     },
   });
-  const base = { harness: "claude_code", at: runDate, tokens: million, webSearches: 0 } as const;
+  const base = { harness: "claude_code", mode: "web", at: runDate, tokens: million, webSearches: 0 } as const;
 
   test("ein Alias der Konfiguration wird über das gemeldete Modell bepreist", () => {
     expect(estimateUnitCost({ ...base, model: "haiku", modelReported: "claude-haiku-5-5" }, prices)).toEqual({
@@ -220,7 +231,7 @@ describe("Modell laut Harness", () => {
   test("die Laufkosten bepreisen jede Unit nach ihrem gemeldeten Modell und ihren Modellanteilen", () => {
     const costs = estimateRunCost(
       {
-        configuration: { harness: "claude_code", model: "haiku" },
+        configuration: { harness: "claude_code", model: "haiku", mode: "web" },
         createdAt: runDate,
         units: [
           {
@@ -260,7 +271,7 @@ describe("Kosten eines Laufs", () => {
     nativeCostUsd: number | null,
   ) => ({ unitId, status, tokens, webSearches: 0, nativeCostUsd });
   const run = (units: ReturnType<typeof unit>[]) => ({
-    configuration: { harness: "fake", model: "m" } as const,
+    configuration: { harness: "fake", model: "m", mode: "text_only" } as const,
     createdAt: runDate,
     units,
   });
@@ -310,7 +321,10 @@ describe("Kosten eines Laufs", () => {
 
   test("ohne Preis fürs Modell sind alle Units unbekannt; ohne native Angaben bleibt die native Summe leer", () => {
     const costs = estimateRunCost(
-      { ...run([unit("a", "done", million, null)]), configuration: { harness: "fake", model: "neu" } },
+      {
+        ...run([unit("a", "done", million, null)]),
+        configuration: { harness: "fake", model: "neu", mode: "text_only" },
+      },
       prices,
     );
     expect(costs.estimated).toMatchObject({ kind: "unknown", knownUsd: 0, unknownUnits: 1 });

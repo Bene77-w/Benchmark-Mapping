@@ -57,12 +57,15 @@ export function readClaudeOutput(stdout: string, expectedUnitId: string): Claude
   const result = events.findLast((event) => event.type === "result");
   const rateLimit = readRateLimit(events);
   const modelUsage = isObject(result?.modelUsage) ? result.modelUsage : null;
+  const failed =
+    result !== undefined &&
+    (result.is_error === true || (typeof result.subtype === "string" && result.subtype !== "success"));
 
   const base = {
     tokens: modelUsage ? readTokens(Object.values(modelUsage).filter(isObject)) : null,
     tokensByModel: modelUsage ? readTokensByModel(modelUsage) : null,
     webSearches: modelUsage ? readWebSearches(modelUsage) : null,
-    nativeCostUsd: typeof result?.total_cost_usd === "number" ? result.total_cost_usd : null,
+    nativeCostUsd: readNativeCost(result, failed),
     cliVersion: typeof init?.claude_code_version === "string" ? init.claude_code_version : null,
     modelReported: readModel(init, modelUsage),
     init: init
@@ -76,7 +79,7 @@ export function readClaudeOutput(stdout: string, expectedUnitId: string): Claude
   if (!result) return { ...base, outcome: null, rawResponse: null };
 
   const resultText = typeof result.result === "string" ? result.result : null;
-  if (result.is_error === true || (typeof result.subtype === "string" && result.subtype !== "success")) {
+  if (failed) {
     return { ...base, outcome: errorOutcome(result, resultText, rateLimit), rawResponse: resultText };
   }
   // `structured_output` ist die von der CLI geprüfte Antwort; `result` trägt denselben Inhalt als Text.
@@ -107,11 +110,25 @@ function readTokens(models: Json[]): TokenUsage | null {
   };
 }
 
-/** Websuchen aus `webSearchRequests`; fehlt der Zähler in jedem Eintrag, ist die Zahl unbekannt (`null`). */
+/**
+ * Websuchen aus `webSearchRequests`, summiert über die Modelle; fehlt der Zähler bei einem Eintrag, ist die
+ * Gesamtzahl unbekannt (`null`), nie eine Teilsumme.
+ */
 function readWebSearches(modelUsage: Json): number | null {
   const models = Object.values(modelUsage).filter(isObject);
-  if (!models.some((model) => typeof model.webSearchRequests === "number")) return null;
+  if (models.length === 0 || !models.every((model) => typeof model.webSearchRequests === "number"))
+    return null;
   return models.reduce((total, model) => total + number(model.webSearchRequests), 0);
+}
+
+/**
+ * `total_cost_usd` zur Gegenprobe. Nach einem Fehler meldet Claude Code oft 0, obwohl Tokens verbraucht sein
+ * können: dann unbekannt (`null`), damit die Summe über die Versuche nicht zu niedrig erscheint.
+ */
+function readNativeCost(result: Json | undefined, failed: boolean): number | null {
+  const cost = result?.total_cost_usd;
+  if (typeof cost !== "number") return null;
+  return failed && cost === 0 ? null : cost;
 }
 
 function readModel(init: Json | undefined, modelUsage: Json | null): string | null {

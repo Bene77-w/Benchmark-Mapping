@@ -1,4 +1,5 @@
 import type { Harness, TokensByModel, TokenUsage } from "@/server/harness/adapter";
+import type { Mode } from "@/server/prompt/benchmark-prompt";
 import type { UnitResultStatus } from "@/server/runs/model";
 
 /**
@@ -34,6 +35,8 @@ export interface PriceTable {
 
 export interface UnitCostInput {
   harness: Harness;
+  /** Modus der Konfiguration: nur mit Websuche können ungemeldete Suchen Kosten verursacht haben. */
+  mode: Mode;
   /** Modell-ID der Konfiguration (Schlüssel der Preistabelle; kann ein Alias sein). */
   model: string;
   /** Modell-ID laut Harness; hat sie einen Preis, gilt dieser statt dem des konfigurierten Modells. */
@@ -44,8 +47,8 @@ export interface UnitCostInput {
   at: Date;
   tokens: TokenUsage | null;
   /**
-   * `null` = vom Harness nicht gemeldet: unbekannt, sobald der Harness einen Websuchpreis hat (es könnten
-   * Suchen angefallen sein); ohne Websuchpreis zählt es wie keine Suche.
+   * `null` = vom Harness nicht gemeldet: im Modus mit Websuche unbekannt (es könnten Suchen angefallen sein,
+   * auch ohne bekannten Websuchpreis); im Modus ohne Websuche kostenneutral.
    */
   webSearches: number | null;
 }
@@ -68,7 +71,9 @@ export function estimateUnitCost(input: UnitCostInput, table: PriceTable): CostE
   }
   const searchPrice = validAt(table.webSearch[input.harness] ?? [], input.at);
   if (input.webSearches === null) {
-    return searchPrice ? unknown(`Websuchen nicht gemeldet (${input.harness})`) : { kind: "estimated", usd };
+    return input.mode === "web"
+      ? unknown(`Websuchen nicht gemeldet (${input.harness})`)
+      : { kind: "estimated", usd };
   }
   if (input.webSearches === 0) return { kind: "estimated", usd };
   if (!searchPrice) return unknown(`kein Websuchpreis für ${input.harness}`);
@@ -115,7 +120,7 @@ function unknown(reason: string): CostEstimate {
 
 /** Was die Kostenrechnung von einem Lauf braucht (passt zu `RunView`). */
 export interface RunCostInput {
-  configuration: { harness: Harness; model: string };
+  configuration: { harness: Harness; model: string; mode: Mode };
   /** Laufdatum für die Preiswahl. */
   createdAt: Date;
   units: {
@@ -158,6 +163,7 @@ export function estimateRunCost(run: RunCostInput, table: PriceTable): RunCosts 
     const cost = estimateUnitCost(
       {
         harness: run.configuration.harness,
+        mode: run.configuration.mode,
         model: run.configuration.model,
         modelReported: unit.modelReported,
         at: run.createdAt,
