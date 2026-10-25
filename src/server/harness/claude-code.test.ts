@@ -85,7 +85,8 @@ describe("Claude-Code-Adapter: Fehler", () => {
     });
     expect(result.exitCode).toBe(1);
     expect(result.tokens).toBeNull();
-    expect(result.nativeCostUsd).toBe(0);
+    // Die CLI meldet total_cost_usd 0; nach einem Fehler ist das keine belastbare Angabe.
+    expect(result.nativeCostUsd).toBeNull();
     expect(result.log).toContain("[claude-code:unrecognized_model]");
   });
 
@@ -255,6 +256,53 @@ describe("Claude-Code-Ausgabe: konstruierte Sonderfälle", () => {
       reasoningTokens: 30,
     });
     expect(output.webSearches).toBe(1);
+  });
+
+  test("fehlt bei mehreren Modellen ein Websuchzähler, ist die Gesamtzahl der Websuchen unbekannt", () => {
+    const output = readClaudeOutput(
+      resultWith({
+        "claude-opus-5-5": { inputTokens: 100, outputTokens: 50, webSearchRequests: 2 },
+        "claude-haiku-5-5": { inputTokens: 5, outputTokens: 2 },
+      }),
+      "house--ethics",
+    );
+    expect(output.webSearches).toBeNull();
+  });
+
+  test("total_cost_usd 0 eines fehlgeschlagenen Aufrufs ist unbekannt, bei Erfolg bleibt 0 ein Wert", () => {
+    const failed = readClaudeOutput(
+      JSON.stringify({
+        type: "result",
+        subtype: "error_max_turns",
+        is_error: true,
+        total_cost_usd: 0,
+        modelUsage: { "claude-haiku-5-5": { inputTokens: 5, outputTokens: 2 } },
+      }),
+      "house--ethics",
+    );
+    expect(failed.nativeCostUsd).toBeNull();
+    const withCost = readClaudeOutput(
+      JSON.stringify({
+        type: "result",
+        subtype: "success",
+        is_error: true,
+        result: "kaputt",
+        total_cost_usd: 0.02,
+      }),
+      "house--ethics",
+    );
+    expect(withCost.nativeCostUsd).toBe(0.02);
+    const succeeded = readClaudeOutput(
+      JSON.stringify({
+        type: "result",
+        subtype: "success",
+        is_error: false,
+        result: "{}",
+        total_cost_usd: 0,
+      }),
+      "house--ethics",
+    );
+    expect(succeeded.nativeCostUsd).toBe(0);
   });
 });
 
