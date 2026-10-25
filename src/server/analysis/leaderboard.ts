@@ -252,6 +252,10 @@ function meanOrNull(values: (number | null)[]): number | null {
 export interface AnalysisState {
   filters: AnalysisFilters;
   xAxis: XAxis;
+  /** Gewählte Läufe des Kategorie-Diagramms (leer = Standard). */
+  categoryRuns: readonly number[];
+  /** Konfiguration des Verlaufs (`null` = Standard). */
+  historyConfiguration: number | null;
 }
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -259,7 +263,10 @@ type SearchParams = Record<string, string | string[] | undefined>;
 const EFFORT_PARAMS: Record<EffortFilter, string> = { all: "alle", best: "beste" };
 const X_AXIS_PARAMS: Record<XAxis, string> = { cost: "kosten", tokens: "tokens", duration: "dauer" };
 
-/** Liest den Zustand aus den Suchparametern (`gruppe`, `modus`, `effort`, `x`); Unbekanntes wird zum Standard. */
+/**
+ * Liest den Zustand aus den Suchparametern (`gruppe`, `modus`, `effort`, `x`, `laeufe`, `verlauf`);
+ * Unbekanntes wird zum Standard.
+ */
 export function parseAnalysisParams(params: SearchParams): AnalysisState {
   const first = (name: string) => {
     const value = params[name];
@@ -273,7 +280,16 @@ export function parseAnalysisParams(params: SearchParams): AnalysisState {
       effort: keyOf(EFFORT_PARAMS, first("effort")) ?? "all",
     },
     xAxis: keyOf(X_AXIS_PARAMS, first("x")) ?? "cost",
+    categoryRuns: (first("laeufe") ?? "")
+      .split(",")
+      .map(positiveId)
+      .filter((id) => id !== null),
+    historyConfiguration: positiveId(first("verlauf") ?? ""),
   };
+}
+
+function positiveId(value: string): number | null {
+  return /^[1-9]\d*$/.test(value) ? Number(value) : null;
 }
 
 /** Suchparameter zum Zustand (Gegenstück zu `parseAnalysisParams`). */
@@ -283,6 +299,8 @@ export function analysisSearch(state: AnalysisState): string {
   if (state.filters.mode) params.set("modus", state.filters.mode);
   params.set("effort", EFFORT_PARAMS[state.filters.effort]);
   params.set("x", X_AXIS_PARAMS[state.xAxis]);
+  if (state.categoryRuns.length > 0) params.set("laeufe", state.categoryRuns.join(","));
+  if (state.historyConfiguration !== null) params.set("verlauf", String(state.historyConfiguration));
   return params.toString();
 }
 

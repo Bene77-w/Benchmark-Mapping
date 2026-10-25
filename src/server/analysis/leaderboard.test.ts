@@ -200,21 +200,48 @@ describe("Filter aus der Adresse", () => {
     expect(parseAnalysisParams({ gruppe: "abc", modus: "web", effort: "beste", x: "dauer" })).toEqual({
       filters: { group: "abc", mode: "web", effort: "best" },
       xAxis: "duration",
+      categoryRuns: [],
+      historyConfiguration: null,
     });
     expect(parseAnalysisParams({ modus: "quatsch", effort: ["alle"], x: "tokens" })).toEqual({
       filters: { group: null, mode: null, effort: "all" },
       xAxis: "tokens",
+      categoryRuns: [],
+      historyConfiguration: null,
     });
     expect(parseAnalysisParams({})).toEqual({
       filters: { group: null, mode: null, effort: "all" },
       xAxis: "cost",
+      categoryRuns: [],
+      historyConfiguration: null,
+    });
+  });
+
+  test("liest die Läufe des Kategorie-Diagramms und die Konfiguration des Verlaufs; Unlesbares entfällt", () => {
+    expect(parseAnalysisParams({ laeufe: "7,3,x,-1,3.5", verlauf: "12" })).toMatchObject({
+      categoryRuns: [7, 3],
+      historyConfiguration: 12,
+    });
+    expect(parseAnalysisParams({ laeufe: "", verlauf: "abc" })).toMatchObject({
+      categoryRuns: [],
+      historyConfiguration: null,
     });
   });
 
   test("schreibt die Filter so in die Adresse, dass sie wieder gelesen werden", () => {
-    const state = { filters: { group: "abc", mode: "web", effort: "best" }, xAxis: "tokens" } as const;
+    const state = {
+      filters: { group: "abc", mode: "web", effort: "best" },
+      xAxis: "tokens",
+      categoryRuns: [],
+      historyConfiguration: null,
+    } as const;
     const search = analysisSearch(state);
     expect(search).toBe("gruppe=abc&modus=web&effort=beste&x=tokens");
     expect(parseAnalysisParams(Object.fromEntries(new URLSearchParams(search)))).toEqual(state);
+
+    const withViews = { ...state, categoryRuns: [7, 3], historyConfiguration: 12 };
+    const viewSearch = analysisSearch(withViews);
+    expect(viewSearch).toBe("gruppe=abc&modus=web&effort=beste&x=tokens&laeufe=7%2C3&verlauf=12");
+    expect(parseAnalysisParams(Object.fromEntries(new URLSearchParams(viewSearch)))).toEqual(withViews);
   });
 });
