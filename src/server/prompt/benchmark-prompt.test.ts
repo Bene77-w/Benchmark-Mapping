@@ -279,8 +279,9 @@ describe("Prompt-Hash", () => {
   });
 
   test("ist für prompt-v1 eingefroren", async () => {
-    // Ändert sich ein Wert, hat sich ein fester Anweisungstext (Vertrag, Brief, Vorlage, Ausgabeschema) geändert:
-    // dann prompt-v2 anlegen statt prompt-v1 ändern. Ein neuer Snapshot ändert diese Werte nicht.
+    // Ändert sich ein Wert, hat sich ein fester Anweisungstext (Vertrag, Brief, Vorlage, Formatierungsauftrag,
+    // Ausgabeschema) geändert: dann prompt-v2 anlegen statt prompt-v1 ändern. Ein neuer Snapshot ändert diese
+    // Werte nicht.
     const hashes = Object.fromEntries(
       await Promise.all(
         REQUESTS.map(
@@ -293,9 +294,9 @@ describe("Prompt-Hash", () => {
       ),
     );
     expect(hashes).toEqual({
-      "benchmark/text_only": "cd8875192bca29267d94977374a3ae785a7b83fd4f918b0fefdddcf46e429ca7",
-      "benchmark/web": "abda859b914e9e9c7ac07a21d178dce7b52b9d972c772adfde807a9ceb50f3b2",
-      "proposal/web": "601c9265ddb7e236fdbbaa66bc0eddfb6eaf2c13000068ccf6e951f9a9772b1a",
+      "benchmark/text_only": "111f5e8dbcc0cc39b659270818eab0f2fae6cbf0921fb4f058f23da86d5cebe2",
+      "benchmark/web": "181e84bd492659733c5ad41753b9c796b917fc29d0f939b20c2d3874649e2e9b",
+      "proposal/web": "68421a61a9815ee281646403e27447ed29122329e2dfc79dad2cbb15e7ac7029",
     });
   });
 });
@@ -320,7 +321,7 @@ describe("Formatierungsauftrag für Harnesses ohne Schema-Option (OpenCode)", ()
     expect(inline.unitPromptHash).not.toBe(common.unitPromptHash);
   });
 
-  test("eine Textänderung ändert den Unit-Hash mit Schema im Prompt, nicht den gemeinsamen Prompt-Hash", async () => {
+  test("eine Textänderung ändert den gemeinsamen Prompt-Hash und den Unit-Hash mit Schema im Prompt", async () => {
     const original = await buildBenchmarkPrompt(snapshot, request);
     const root = await mkdtemp(path.join(tmpdir(), "prompts-"));
     await cp(PROMPT_ROOT, root, { recursive: true });
@@ -328,7 +329,9 @@ describe("Formatierungsauftrag für Harnesses ohne Schema-Option (OpenCode)", ()
     await writeFile(file, (await readFile(file, "utf8")).replace("Kein Markdown", "Ohne Markdown"));
     const changed = await buildBenchmarkPrompt(snapshot, request, { promptRoot: root });
 
-    expect(changed.promptHash).toBe(original.promptHash);
+    // Der Prompt-Hash ist für alle Harnesses gleich und trennt die Vergleichsgruppen; der Unit-Hash ohne Schema
+    // im Prompt deckt nur den tatsächlich gesendeten Text ab und bleibt.
+    expect(changed.promptHash).not.toBe(original.promptHash);
     expect(changed.forUnit("house--rules").unitPromptHash).toBe(
       original.forUnit("house--rules").unitPromptHash,
     );

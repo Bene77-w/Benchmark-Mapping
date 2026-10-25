@@ -2,6 +2,7 @@ import { cp, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, test, vi } from "vitest";
+import { buildAnalysis } from "@/server/analysis/leaderboard";
 import type { Database } from "@/server/db/database";
 import { createTestDatabase } from "@/server/db/test-database";
 import { readTestGold } from "@/server/gold/test-gold";
@@ -13,11 +14,14 @@ import {
 } from "@/server/harness/adapter";
 import { type CliOutcome, runCli } from "@/server/harness/cli-process";
 import { createFakeAdapter } from "@/server/harness/fake";
+import { getPriceTable } from "@/server/pricing/store";
 import { buildBenchmarkPrompt, PROMPT_ROOT, PROMPT_VERSION } from "@/server/prompt/benchmark-prompt";
+import { listCurrentEvaluations } from "@/server/scoring/current";
 import { ensureEvaluation, listEvaluations } from "@/server/scoring/store";
 import type { Snapshot } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
+import type { RunView } from "./model";
 import { processNextRun } from "./runner";
 import {
   cancelRun,
@@ -301,7 +305,7 @@ describe("Harness ohne Schema-Option (OpenCode)", { timeout: 30_000 }, () => {
   }
   const opencodeConfiguration = { ...fakeConfiguration, harness: "opencode" } as const;
 
-  test("bekommt den Formatierungsauftrag; der Unit-Hash deckt ihn ab, der Prompt-Hash nicht", async () => {
+  test("bekommt den Formatierungsauftrag; eine Änderung ändert den Lauf-Hash, trennt die Vergleichsgruppen und wird beim Worker-Start erkannt", async () => {
     const db = await databaseWithSnapshot();
     const prompt = await buildBenchmarkPrompt(snapshot, { runKind: "benchmark", mode: "text_only" });
     const changedRoot = await mkdtemp(path.join(tmpdir(), "prompts-"));
@@ -314,24 +318,55 @@ describe("Harness ohne Schema-Option (OpenCode)", { timeout: 30_000 }, () => {
     );
 
     const seen: HarnessTask[] = [];
-    const first = await createRun(db, { configuration: opencodeConfiguration, unitIds: ["house--ethics"] });
+    const first = await createRun(db, { configuration: opencodeConfiguration, unitIds: STANDARD_UNITS });
     await processNextRun(db, { adapters: { opencode: inliningAdapter(seen) } });
-    const second = await createRun(db, { configuration: opencodeConfiguration, unitIds: ["house--ethics"] });
+    const second = await createRun(
+      db,
+      { configuration: opencodeConfiguration, unitIds: STANDARD_UNITS },
+      { promptRoot: changedRoot },
+    );
     await processNextRun(db, { adapters: { opencode: inliningAdapter(seen) }, promptRoot: changedRoot });
 
-    expect(seen.map((task) => task.formatInstruction)).toEqual([
-      prompt.formatInstruction,
-      "## Ausgabeformat\n\nNur JSON, sonst nichts.",
-    ]);
+    expect(new Set(seen.map((task) => task.formatInstruction))).toEqual(
+      new Set([prompt.formatInstruction, "## Ausgabeformat\n\nNur JSON, sonst nichts."]),
+    );
     const [firstRun, secondRun] = await Promise.all([getRun(db, first.runId), getRun(db, second.runId)]);
     expect(firstRun?.status).toBe("completed");
     expect(secondRun?.status).toBe("completed");
-    expect(secondRun?.promptHash).toBe(firstRun?.promptHash);
-    expect(firstRun?.units[0].unitPromptHash).toBe(
+    expect(firstRun?.promptHash).toBe(prompt.promptHash);
+    expect(secondRun?.promptHash).not.toBe(firstRun?.promptHash);
+    const ethicsOf = (run: typeof firstRun) => run?.units.find((unit) => unit.unitId === "house--ethics");
+    expect(ethicsOf(firstRun)?.unitPromptHash).toBe(
       prompt.forUnit("house--ethics", { inlineSchema: true }).unitPromptHash,
     );
-    expect(firstRun?.units[0].unitPromptHash).not.toBe(prompt.forUnit("house--ethics").unitPromptHash);
-    expect(secondRun?.units[0].unitPromptHash).not.toBe(firstRun?.units[0].unitPromptHash);
+    expect(ethicsOf(firstRun)?.unitPromptHash).not.toBe(prompt.forUnit("house--ethics").unitPromptHash);
+    expect(ethicsOf(secondRun)?.unitPromptHash).not.toBe(ethicsOf(firstRun)?.unitPromptHash);
+
+    // Die Auswertung vergleicht die beiden Läufe nicht miteinander: zwei Vergleichsgruppen.
+    const gold = await readTestGold();
+    const current = await listCurrentEvaluations(db, gold);
+    const runs = await Promise.all(
+      current.runs.map(async ({ run, evaluation }) => ({
+        run: (await getRun(db, run.id)) as RunView,
+        evaluation,
+      })),
+    );
+    const analysis = buildAnalysis({
+      runs,
+      prices: await getPriceTable(db),
+      filters: { group: null, mode: null, effort: "all", perConfiguration: "all" },
+    });
+    expect(analysis.groups.map((group) => group.promptHash).sort()).toEqual(
+      [firstRun?.promptHash, secondRun?.promptHash].sort(),
+    );
+
+    // Ändert sich der Formatierungsauftrag nach dem Anlegen, startet der Worker den Lauf nicht.
+    const third = await createRun(db, { configuration: opencodeConfiguration, unitIds: ["house--ethics"] });
+    await processNextRun(db, { adapters: { opencode: inliningAdapter(seen) }, promptRoot: changedRoot });
+    expect(await getRun(db, third.runId)).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/Benchmark-Prompt hat sich seit dem Anlegen des Laufs geändert/),
+    });
   });
 });
 

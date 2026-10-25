@@ -58,15 +58,15 @@ export interface BenchmarkPrompt {
   outputSchemaHash: string;
   /**
    * Benchmark-Prompt-Hash des Laufs: SHA-256 über die festen Anweisungstexte – Version, System-Prompt
-   * (Vertrag + Brief bzw. Gold-Brief), Vorlage des User-Prompts und Ausgabeschema. Jede Textänderung daran
-   * ändert ihn; die Daten (Units, Taxonomie) deckt der Snapshot-Hash ab. Gleicher Prompt-Hash und gleicher
-   * Snapshot-Hash ⇔ gleiche gesendete Texte.
+   * (Vertrag + Brief bzw. Gold-Brief), Vorlage des User-Prompts, Formatierungsauftrag und Ausgabeschema. Jede
+   * Textänderung daran ändert ihn; die Daten (Units, Taxonomie) deckt der Snapshot-Hash ab. Er ist für alle
+   * Harnesses gleich (auch für die, die den Formatierungsauftrag nicht erhalten), damit Läufe harness-übergreifend
+   * vergleichbar bleiben. Gleicher Prompt-Hash und gleicher Snapshot-Hash ⇔ gleiche Anweisungstexte.
    */
   promptHash: string;
   /**
    * Formatierungsauftrag für Harnesses ohne Schema-Option (`format-instruction.md` der Prompt-Version). Er
-   * steht nicht im gemeinsamen Prompt-Hash (harness-übergreifend vergleichbar), aber im Unit-Hash der Units,
-   * die ihn erhalten.
+   * steht im gemeinsamen Prompt-Hash und im Unit-Hash der Units, die ihn erhalten.
    */
   formatInstruction: string;
   /** Prompt für eine Unit des Snapshots; eine unbekannte unit_id ist ein Fehler. */
@@ -149,6 +149,7 @@ export async function buildBenchmarkPrompt(
       outputSchemaVersion: OUTPUT_SCHEMA_VERSION,
       systemPrompt,
       userPromptTemplate: template,
+      formatInstruction,
       outputSchema: outputJsonSchema,
     }),
     formatInstruction,

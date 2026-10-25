@@ -19,8 +19,8 @@ export default function PromptPage({ searchParams }: PageProps<"/prompt">) {
       <p className="max-w-3xl text-muted-foreground">
         Vorschau des fertigen System- und User-Prompts, den ein Modell für eine Unit erhält. Der Prompt-Hash
         gilt für den ganzen Lauf und deckt die festen Anweisungstexte ab (Vertrag, Brief, Vorlage des
-        User-Prompts, Ausgabeschema); die Daten deckt der Snapshot-Hash ab. Der Unit-Hash gilt für den exakt
-        gesendeten Text dieser Unit.
+        User-Prompts, Formatierungsauftrag, Ausgabeschema); die Daten deckt der Snapshot-Hash ab. Der
+        Unit-Hash gilt für den exakt gesendeten Text dieser Unit.
       </p>
       <Suspense fallback={<p className="text-muted-foreground">Lade Prompt …</p>}>
         <PromptPreview searchParams={searchParams} />
