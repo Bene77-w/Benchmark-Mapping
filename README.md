@@ -13,7 +13,7 @@ Voraussetzungen: Node 24, pnpm 11, Docker mit Compose v2.
 ```sh
 pnpm install
 docker compose up -d   # PostgreSQL
-pnpm dev               # Migrationen + Snapshot laden, dann App auf http://localhost:3000
+pnpm dev               # Migrationen + Snapshot laden, dann App auf http://127.0.0.1:3000
 pnpm worker            # zweites Terminal: führt die in der GUI angelegten Läufe aus
 ```
 
@@ -26,7 +26,7 @@ export DB_PORT=55432 APP_PORT=3101
 docker compose up -d && pnpm dev
 ```
 
-`DB_PORT` (Standard 5432) gilt für den Container und die Verbindung der App, `APP_PORT` (Standard 3000) für Next.js. `DATABASE_URL` überschreibt die Verbindung vollständig. Compose trennt Container und Volumes je Verzeichnisname; `docker compose down` stoppt die Datenbank, `docker compose down -v` löscht zusätzlich ihre Daten.
+`DB_PORT` (Standard 5432) gilt für den Container und die Verbindung der App, `APP_PORT` (Standard 3000) für Next.js. App (`pnpm dev`, `pnpm start`) und Datenbank sind nur über die Loopback-Adresse `127.0.0.1` erreichbar, nicht aus dem Netzwerk: Die App hat keine Anmeldung und kann kostenpflichtige CLI-Aufrufe auslösen. `DATABASE_URL` überschreibt die Verbindung vollständig. Compose trennt Container und Volumes je Verzeichnisname; `docker compose down` stoppt die Datenbank, `docker compose down -v` löscht zusätzlich ihre Daten.
 
 ## Snapshot und Import
 
@@ -84,10 +84,10 @@ Darunter folgen unter denselben Filtern drei weitere Ansichten: **Score je Kateg
 
 ```sh
 pnpm check       # Biome, Typecheck, Vitest
-pnpm test:e2e    # Playwright gegen Dev-Server und eigenen Worker; Datenbank muss laufen
-                 # Läufe nutzen dabei das Test-Gold (TEST_GOLD_PATH=tests/fixtures/test-gold.json); ein schon
-                 # laufender Dev-Server muss mit dieser Variable gestartet sein
+pnpm test:e2e    # Playwright in eigener Umgebung (Datenbankserver muss laufen: docker compose up -d)
 ```
+
+`pnpm test:e2e` berührt die Daten der App nicht: Es legt die eigene Datenbank `benchmark_e2e` auf dem Datenbankserver (`DB_PORT`, anders über `E2E_DB_PORT` oder vollständig `E2E_DATABASE_URL`) bei jedem Aufruf leer neu an (`pnpm e2e:reset-db`), startet einen eigenen Dev-Server auf `E2E_APP_PORT` (Standard 3001, Build-Verzeichnis `.next-e2e`) und einen eigenen Worker gegen diese Datenbank. Läufe nutzen dort das Test-Gold (`tests/fixtures/test-gold.json`). Ein schon laufender Server wird nie wiederverwendet (belegter Port = Abbruch), und Konfiguration wie Reset brechen ab, wenn die Datenbank keine Test-Datenbank (Name mit Endung `_e2e`) oder die Datenbank der App ist. Der normale Dev-Server darf daneben weiterlaufen. Parallele Worktrees setzen zusätzlich `E2E_APP_PORT`.
 
 Vor dem ersten `pnpm test:e2e` den Browser für Playwright installieren (einmal je Rechner bzw. nach einem Playwright-Update):
 

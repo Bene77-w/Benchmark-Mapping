@@ -1,7 +1,7 @@
 /**
  * Worker-Prozess: führt die in der GUI angelegten Läufe aus, unabhängig vom Dev-Server.
  *
- *   pnpm worker      (Datenbank wie die App: DATABASE_URL oder localhost:${DB_PORT:-5432})
+ *   pnpm worker      (Datenbank wie die App: DATABASE_URL oder 127.0.0.1:${DB_PORT:-5432})
  *
  * Beenden mit Strg+C. Ein dabei laufender Lauf bleibt im Status „läuft“; sobald sein Lebenszeichen älter
  * als 60 s ist, übernimmt ihn der nächste Worker und führt die laufenden und offenen Units aus (fertige nicht).

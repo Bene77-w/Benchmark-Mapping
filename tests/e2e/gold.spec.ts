@@ -32,12 +32,8 @@ test("Gold-Review mit Fake-Vorschlägen abschließen", async ({ page }) => {
   const effort = `e2e-${Date.now()}`;
   await page.goto("/gold");
   await expect(page.getByRole("heading", { name: "Gold", exact: true })).toBeVisible();
-  // Ein Entwurf aus einem abgebrochenen Testlauf wird verworfen.
-  const discard = page.getByRole("button", { name: "Entwurf verwerfen" });
-  if (await discard.isVisible()) {
-    await discard.click();
-    await expect(page.getByTestId("draft-count")).toHaveText("0");
-  }
+  // Die Test-Datenbank ist bei jedem Aufruf neu angelegt: kein Entwurf vorhanden, nichts zu verwerfen.
+  await expect(page.getByTestId("draft-count")).toHaveText("0");
 
   await addUnit(page, AVIATION, "a");
   await addUnit(page, ETHICS, "c");
