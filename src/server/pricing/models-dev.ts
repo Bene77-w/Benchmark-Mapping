@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { z } from "zod";
-import type { ModelPrice } from "./cost";
+import type { Harness } from "@/server/harness/adapter";
+import type { ModelPrice, WebSearchPrice } from "./cost";
 
 /**
  * Datierter Auszug aus dem models.dev-Katalog (https://models.dev/api.json): nur die Anbieter, deren Modelle
@@ -15,6 +16,16 @@ export const MODELS_DEV_FORMAT = "models-dev-prices-v1";
 export const MODELS_DEV_PROVIDERS = ["anthropic", "openai", "deepseek"] as const;
 /** Anbieter, deren Modell-IDs zusätzlich ohne Anbieter-Präfix gelten (so heißen sie in Claude Code und Codex). */
 const BARE_ID_PROVIDERS = new Set<string>(["anthropic", "openai"]);
+
+/**
+ * Claude Code schreibt Caches mit 1h-TTL (docs/research/kosten-claude-code.md): Cache-Write kostet dort das
+ * Doppelte des Input-Tarifs statt des 5-min-Tarifs von models.dev. Gilt für die Anthropic-IDs ohne Präfix
+ * (so heißen die Modelle in Claude Code); `anthropic/…` (OpenCode) behält den Tarif von models.dev.
+ */
+const CLAUDE_CODE_CACHE_WRITE_FACTOR = 2;
+
+/** Vorbefüllte Websuchpreise je Harness in USD pro Suche (Claude Code: $10 pro 1.000 Suchen). */
+const WEB_SEARCH_PER_SEARCH: Partial<Record<Harness, number>> = { claude_code: 0.01 };
 
 /** Aktueller Auszug im Repo. */
 export const MODELS_DEV_SNAPSHOT_PATH = path.join(
@@ -54,7 +65,8 @@ export async function readModelsDevSnapshot(
 /**
  * Preise des Auszugs je Modell-ID, gültig ab dem Abrufdatum. Jedes Modell erscheint als `anbieter/modell`
  * (OpenCode), Modelle von Anthropic und OpenAI zusätzlich ohne Präfix. Modelle ohne Input- oder
- * Output-Preis fehlen. Kontextstufen (`tiers`) bleiben unberücksichtigt: es gilt der Grundtarif.
+ * Output-Preis fehlen. Kontextstufen (`tiers`) bleiben unberücksichtigt: es gilt der Grundtarif. Für die
+ * Anthropic-IDs ohne Präfix (Claude Code) gilt Cache-Write = 2× Input (`CLAUDE_CODE_CACHE_WRITE_FACTOR`).
  */
 export function pricesFromModelsDev(snapshot: ModelsDevSnapshot): { modelId: string; price: ModelPrice }[] {
   const prices: { modelId: string; price: ModelPrice }[] = [];
@@ -70,10 +82,25 @@ export function pricesFromModelsDev(snapshot: ModelsDevSnapshot): { modelId: str
         output: cost.output,
       };
       prices.push({ modelId: `${provider}/${id}`, price });
-      if (BARE_ID_PROVIDERS.has(provider)) prices.push({ modelId: id, price });
+      if (!BARE_ID_PROVIDERS.has(provider)) continue;
+      const bare =
+        provider === "anthropic"
+          ? { ...price, cacheWrite: price.input * CLAUDE_CODE_CACHE_WRITE_FACTOR }
+          : price;
+      prices.push({ modelId: id, price: bare });
     }
   }
   return prices.sort((a, b) => (a.modelId < b.modelId ? -1 : a.modelId > b.modelId ? 1 : 0));
+}
+
+/** Websuchpreise, die mit dem Auszug vorbefüllt werden (gültig ab dem Abrufdatum). */
+export function webSearchPricesFromModelsDev(
+  snapshot: ModelsDevSnapshot,
+): { harness: Harness; price: WebSearchPrice }[] {
+  return Object.entries(WEB_SEARCH_PER_SEARCH).map(([harness, perSearch]) => ({
+    harness: harness as Harness,
+    price: { validFrom: snapshot.retrievedAt, perSearch: perSearch as number },
+  }));
 }
 
 /** Baut den Auszug aus dem vollständigen models.dev-Katalog (Ergebnis von `MODELS_DEV_URL`). */

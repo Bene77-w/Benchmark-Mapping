@@ -30,8 +30,12 @@ describe("models.dev-Snapshot", { timeout: 30_000 }, () => {
 
     // Werte laut models.dev vom 2026-10-24 (Grundtarif, USD pro Million Tokens).
     const haiku = { validFrom: "2026-10-24", input: 0.1, cacheRead: 0.01, cacheWrite: 0.125, output: 0.5 };
-    expect(table.models["claude-haiku-5-5"]).toEqual([haiku]);
     expect(table.models["anthropic/claude-haiku-5-5"]).toEqual([haiku]);
+    // Claude Code (IDs ohne Präfix) schreibt Caches mit 1h-TTL: Cache-Write = 2× Input statt models.dev (5 min).
+    expect(table.models["claude-haiku-5-5"]).toEqual([{ ...haiku, cacheWrite: 0.2 }]);
+    expect(table.models["claude-opus-5-5"]?.[0]).toMatchObject({ input: 4, cacheWrite: 8 });
+    // Websuche bei Claude Code: $0,01 pro Suche; andere Harnesses ohne vorbefüllten Preis.
+    expect(table.webSearch).toEqual({ claude_code: [{ validFrom: "2026-10-24", perSearch: 0.01 }] });
     expect(table.models["gpt-5.6-luna"]).toEqual([
       { validFrom: "2026-10-24", input: 0.2, cacheRead: 0.02, cacheWrite: 0.25, output: 1.2 },
     ]);
@@ -49,6 +53,37 @@ describe("models.dev-Snapshot", { timeout: 30_000 }, () => {
     const first = await getPriceTable(db);
     await loadModelsDevSnapshot(db, modelsDev);
     expect(await getPriceTable(db)).toEqual(first);
+  });
+
+  test("erneutes Laden bringt unveränderte Preise desselben Auszugs auf den aktuellen Stand, von Hand geänderte nicht", async () => {
+    const db = await createTestDatabase();
+    // Stand vor der Umstellung: Cache-Write laut models.dev, Opus von Hand geändert.
+    const before = {
+      ...modelsDev,
+      providers: {
+        ...modelsDev.providers,
+        anthropic: Object.fromEntries(
+          Object.entries(modelsDev.providers.anthropic).map(([id, model]) => [
+            id,
+            { ...model, cost: model.cost && { ...model.cost, input: (model.cost.input ?? 0) + 1 } },
+          ]),
+        ),
+      },
+    };
+    await loadModelsDevSnapshot(db, before);
+    await saveModelPrice(db, {
+      modelId: "claude-opus-5-5",
+      validFrom: "2026-10-24",
+      input: 3,
+      cacheRead: 0.3,
+      cacheWrite: 6,
+      output: 15,
+    });
+
+    await loadModelsDevSnapshot(db, modelsDev);
+    const table = await getPriceTable(db);
+    expect(table.models["claude-haiku-5-5"]?.[0]).toMatchObject({ input: 0.1, cacheWrite: 0.2 });
+    expect(table.models["claude-opus-5-5"]?.[0]).toMatchObject({ input: 3, cacheWrite: 6 });
   });
 });
 
