@@ -39,8 +39,20 @@ function answer(assignments: Assignment[], overrides: Partial<UnitAnswer> = {}):
   };
 }
 
+/** Antwort `decision: "mapped"` mit diesen Industries (auch ohne Zuordnung: widersprüchlich). */
 function mapped(ids: string[]): UnitOutcome {
-  return { kind: "answer", answer: answer(ids.map((id) => assignment(id))) };
+  return {
+    kind: "answer",
+    answer: answer(
+      ids.map((id) => assignment(id)),
+      { decision: "mapped", no_mapping_reason: null },
+    ),
+  };
+}
+
+/** Antwort `decision: "no_mapping"` ohne Zuordnungen. */
+function noMapping(): UnitOutcome {
+  return { kind: "answer", answer: answer([]) };
 }
 
 function gold(industries: Partial<GoldIndustry>[], overrides: Partial<GoldUnit> = {}): GoldUnit {
@@ -95,16 +107,36 @@ describe("Unit-Score: F1 aus Recall auf positiv und Präzision auf positiv ∪ v
     { name: "halber Recall, halbe Präzision", ids: ["a", "c", "d", "e"], score: (2 * 0.5 * 0.5) / 1 },
     { name: "nur vertretbar genannt", ids: ["c"], score: 0 },
     { name: "nur falsche genannt", ids: ["d"], score: 0 },
-    { name: "no_mapping statt Industries", ids: [], score: 0 },
+    { name: "mapped ohne Zuordnung", ids: [], score: 0 },
     { name: "doppelte Nennung zählt einmal", ids: ["a", "a", "b"], score: 1 },
   ])("$name → $score", ({ ids, score }) => {
     expect(evaluateUnit(AB_POSITIV_C_VERTRETBAR, mapped(ids)).score).toBeCloseTo(score, 10);
   });
 
-  test("no_mapping-Unit: 1 bei no_mapping, sonst 0", () => {
-    const noMapping = gold([], { category: "c" });
-    expect(evaluateUnit(noMapping, mapped([])).score).toBe(1);
-    expect(evaluateUnit(noMapping, mapped(["a"])).score).toBe(0);
+  test("no_mapping statt Industries → 0", () => {
+    expect(evaluateUnit(AB_POSITIV_C_VERTRETBAR, noMapping()).score).toBe(0);
+  });
+
+  test("no_mapping-Unit: 1 bei decision no_mapping, sonst 0", () => {
+    const goldNoMapping = gold([], { category: "c" });
+    expect(evaluateUnit(goldNoMapping, noMapping()).score).toBe(1);
+    expect(evaluateUnit(goldNoMapping, mapped(["a"])).score).toBe(0);
+  });
+
+  test("no_mapping-Unit: decision mapped ohne Zuordnung ist falsch (Widerspruch, Score 0)", () => {
+    const unit = evaluateUnit(gold([], { category: "c" }), mapped([]));
+    expect(unit.score).toBe(0);
+    expect(unit.violations.map((violation) => violation.kind)).toEqual(["decision_contradiction"]);
+  });
+
+  test("no_mapping-Unit: decision no_mapping mit Zuordnungen zählt als no_mapping (Widerspruch)", () => {
+    const outcome: UnitOutcome = {
+      kind: "answer",
+      answer: answer([assignment("a")], { decision: "no_mapping", no_mapping_reason: "Keine." }),
+    };
+    const unit = evaluateUnit(gold([], { category: "c" }), outcome);
+    expect(unit).toMatchObject({ score: 1, named: [] });
+    expect(unit.violations.map((violation) => violation.kind)).toContain("decision_contradiction");
   });
 
   test.each([
@@ -151,7 +183,12 @@ describe("web_only je Modus", () => {
     ids,
     score,
   }) => {
-    expect(evaluateUnit(ALLE_POSITIVEN_WEB_ONLY, mapped([...ids]), { mode }).score).toBeCloseTo(score, 10);
+    const outcome = ids.length === 0 ? noMapping() : mapped([...ids]);
+    expect(evaluateUnit(ALLE_POSITIVEN_WEB_ONLY, outcome, { mode }).score).toBeCloseTo(score, 10);
+  });
+
+  test("alle positiven web_only, ohne Web: decision mapped ohne Zuordnung ist falsch", () => {
+    expect(evaluateUnit(ALLE_POSITIVEN_WEB_ONLY, mapped([])).score).toBe(0);
   });
 
   test("vertretbare web_only-Industries bleiben in beiden Modi vertretbar", () => {
@@ -267,7 +304,7 @@ describe("Evidence-Prüfung", () => {
     );
     expect(evaluation.evidenceFidelity).toBeCloseTo(2 / 3, 10);
     expect(
-      evaluateRun(input(goldUnits, { u1: mapped([]), u2: mapped([]), u3: mapped([]) })).evidenceFidelity,
+      evaluateRun(input(goldUnits, { u1: noMapping(), u2: noMapping(), u3: noMapping() })).evidenceFidelity,
     ).toBe(null);
   });
 });
@@ -376,7 +413,7 @@ describe("Lauf-Score, Vollständigkeit und Kategorien", () => {
       input([A_POSITIV("u1"), A_POSITIV("u2"), gold([], { unitId: "u3", category: "c" })], {
         u1: mapped(["a", "b"]),
         u2: mapped(["a"]),
-        u3: mapped([]),
+        u3: noMapping(),
         entfernt: mapped(["d"]),
       }),
     );
@@ -423,7 +460,7 @@ describe("Lauf-Score, Vollständigkeit und Kategorien", () => {
           A_POSITIV("u3", "f"),
           gold([], { unitId: "u4", category: "c" }),
         ],
-        { u1: mapped(["a", "b"]), u2: mapped(["a"]), u3: mapped([]), u4: mapped([]) },
+        { u1: mapped(["a", "b"]), u2: mapped(["a"]), u3: noMapping(), u4: noMapping() },
       ),
     );
     expect(evaluation.categories).toEqual([
@@ -459,7 +496,7 @@ describe("Bootstrap-Intervall über die Units", () => {
   // 8 no_mapping-Units; jede dritte nennt trotzdem eine Industry: Unit-Scores 0,1,1,0,1,1,0,1 (Score 5/8).
   const goldUnits = Array.from({ length: 8 }, (_, index) => gold([], { unitId: `u${index}`, category: "c" }));
   const outcomes = Object.fromEntries(
-    goldUnits.map((unit, index) => [unit.unitId, mapped(index % 3 === 0 ? ["a"] : [])]),
+    goldUnits.map((unit, index) => [unit.unitId, index % 3 === 0 ? mapped(["a"]) : noMapping()]),
   );
 
   test("mit festem Seed reproduzierbar, mit anderem Seed verschieden", () => {
@@ -484,7 +521,7 @@ describe("Bootstrap-Intervall über die Units", () => {
   });
 
   test("gleiche Unit-Scores ergeben ein Intervall der Breite 0", () => {
-    const same = Object.fromEntries(goldUnits.map((unit) => [unit.unitId, mapped([])]));
+    const same = Object.fromEntries(goldUnits.map((unit) => [unit.unitId, noMapping()]));
     expect(evaluateRun(input(goldUnits, same)).interval).toEqual({ low: 1, high: 1 });
   });
 

@@ -6,6 +6,7 @@ import {
   CATEGORIES,
   type Category,
   type RunEvaluation,
+  SCORING_VERSION,
   type UnitEvaluation,
   VIOLATION_KINDS,
   type ViolationKind,
@@ -154,7 +155,7 @@ export function evaluated(spec: RunSpec): { run: RunView; evaluation: RunEvaluat
     };
   });
   const evaluation: RunEvaluation = {
-    scoringVersion: "scoring-v1",
+    scoringVersion: SCORING_VERSION,
     goldVersion: "gold-v1",
     mode,
     complete: true,

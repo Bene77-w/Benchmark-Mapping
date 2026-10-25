@@ -9,7 +9,8 @@ import type { InputBasis, UnitKind } from "@/server/snapshot/model";
  */
 
 /** Version der Bewertungsregeln; eine Änderung der Regeln erzwingt die Neubewertung gespeicherter Läufe. */
-export const SCORING_VERSION = "scoring-v1";
+// scoring-v2: no_mapping wird nach `decision` bewertet (decision mapped ohne Zuordnung ist kein no_mapping).
+export const SCORING_VERSION = "scoring-v2";
 
 /** Kategorien des Gold-Sets: a breit, b eng, c no_mapping, d Committee-Kern/direkt, e name_only, f schwierig. */
 export const CATEGORIES = ["a", "b", "c", "d", "e", "f"] as const;
