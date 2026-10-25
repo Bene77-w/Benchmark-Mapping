@@ -21,6 +21,12 @@ export default function HomePage() {
         – Konfiguration zusammenstellen, Lauf starten, Fortschritt und Ergebnisse ansehen.
       </p>
       <p>
+        <Link href="/auswertung" className="underline underline-offset-4">
+          Auswertung
+        </Link>{" "}
+        – Rangliste und Scatter-Plot der abgeschlossenen Läufe gegen die neueste Gold-Version.
+      </p>
+      <p>
         <Link href="/gold" className="underline underline-offset-4">
           Gold
         </Link>{" "}

@@ -25,6 +25,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <Link href="/laeufe" className="text-muted-foreground hover:text-foreground">
               Läufe
             </Link>
+            <Link href="/auswertung" className="text-muted-foreground hover:text-foreground">
+              Auswertung
+            </Link>
             <Link href="/gold" className="text-muted-foreground hover:text-foreground">
               Gold
             </Link>

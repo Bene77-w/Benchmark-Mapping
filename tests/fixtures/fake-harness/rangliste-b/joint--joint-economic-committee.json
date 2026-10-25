@@ -1,0 +1,23 @@
+{
+  "delayMs": 100,
+  "tokens": { "input": 5100, "cacheRead": 31000, "cacheWrite": 0, "output": 330, "reasoning": 150 },
+  "webSearches": 0,
+  "nativeCostUsd": 0.0105,
+  "response": {
+    "unit_id": "joint--joint-economic-committee",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "banks-regional",
+        "evidence_excerpt": "matters relating to the Economic Report",
+        "rationale_short": "Der Wirtschaftsbericht betrifft die Kreditwirtschaft."
+      }
+    ],
+    "sources": [],
+    "label_uncertain": true,
+    "uncertainty_note": "Die Zustaendigkeit ist allgemein wirtschaftspolitisch."
+  }
+}
