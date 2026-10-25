@@ -60,3 +60,55 @@ export function buildHeatmap(entries: AnalysisEntry[]): Heatmap {
   });
   return { units, rows };
 }
+
+/** Höchstens so viele Läufe im Kategorie-Diagramm (gruppierte Balken bleiben lesbar, Farben eindeutig). */
+export const MAX_CATEGORY_RUNS = 4;
+/** Ohne gültige Auswahl: die besten Läufe der Rangliste. */
+const DEFAULT_CATEGORY_RUNS = 3;
+
+export interface CategorySeries {
+  runId: number;
+  configuration: ConfigurationView;
+  /** Score je Kategorie in der Reihenfolge von `categories`; `null`, wenn der Lauf die Kategorie nicht hat. */
+  scores: (number | null)[];
+}
+
+export interface CategoryChart {
+  /** Kategorien der Gold-Version in fester Reihenfolge (a–f) mit ihrer Zahl an Units. */
+  categories: { category: Category; unitCount: number }[];
+  /** Gewählte Läufe in der Reihenfolge der Auswahl (bestimmt die Farbe). */
+  series: CategorySeries[];
+}
+
+/**
+ * Score je Kategorie für ausgewählte Läufe. Wählbar sind nur Läufe der Rangliste (also unter denselben
+ * Filtern); Unbekanntes, Doppeltes und Überzähliges entfällt, ohne gültige Auswahl gelten die besten Läufe.
+ */
+export function buildCategoryChart(entries: AnalysisEntry[], requested: number[]): CategoryChart {
+  const byId = new Map(entries.map((entry) => [entry.runId, entry]));
+  let selected = [...new Set(requested)]
+    .map((runId) => byId.get(runId))
+    .filter((entry): entry is AnalysisEntry => entry !== undefined)
+    .slice(0, MAX_CATEGORY_RUNS);
+  if (selected.length === 0) selected = entries.slice(0, DEFAULT_CATEGORY_RUNS);
+
+  const unitCounts = new Map<Category, number>();
+  for (const entry of selected) {
+    for (const { category, unitCount } of entry.evaluation.categories) {
+      unitCounts.set(category, Math.max(unitCount, unitCounts.get(category) ?? 0));
+    }
+  }
+  const categories = CATEGORIES.filter((category) => unitCounts.has(category)).map((category) => ({
+    category,
+    unitCount: unitCounts.get(category) ?? 0,
+  }));
+  const series = selected.map((entry) => {
+    const scores = new Map(entry.evaluation.categories.map((item) => [item.category, item.score]));
+    return {
+      runId: entry.runId,
+      configuration: entry.configuration,
+      scores: categories.map(({ category }) => scores.get(category) ?? null),
+    };
+  });
+  return { categories, series };
+}
