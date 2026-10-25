@@ -6,7 +6,9 @@ import type {
   UnitResultStatus,
   UnitResultView,
 } from "@/server/runs/model";
-import type { Category, UnitEvaluationStatus, ViolationKind } from "@/server/scoring/model";
+import type { UnitEvaluationStatus, ViolationKind } from "@/server/scoring/model";
+
+export { CATEGORY_LABELS } from "@/server/scoring/model";
 
 export const RUN_STATUS_LABELS: Record<RunStatus, string> = {
   queued: "wartet auf Worker",
@@ -48,15 +50,6 @@ export const VIOLATION_LABELS: Record<ViolationKind, string> = {
   recherche_without_web: "Recherche im Modus ohne Web",
   decision_contradiction: "Widerspruch decision/assignments",
   unknown_industry_id: "unbekannte industry_id",
-};
-
-export const CATEGORY_LABELS: Record<Category, string> = {
-  a: "a – breit",
-  b: "b – eng",
-  c: "c – no_mapping",
-  d: "d – Committee-Kern/direkt",
-  e: "e – name_only",
-  f: "f – schwierige Zuordnung",
 };
 
 export const UNIT_EVALUATION_STATUS_LABELS: Record<UnitEvaluationStatus, string> = {

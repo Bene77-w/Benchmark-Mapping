@@ -4,9 +4,10 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
-import { GOLD_CATEGORY_LABELS, toScoringGold } from "@/server/gold/model";
+import { toScoringGold } from "@/server/gold/model";
 import { getGoldDraft, getGoldVersion, getLatestGoldVersion } from "@/server/gold/store";
 import { reevaluateAllRuns } from "@/server/scoring/current";
+import { CATEGORY_LABELS } from "@/server/scoring/model";
 import { formatDateTime } from "../../../laeufe/labels";
 import { ActionForm } from "../../action-form";
 import { startDraftFromVersionAction } from "../../actions";
@@ -92,7 +93,7 @@ async function GoldVersionDetail({ params }: Pick<PageProps<"/gold/versionen/[la
           {version.units.map((unit) => (
             <TableRow key={unit.unitId} data-testid="gold-version-unit">
               <TableCell className="font-mono text-xs">{unit.unitId}</TableCell>
-              <TableCell>{GOLD_CATEGORY_LABELS[unit.category]}</TableCell>
+              <TableCell>{CATEGORY_LABELS[unit.category]}</TableCell>
               <TableCell className="text-xs">
                 {unit.noMapping
                   ? "no_mapping"

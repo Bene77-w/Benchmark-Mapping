@@ -14,11 +14,11 @@ import {
 import type { Configuration, RunSummary } from "@/server/runs/model";
 import { createRun, listRuns, type PromptRootOption } from "@/server/runs/store";
 import { type ReevaluationStatus, reevaluateAllRuns } from "@/server/scoring/current";
+import type { Category } from "@/server/scoring/model";
 import { hashCanonical } from "@/server/snapshot/hash";
 import { getCurrentSnapshot } from "@/server/snapshot/store";
 import { readGoldCandidates } from "./candidates";
 import {
-  type GoldCategory,
   type GoldIssue,
   type GoldProposal,
   type GoldReviewIndustry,
@@ -48,7 +48,7 @@ export async function getGoldDraft(db: Database): Promise<GoldVersionView | null
 /** Nimmt eine Unit des Snapshots mit Kategorie in den Entwurf auf (höchstens 30). */
 export async function addGoldUnit(
   db: Database,
-  { unitId, category }: { unitId: string; category: GoldCategory },
+  { unitId, category }: { unitId: string; category: Category },
 ): Promise<void> {
   await db.transaction(async (tx) => {
     const draft = await ensureDraft(tx);
@@ -93,11 +93,7 @@ export async function discardGoldDraft(db: Database): Promise<void> {
   await db.delete(goldVersions).where(eq(goldVersions.status, "draft"));
 }
 
-export async function setGoldUnitCategory(
-  db: Database,
-  unitId: string,
-  category: GoldCategory,
-): Promise<void> {
+export async function setGoldUnitCategory(db: Database, unitId: string, category: Category): Promise<void> {
   const draft = await requireDraft(db);
   const updated = await db
     .update(goldUnits)

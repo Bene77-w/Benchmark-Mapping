@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getDatabase } from "@/server/db/client";
-import { GOLD_CATEGORIES, GOLD_CLASSES, GoldValidationError } from "@/server/gold/model";
+import { GoldValidationError } from "@/server/gold/model";
 import {
   addGoldUnit,
   adoptRecommendedCandidates,
@@ -16,6 +16,7 @@ import {
   startProposalRun,
 } from "@/server/gold/store";
 import { configurationSchema, MAX_PARALLELISM, MIN_PARALLELISM } from "@/server/runs/model";
+import { CATEGORIES, GOLD_CLASSES } from "@/server/scoring/model";
 
 export interface ActionState {
   error: string | null;
@@ -36,7 +37,7 @@ async function attempt(work: () => Promise<string | undefined>): Promise<ActionS
 export async function addUnitAction(_previous: ActionState, formData: FormData): Promise<ActionState> {
   return attempt(async () => {
     const { unitId, category } = z
-      .object({ unitId: z.string().trim().min(1, "Unit fehlt"), category: z.enum(GOLD_CATEGORIES) })
+      .object({ unitId: z.string().trim().min(1, "Unit fehlt"), category: z.enum(CATEGORIES) })
       .parse(Object.fromEntries(formData));
     await addGoldUnit(getDatabase(), { unitId, category });
     return `${unitId} hinzugefügt`;
@@ -114,7 +115,7 @@ export async function saveDecisionAction(_previous: ActionState, formData: FormD
       });
     }
     await saveGoldUnitDecision(getDatabase(), unitId, {
-      category: z.enum(GOLD_CATEGORIES).parse(formData.get("category")),
+      category: z.enum(CATEGORIES).parse(formData.get("category")),
       noMapping: formData.get("noMapping") === "on",
       note: String(formData.get("note") ?? "").trim() || null,
       industries,

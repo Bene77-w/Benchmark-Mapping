@@ -15,7 +15,16 @@ export const SCORING_VERSION = "scoring-v2";
 /** Kategorien des Gold-Sets: a breit, b eng, c no_mapping, d Committee-Kern/direkt, e name_only, f schwierig. */
 export const CATEGORIES = ["a", "b", "c", "d", "e", "f"] as const;
 export type Category = (typeof CATEGORIES)[number];
+export const CATEGORY_LABELS: Record<Category, string> = {
+  a: "a – breit",
+  b: "b – eng",
+  c: "c – no_mapping",
+  d: "d – Committee-Kern/direkt",
+  e: "e – name_only",
+  f: "f – schwierige Zuordnung",
+};
 
+/** Gold-Klasse einer Industry. */
 export const GOLD_CLASSES = ["positiv", "vertretbar"] as const;
 export type GoldClass = (typeof GOLD_CLASSES)[number];
 

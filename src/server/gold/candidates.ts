@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { z } from "zod";
-import { GOLD_CATEGORIES } from "./model";
+import { CATEGORIES } from "@/server/scoring/model";
 
 /**
  * Kandidaten für das Gold-Set aus `docs/goldset/kandidaten.md` als Hilfe für die Auswahl in der App (Code wie
@@ -15,7 +15,7 @@ const candidatesFileSchema = z.object({
     z.object({
       code: z.string().min(1),
       unitId: z.string().min(1),
-      category: z.enum(GOLD_CATEGORIES),
+      category: z.enum(CATEGORIES),
       recommended: z.boolean(),
     }),
   ),
