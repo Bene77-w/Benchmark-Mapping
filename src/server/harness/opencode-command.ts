@@ -1,4 +1,4 @@
-import type { Mode } from "@/server/prompt/benchmark-prompt";
+import { type Mode, withInlineSchema } from "@/server/prompt/benchmark-prompt";
 import type { JsonSchema } from "@/server/prompt/output-schema";
 
 /**
@@ -8,8 +8,9 @@ import type { JsonSchema } from "@/server/prompt/output-schema";
  * - `--standalone`: eigener, privater Server statt des Hintergrunddienstes des Nutzers (der Dienst würde mit der
  *   Umgebung des ersten Aufrufs weiterlaufen und den festen Port belegen).
  * - `--agent benchmark`: eigener Agent aus der temporären Konfiguration. Sein `system` ersetzt den Basis-Prompt
- *   von OpenCode; er enthält den Benchmark-Prompt und das angehängte Ausgabeschema (OpenCode kennt in v2 keine
- *   Schema-Option). Der Zusatz gehört nicht zum Prompt-Hash.
+ *   von OpenCode; er enthält den Benchmark-Prompt, den versionierten Formatierungsauftrag
+ *   (`format-instruction.md`) und das Ausgabeschema (OpenCode kennt in v2 keine Schema-Option). Der Zusatz
+ *   gehört nicht zum gemeinsamen Prompt-Hash, aber zum Unit-Hash (`withInlineSchema`).
  * - Berechtigungen: alles verboten (`*`), im Modus mit Web nur `websearch` erlaubt; `websearch: false` nimmt
  *   das Suchwerkzeug im Modus ohne Web ganz aus den Anfragen.
  * - Modell `provider/model#variant`: der Effort ist die Variante; Effort `default` ruft ohne Variante auf
@@ -22,15 +23,16 @@ export const OPENCODE_AGENT = "benchmark";
 /** Effort, bei dem kein `#variant` angehängt wird. */
 export const DEFAULT_VARIANT = "default";
 
-/** Hinweis samt Schema, der bei OpenCode an den System-Prompt angehängt wird. */
-export function opencodeSystemPrompt(systemPrompt: string, outputSchema: JsonSchema | null): string {
-  if (!outputSchema) return systemPrompt;
-  return [
-    systemPrompt,
-    "## Ausgabeformat",
-    "Antworte ausschließlich mit einem einzigen JSON-Objekt, das dem folgenden JSON-Schema entspricht. Kein Markdown, kein Codeblock, kein Text davor oder danach.",
-    JSON.stringify(outputSchema),
-  ].join("\n\n");
+/** Ausgabeschema samt Formatierungsauftrag für den System-Prompt. */
+export interface InlineSchema {
+  formatInstruction: string;
+  outputSchema: JsonSchema;
+}
+
+/** System-Prompt des Agents: ohne Schema (Preflight-Probe) der Prompt selbst, sonst `withInlineSchema`. */
+export function opencodeSystemPrompt(systemPrompt: string, inline: InlineSchema | null): string {
+  if (!inline) return systemPrompt;
+  return withInlineSchema(systemPrompt, inline.formatInstruction, inline.outputSchema);
 }
 
 export function opencodeModelRef(model: string, effort: string): string {

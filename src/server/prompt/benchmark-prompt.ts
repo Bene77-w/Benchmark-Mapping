@@ -32,10 +32,20 @@ export type PromptSnapshot = Pick<Snapshot, "units" | "industries" | "source">;
 
 export interface UnitPrompt {
   unitId: string;
+  /** Gemeinsamer System-Prompt (Vertrag + Brief); geht so an den Adapter. */
   systemPrompt: string;
   userPrompt: string;
-  /** SHA-256 über den exakt gesendeten Text dieser Unit: System-Prompt, User-Prompt und Ausgabeschema. */
+  /**
+   * SHA-256 über den exakt gesendeten Text dieser Unit: System-Prompt, User-Prompt und Ausgabeschema; bei
+   * Harnesses ohne Schema-Option (`inlineSchema`) der System-Prompt samt Formatierungsauftrag und Schema
+   * (`withInlineSchema`).
+   */
   unitPromptHash: string;
+}
+
+export interface UnitPromptOptions {
+  /** Der Harness bekommt das Ausgabeschema im System-Prompt (OpenCode), siehe `withInlineSchema`. */
+  inlineSchema?: boolean;
 }
 
 export interface BenchmarkPrompt {
@@ -53,8 +63,14 @@ export interface BenchmarkPrompt {
    * Snapshot-Hash ⇔ gleiche gesendete Texte.
    */
   promptHash: string;
+  /**
+   * Formatierungsauftrag für Harnesses ohne Schema-Option (`format-instruction.md` der Prompt-Version). Er
+   * steht nicht im gemeinsamen Prompt-Hash (harness-übergreifend vergleichbar), aber im Unit-Hash der Units,
+   * die ihn erhalten.
+   */
+  formatInstruction: string;
   /** Prompt für eine Unit des Snapshots; eine unbekannte unit_id ist ein Fehler. */
-  forUnit(unitId: string): UnitPrompt;
+  forUnit(unitId: string, options?: UnitPromptOptions): UnitPrompt;
 }
 
 export interface PromptOptions {
@@ -65,6 +81,21 @@ export interface PromptOptions {
 
 /** Vorlage, nach der Taxonomie und Unit in den User-Prompt gerendert werden. */
 const USER_PROMPT_TEMPLATE_FILE = "user-prompt.json";
+/** Formatierungsauftrag für Harnesses, die das Ausgabeschema im System-Prompt bekommen. */
+const FORMAT_INSTRUCTION_FILE = "format-instruction.md";
+
+/**
+ * System-Prompt für Harnesses ohne Schema-Option (OpenCode): gemeinsamer System-Prompt, Formatierungsauftrag
+ * und Ausgabeschema als JSON. Adapter und Unit-Hash nutzen dieselbe Funktion, damit der Hash den gesendeten
+ * Text trifft.
+ */
+export function withInlineSchema(
+  systemPrompt: string,
+  formatInstruction: string,
+  outputSchema: JsonSchema,
+): string {
+  return [systemPrompt, formatInstruction, JSON.stringify(outputSchema)].join("\n\n");
+}
 
 const BRIEF_FILE: Record<`${RunKind}/${Mode}`, string | null> = {
   "benchmark/text_only": "brief-text-only.md",
@@ -84,12 +115,13 @@ export async function buildBenchmarkPrompt(
   const directory = path.join(/*turbopackIgnore: true*/ options.promptRoot ?? PROMPT_ROOT, version);
   const briefFile = BRIEF_FILE[`${request.runKind}/${request.mode}`];
   if (briefFile === null) throw new Error("Vorschlagsläufe laufen immer im Modus mit Websuche");
-  const [contract, brief, templateText] = await Promise.all(
-    ["contract.md", briefFile, USER_PROMPT_TEMPLATE_FILE].map((file) =>
+  const [contract, brief, templateText, formatText] = await Promise.all(
+    ["contract.md", briefFile, USER_PROMPT_TEMPLATE_FILE, FORMAT_INSTRUCTION_FILE].map((file) =>
       readFile(/*turbopackIgnore: true*/ path.join(/*turbopackIgnore: true*/ directory, file), "utf8"),
     ),
   );
   const systemPrompt = [contract.trim(), brief.trim()].join("\n\n");
+  const formatInstruction = formatText.trim();
   const template = userPromptTemplateSchema.parse(JSON.parse(templateText));
 
   const units = [...snapshot.units].sort((a, b) => compare(a.unitId, b.unitId));
@@ -119,15 +151,23 @@ export async function buildBenchmarkPrompt(
       userPromptTemplate: template,
       outputSchema: outputJsonSchema,
     }),
-    forUnit(unitId) {
+    formatInstruction,
+    forUnit(unitId, unitOptions = {}) {
       const unit = unitById.get(unitId);
       if (!unit) throw new Error(`Unit ${unitId} gibt es im Snapshot nicht`);
       const userPrompt = userPromptOf(unit);
+      const sentSystemPrompt = unitOptions.inlineSchema
+        ? withInlineSchema(systemPrompt, formatInstruction, outputJsonSchema)
+        : systemPrompt;
       return {
         unitId,
         systemPrompt,
         userPrompt,
-        unitPromptHash: hashCanonical({ systemPrompt, userPrompt, outputSchema: outputJsonSchema }),
+        unitPromptHash: hashCanonical({
+          systemPrompt: sentSystemPrompt,
+          userPrompt,
+          outputSchema: outputJsonSchema,
+        }),
       };
     },
   };

@@ -32,12 +32,13 @@ const mode = values.mode as Mode;
 
 const snapshot = await readSnapshotFile("data/snapshot/snapshot.json");
 const prompt = await buildBenchmarkPrompt(snapshot, { runKind: "benchmark", mode });
-const unit = prompt.forUnit(unitId);
+const unit = prompt.forUnit(unitId, { inlineSchema: true });
 const call = await runOpencodeCall(
   {
     systemPrompt: unit.systemPrompt,
     userPrompt: unit.userPrompt,
     outputSchema: prompt.outputSchema,
+    formatInstruction: prompt.formatInstruction,
     model: values.model,
     effort: values.effort,
     mode,

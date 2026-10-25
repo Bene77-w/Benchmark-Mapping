@@ -101,6 +101,8 @@ export interface OpencodeCallInput {
   userPrompt: string;
   /** `null` = ohne Schema-Anhang (Preflight-Probe). */
   outputSchema: JsonSchema | null;
+  /** Formatierungsauftrag vor dem Schema; Pflicht, sobald `outputSchema` gesetzt ist. */
+  formatInstruction?: string;
   model: string;
   effort: string;
   mode: Mode;
@@ -130,6 +132,9 @@ export interface OpencodeCallResult {
   commandLine: string;
 }
 
+export const MISSING_FORMAT_INSTRUCTION =
+  "Ohne Formatierungsauftrag (format-instruction.md) kann OpenCode kein Ausgabeschema bekommen";
+
 /** Höchstdauer für `session export|list|delete`. */
 const SESSION_TIMEOUT_MS = 60_000;
 
@@ -139,8 +144,12 @@ export async function runOpencodeCall(
 ): Promise<OpencodeCallResult> {
   const command = options.command ?? OPENCODE_COMMAND;
   const title = `benchmark-mapping-${randomBytes(6).toString("hex")}`;
+  if (input.outputSchema && !input.formatInstruction) throw new Error(MISSING_FORMAT_INSTRUCTION);
+  const inline = input.outputSchema
+    ? { formatInstruction: input.formatInstruction ?? "", outputSchema: input.outputSchema }
+    : null;
   const config = buildOpencodeConfig({
-    systemPrompt: opencodeSystemPrompt(input.systemPrompt, input.outputSchema),
+    systemPrompt: opencodeSystemPrompt(input.systemPrompt, inline),
     mode: input.mode,
     websearchProvider: options.websearchProvider ?? null,
   });

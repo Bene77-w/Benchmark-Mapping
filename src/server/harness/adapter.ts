@@ -26,6 +26,11 @@ export interface HarnessTask {
   userPrompt: string;
   /** Ausgabeschema als JSON-Schema (`--json-schema`, `--output-schema`, bei OpenCode im Prompt). */
   outputSchema: JsonSchema;
+  /**
+   * Formatierungsauftrag der Prompt-Version (`format-instruction.md`) für Adapter, die das Schema im
+   * System-Prompt mitschicken (`inlinesOutputSchema`); andere Adapter ignorieren ihn.
+   */
+  formatInstruction?: string;
   /** Modell-ID wie im Harness (Freitext). */
   model: string;
   /** Effort-Stufe wie im Harness (Freitext). */
@@ -93,6 +98,11 @@ export interface HarnessResult {
 export interface HarnessAdapter {
   readonly harness: Harness;
   run(task: HarnessTask): Promise<HarnessResult>;
+  /**
+   * Der Harness kennt keine Schema-Option: der Adapter hängt Formatierungsauftrag und Schema an den
+   * System-Prompt (`withInlineSchema`), und der Runner bildet den Unit-Hash über genau diesen Text.
+   */
+  readonly inlinesOutputSchema?: boolean;
   /**
    * Prüft vor einem Lauf, ob die Konfiguration ausführbar ist (siehe preflight.ts). Der Runner speichert das
    * Ergebnis am Lauf und führt ihn bei `ok == false` nicht aus. Adapter ohne Preflight laufen ungeprüft.

@@ -4,7 +4,13 @@ import path from "node:path";
 import { beforeAll, describe, expect, test } from "vitest";
 import type { Snapshot, SnapshotUnit } from "@/server/snapshot/model";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
-import { buildBenchmarkPrompt, PROMPT_ROOT, PROMPT_VERSION, type PromptRequest } from "./benchmark-prompt";
+import {
+  buildBenchmarkPrompt,
+  PROMPT_ROOT,
+  PROMPT_VERSION,
+  type PromptRequest,
+  withInlineSchema,
+} from "./benchmark-prompt";
 
 let snapshot: Snapshot;
 beforeAll(async () => {
@@ -291,5 +297,43 @@ describe("Prompt-Hash", () => {
       "benchmark/web": "abda859b914e9e9c7ac07a21d178dce7b52b9d972c772adfde807a9ceb50f3b2",
       "proposal/web": "601c9265ddb7e236fdbbaa66bc0eddfb6eaf2c13000068ccf6e951f9a9772b1a",
     });
+  });
+});
+
+describe("Formatierungsauftrag für Harnesses ohne Schema-Option (OpenCode)", () => {
+  const request: PromptRequest = { runKind: "benchmark", mode: "text_only" };
+
+  test("ist eine versionierte Prompt-Datei und steht im Unit-Hash des gesendeten Texts", async () => {
+    const prompt = await buildBenchmarkPrompt(snapshot, request);
+    const instruction = await promptFile("format-instruction.md");
+    expect(instruction).toMatch(
+      /^## Ausgabeformat\n\nAntworte ausschließlich mit einem einzigen JSON-Objekt/,
+    );
+    expect(prompt.formatInstruction).toBe(instruction);
+    expect(withInlineSchema(prompt.systemPrompt, prompt.formatInstruction, prompt.outputSchema)).toBe(
+      `${prompt.systemPrompt}\n\n${instruction}\n\n${JSON.stringify(prompt.outputSchema)}`,
+    );
+
+    const common = prompt.forUnit("house--rules");
+    const inline = prompt.forUnit("house--rules", { inlineSchema: true });
+    expect(inline.systemPrompt).toBe(common.systemPrompt);
+    expect(inline.unitPromptHash).not.toBe(common.unitPromptHash);
+  });
+
+  test("eine Textänderung ändert den Unit-Hash mit Schema im Prompt, nicht den gemeinsamen Prompt-Hash", async () => {
+    const original = await buildBenchmarkPrompt(snapshot, request);
+    const root = await mkdtemp(path.join(tmpdir(), "prompts-"));
+    await cp(PROMPT_ROOT, root, { recursive: true });
+    const file = path.join(root, PROMPT_VERSION, "format-instruction.md");
+    await writeFile(file, (await readFile(file, "utf8")).replace("Kein Markdown", "Ohne Markdown"));
+    const changed = await buildBenchmarkPrompt(snapshot, request, { promptRoot: root });
+
+    expect(changed.promptHash).toBe(original.promptHash);
+    expect(changed.forUnit("house--rules").unitPromptHash).toBe(
+      original.forUnit("house--rules").unitPromptHash,
+    );
+    expect(changed.forUnit("house--rules", { inlineSchema: true }).unitPromptHash).not.toBe(
+      original.forUnit("house--rules", { inlineSchema: true }).unitPromptHash,
+    );
   });
 });
