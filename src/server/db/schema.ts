@@ -15,13 +15,13 @@ import {
   unique,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
-import { GOLD_CATEGORIES, GOLD_CLASSES, GOLD_VERSION_STATUSES } from "@/server/gold/model";
+import { GOLD_VERSION_STATUSES } from "@/server/gold/model";
 import { HARNESS_ERROR_KINDS, HARNESSES, type TokensByModel } from "@/server/harness/adapter";
 import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import { RUN_STATUSES, UNIT_RESULT_STATUSES } from "@/server/runs/model";
-import type { RunEvaluation } from "@/server/scoring/model";
+import { CATEGORIES, GOLD_CLASSES, type RunEvaluation } from "@/server/scoring/model";
 import type { SnapshotSource } from "@/server/snapshot/model";
 
 /** Ein geladener Snapshot. Läufe beziehen sich später auf ihn (über `id` bzw. `contentHash`). */
@@ -224,7 +224,7 @@ export const goldUnits = pgTable(
       .notNull()
       .references(() => goldVersions.id, { onDelete: "cascade" }),
     unitId: text("unit_id").notNull(),
-    category: text("category", { enum: GOLD_CATEGORIES }).notNull(),
+    category: text("category", { enum: CATEGORIES }).notNull(),
     noMapping: boolean("no_mapping").notNull().default(false),
     note: text("note"),
   },

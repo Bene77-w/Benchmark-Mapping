@@ -2,7 +2,7 @@ import { z } from "zod";
 import type { HarnessErrorKind } from "@/server/harness/adapter";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
 import type { ConfigurationView, UnitResultStatus } from "@/server/runs/model";
-import type { GoldVersion } from "@/server/scoring/model";
+import { CATEGORIES, type Category, GOLD_CLASSES, type GoldVersion } from "@/server/scoring/model";
 import type { SnapshotUnit } from "@/server/snapshot/model";
 
 /**
@@ -13,21 +13,8 @@ import type { SnapshotUnit } from "@/server/snapshot/model";
 export const MAX_GOLD_UNITS = 30;
 export const MAX_VERTRETBAR_PER_UNIT = 2;
 
-/** Kategorie einer Gold-Unit: Art der Schwierigkeit, für die sie steht. */
-export const GOLD_CATEGORIES = ["a", "b", "c", "d", "e", "f"] as const;
-export type GoldCategory = (typeof GOLD_CATEGORIES)[number];
-export const GOLD_CATEGORY_LABELS: Record<GoldCategory, string> = {
-  a: "a – breit",
-  b: "b – eng",
-  c: "c – no_mapping",
-  d: "d – Committee-Kern/direkt",
-  e: "e – name_only",
-  f: "f – schwierige Zuordnung",
-};
-
-/** Gold-Klasse einer Industry. */
-export const GOLD_CLASSES = ["positiv", "vertretbar"] as const;
-export type GoldClass = (typeof GOLD_CLASSES)[number];
+// Kategorien (`CATEGORIES`, `CATEGORY_LABELS`) und Gold-Klassen (`GOLD_CLASSES`) teilt das Gold-Set mit der
+// Bewertung; sie sind in scoring/model.ts definiert.
 
 export const GOLD_VERSION_STATUSES = ["draft", "frozen"] as const;
 export type GoldVersionStatus = (typeof GOLD_VERSION_STATUSES)[number];
@@ -41,7 +28,7 @@ export type GoldIndustry = z.infer<typeof goldIndustrySchema>;
 
 /** Entscheidung der Gold-Review für eine Unit; ersetzt die bisherige vollständig. */
 export const goldUnitDecisionSchema = z.object({
-  category: z.enum(GOLD_CATEGORIES),
+  category: z.enum(CATEGORIES),
   noMapping: z.boolean(),
   note: z.string().trim().nullable(),
   industries: z
@@ -55,7 +42,7 @@ export type GoldUnitDecision = z.input<typeof goldUnitDecisionSchema>;
 
 export interface GoldUnit {
   unitId: string;
-  category: GoldCategory;
+  category: Category;
   noMapping: boolean;
   note: string | null;
   /** Sortiert nach industry_id. */

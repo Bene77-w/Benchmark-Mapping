@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
-import { GOLD_CATEGORIES, GOLD_CATEGORY_LABELS, type GoldProposal } from "@/server/gold/model";
+import type { GoldProposal } from "@/server/gold/model";
 import { getGoldDraft, getGoldUnitReview } from "@/server/gold/store";
 import { HARNESS_LABELS } from "@/server/harness/adapter";
+import { CATEGORIES, CATEGORY_LABELS } from "@/server/scoring/model";
 import { getSnapshotContent } from "@/server/snapshot/store";
 import { ActionForm } from "../../action-form";
 import { saveDecisionAction } from "../../actions";
@@ -105,9 +106,9 @@ async function Review({ params }: Pick<PageProps<"/gold/units/[unitId]">, "param
             <label className="flex flex-col gap-1">
               Kategorie
               <select name="category" className={selectClass} defaultValue={gold.category}>
-                {GOLD_CATEGORIES.map((category) => (
+                {CATEGORIES.map((category) => (
                   <option key={category} value={category}>
-                    {GOLD_CATEGORY_LABELS[category]}
+                    {CATEGORY_LABELS[category]}
                   </option>
                 ))}
               </select>

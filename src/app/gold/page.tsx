@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { readGoldCandidates } from "@/server/gold/candidates";
-import { GOLD_CATEGORIES, GOLD_CATEGORY_LABELS, MAX_GOLD_UNITS, toScoringGold } from "@/server/gold/model";
+import { MAX_GOLD_UNITS, toScoringGold } from "@/server/gold/model";
 import {
   checkGoldDraft,
   getGoldDraft,
@@ -24,6 +24,7 @@ import {
   MIN_PARALLELISM,
 } from "@/server/runs/model";
 import { reevaluateAllRuns } from "@/server/scoring/current";
+import { CATEGORIES, CATEGORY_LABELS } from "@/server/scoring/model";
 import { searchUnits } from "@/server/snapshot/store";
 import { AutoRefresh } from "../laeufe/[id]/auto-refresh";
 import { configurationLabel, formatDateTime, progressLabel, RUN_STATUS_LABELS } from "../laeufe/labels";
@@ -147,9 +148,9 @@ async function GoldContent() {
             <label className="flex flex-col gap-1 text-sm">
               Kategorie
               <select name="category" className={selectClass} defaultValue="f">
-                {GOLD_CATEGORIES.map((category) => (
+                {CATEGORIES.map((category) => (
                   <option key={category} value={category}>
-                    {GOLD_CATEGORY_LABELS[category]}
+                    {CATEGORY_LABELS[category]}
                   </option>
                 ))}
               </select>
@@ -192,7 +193,7 @@ async function GoldContent() {
                         {unitName.get(unit.unitId)}
                       </div>
                     </TableCell>
-                    <TableCell>{GOLD_CATEGORY_LABELS[unit.category]}</TableCell>
+                    <TableCell>{CATEGORY_LABELS[unit.category]}</TableCell>
                     <TableCell>{decisionLabel(unit)}</TableCell>
                     <TableCell className="text-xs text-destructive">
                       {unitIssues.map((issue) => issue.message).join("; ")}
