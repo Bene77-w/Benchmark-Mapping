@@ -1,6 +1,10 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-/** Startet einen Fake-Lauf ohne Web über das Formular und wartet auf den Abschluss; liefert die Lauf-ID. */
+/**
+ * Startet einen Fake-Lauf ohne Web über das Formular und wartet auf den Abschluss; liefert die Lauf-ID. Der eine
+ * Worker arbeitet die Läufe aller Specs nacheinander ab; mit kaltem `.next-e2e` (CPU durch das Kompilieren
+ * ausgelastet) wartet ein Lauf deshalb deutlich länger als warm.
+ */
 export async function startRun(page: Page, model: string, effort: string): Promise<string> {
   await page.goto("/laeufe");
   await page.getByLabel("Harness").selectOption("fake");
@@ -11,7 +15,7 @@ export async function startRun(page: Page, model: string, effort: string): Promi
   await expect(page).toHaveURL(/\/laeufe\/\d+$/);
   const id = page.url().split("/").at(-1) ?? "";
   await expect(page.getByTestId("run-status").filter({ visible: true })).toHaveText("abgeschlossen", {
-    timeout: 60_000,
+    timeout: 120_000,
   });
   return id;
 }
