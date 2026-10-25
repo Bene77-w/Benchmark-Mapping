@@ -2,7 +2,13 @@ import { randomUUID } from "node:crypto";
 import { and, asc, count, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import type { Database } from "@/server/db/database";
 import { configurations, runs, unitResults } from "@/server/db/schema";
-import type { AdapterRegistry, HarnessAdapter, HarnessResult, HarnessTask } from "@/server/harness/adapter";
+import type {
+  AdapterRegistry,
+  HarnessAdapter,
+  HarnessResult,
+  HarnessTask,
+  TokenUsage,
+} from "@/server/harness/adapter";
 import { describePreflightFailure } from "@/server/harness/preflight";
 import { type BenchmarkPrompt, buildBenchmarkPrompt } from "@/server/prompt/benchmark-prompt";
 import { getSnapshotContent } from "@/server/snapshot/store";
@@ -132,6 +138,7 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
   const context: RunContext = {
     db,
     runId,
+    claimId,
     adapter,
     prompt,
     task: {
@@ -183,6 +190,8 @@ type RunState = "active" | "cancelled" | "lost";
 interface RunContext {
   db: Database;
   runId: number;
+  /** Kennung dieser Übernahme: nur solange der Lauf sie trägt, schreibt dieser Worker Unit-Ergebnisse. */
+  claimId: string;
   adapter: HarnessAdapter;
   prompt: BenchmarkPrompt;
   task: Pick<HarnessTask, "model" | "effort" | "mode" | "timeoutMs">;
@@ -196,17 +205,28 @@ interface RunContext {
 const RETRYABLE = new Set<HarnessResult["outcome"]["kind"]>(["timeout", "invalid_json", "schema_violation"]);
 
 /**
- * Führt eine Unit aus und schreibt ihr Ergebnis. Ein Ratenlimit zählt nicht als Versuch: die Unit wartet
- * mit allen anderen (siehe `RateLimitWait`) und wird danach erneut aufgerufen. Timeout, ungültiges JSON und
- * Schemaverstoß lösen genau einen Wiederholversuch aus.
+ * Führt eine Unit aus und schreibt ihr Ergebnis. Ein Versuch zählt, sobald er beginnt (auch wenn der
+ * Worker währenddessen abstürzt); ein Ratenlimit zählt nicht als Versuch: die Unit wartet mit allen anderen
+ * (siehe `RateLimitWait`) und wird danach erneut aufgerufen. Timeout, ungültiges JSON und Schemaverstoß
+ * lösen genau einen Wiederholversuch aus.
  */
 async function runUnit(context: RunContext, unitId: string): Promise<void> {
-  const { db, runId, prompt, rateLimit } = context;
+  const { db, runId, claimId, prompt, rateLimit } = context;
   const unitPrompt = prompt.forUnit(unitId);
-  const where = and(eq(unitResults.runId, runId), eq(unitResults.unitId, unitId));
-  // Ergebnisse nur für eine Unit, die (noch) als laufend gilt: hat ein anderer Worker den Lauf übernommen
-  // und die Unit fertig, verfällt das späte Ergebnis.
-  const whereRunning = and(where, eq(unitResults.status, "running"));
+  // Jedes Schreiben nur, solange dieser Worker den Lauf hält (gleiche claimId): hat ein anderer Worker den
+  // Lauf übernommen, verfallen späte Ergebnisse und Statuswechsel, auch während er die Unit selbst ausführt.
+  const owned = and(
+    eq(unitResults.runId, runId),
+    eq(unitResults.unitId, unitId),
+    inArray(
+      unitResults.runId,
+      db
+        .select({ id: runs.id })
+        .from(runs)
+        .where(and(eq(runs.id, runId), eq(runs.claimId, claimId))),
+    ),
+  );
+  const whereRunning = and(owned, eq(unitResults.status, "running"));
   const task: HarnessTask = {
     ...context.task,
     unitId,
@@ -222,18 +242,27 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
   const call = async (): Promise<HarnessResult | null> => {
     const state = await context.state();
     if (state === "lost" || (state === "cancelled" && attempts.length === 0)) return null;
-    await db
+    const [started] = await db
       .update(unitResults)
-      .set({ status: "running", startedAt: new Date(), unitPromptHash: unitPrompt.unitPromptHash })
-      .where(where);
-    return callAdapter(context, task);
+      .set({
+        status: "running",
+        startedAt: new Date(),
+        unitPromptHash: unitPrompt.unitPromptHash,
+        attempts: sql`${unitResults.attempts} + 1`,
+      })
+      .where(and(owned, inArray(unitResults.status, ["pending", "running"])))
+      .returning({ unitId: unitResults.unitId });
+    if (!started) return null;
+    const result = await callAdapter(context, task);
+    if (result.outcome.kind === "rate_limit")
+      await db.update(unitResults).set(RATE_LIMITED).where(whereRunning);
+    return result;
   };
 
   for (;;) {
     await rateLimit.whenOpen();
     let result = await call();
     if (result?.outcome.kind === "rate_limit") {
-      await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       result = await rateLimit.represent(call);
       if (!result && (await context.state()) !== "active") return;
       if (!result) continue;
@@ -244,20 +273,17 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
       return;
     }
     attempts.push(result);
-    if (attempts.length === 1 && RETRYABLE.has(result.outcome.kind)) {
-      await db
-        .update(unitResults)
-        .set({ attempts: sql`${unitResults.attempts} + 1` })
-        .where(whereRunning);
-      continue;
-    }
+    if (attempts.length === 1 && RETRYABLE.has(result.outcome.kind)) continue;
     await db
       .update(unitResults)
-      .set({ ...resultColumns(combineAttempts(attempts)), attempts: sql`${unitResults.attempts} + 1` })
+      .set(resultColumns(combineAttempts(attempts)))
       .where(whereRunning);
     return;
   }
 }
+
+/** Ein Aufruf, der mit Ratenlimit endet, zählt nicht als Versuch: die Unit wartet wieder. */
+const RATE_LIMITED = { status: "pending", attempts: sql`${unitResults.attempts} - 1` } as const;
 
 /**
  * Ein Aufruf des Adapters. Wirft er, ist das ein Harness-Fehler; meldet er sich nicht bis Timeout plus
@@ -278,35 +304,35 @@ async function callAdapter(context: RunContext, task: HarnessTask): Promise<Harn
 
 /**
  * Fasst die Versuche einer Unit zusammen: Antwort bzw. Fehlerart und Metadaten des letzten Versuchs; Tokens,
- * Websuchen, native Kosten und Dauer aller Versuche (bezahlt ist jeder), Protokolle nacheinander.
+ * Websuchen, native Kosten und Dauer aller Versuche (bezahlt ist jeder), Protokolle nacheinander. Fehlt ein
+ * Wert bei einem Versuch, ist die Summe unbekannt (`null`), nie eine Teilsumme: auch ein Versuch ohne
+ * Angabe kann verbraucht haben.
  */
 function combineAttempts(attempts: HarnessResult[]): HarnessResult {
   const last = attempts[attempts.length - 1];
-  const withTokens = attempts.flatMap((attempt) => (attempt.tokens ? [attempt.tokens] : []));
   if (attempts.length === 1) return last;
+  const tokens = attempts.map((attempt) => attempt.tokens);
+  const allTokens = tokens.every((entry): entry is TokenUsage => entry !== null) ? tokens : null;
   return {
     ...last,
     log: attempts.map((attempt, index) => `--- Versuch ${index + 1} ---\n${attempt.log}`).join("\n"),
-    tokens:
-      withTokens.length === 0
-        ? null
-        : {
-            inputTokens: sum(withTokens.map((tokens) => tokens.inputTokens)) ?? 0,
-            cacheReadTokens: sum(withTokens.map((tokens) => tokens.cacheReadTokens)) ?? 0,
-            cacheWriteTokens: sum(withTokens.map((tokens) => tokens.cacheWriteTokens)) ?? 0,
-            outputTokens: sum(withTokens.map((tokens) => tokens.outputTokens)) ?? 0,
-            reasoningTokens: sum(withTokens.map((tokens) => tokens.reasoningTokens)),
-          },
-    webSearches: sum(attempts.map((attempt) => attempt.webSearches)),
-    nativeCostUsd: sum(attempts.map((attempt) => attempt.nativeCostUsd)),
-    durationMs: sum(attempts.map((attempt) => attempt.durationMs)) ?? 0,
+    tokens: allTokens && {
+      inputTokens: sumAll(allTokens.map((entry) => entry.inputTokens)) ?? 0,
+      cacheReadTokens: sumAll(allTokens.map((entry) => entry.cacheReadTokens)) ?? 0,
+      cacheWriteTokens: sumAll(allTokens.map((entry) => entry.cacheWriteTokens)) ?? 0,
+      outputTokens: sumAll(allTokens.map((entry) => entry.outputTokens)) ?? 0,
+      reasoningTokens: sumAll(allTokens.map((entry) => entry.reasoningTokens)),
+    },
+    webSearches: sumAll(attempts.map((attempt) => attempt.webSearches)),
+    nativeCostUsd: sumAll(attempts.map((attempt) => attempt.nativeCostUsd)),
+    durationMs: sumAll(attempts.map((attempt) => attempt.durationMs)) ?? 0,
   };
 }
 
-/** Summe der bekannten Werte; `null`, wenn keiner bekannt ist. */
-function sum(values: (number | null)[]): number | null {
-  const known = values.filter((value): value is number => value !== null);
-  return known.length === 0 ? null : known.reduce((total, value) => total + value, 0);
+/** Summe aller Werte; `null`, sobald einer unbekannt ist. */
+function sumAll(values: (number | null)[]): number | null {
+  if (values.some((value) => value === null)) return null;
+  return (values as number[]).reduce((total, value) => total + value, 0);
 }
 
 function resultColumns(result: HarnessResult): Partial<typeof unitResults.$inferInsert> {
