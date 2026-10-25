@@ -41,6 +41,8 @@ export interface AnalysisEntry {
   harnessFailures: number;
   /** Summe aller Regelverstöße. */
   violations: number;
+  /** Bewertung gegen die neueste Gold-Version (Kategorien, Unit-Scores für Heatmap und Kategorie-Diagramm). */
+  evaluation: RunEvaluation;
 }
 
 export type CostPerUnit = { kind: "estimated"; usd: number } | { kind: "unknown"; reasons: string[] };
@@ -229,6 +231,7 @@ function toEntry(run: RunView, evaluation: RunEvaluation, prices: PriceTable): A
     formatErrors: evaluation.formatErrors,
     harnessFailures: evaluation.harnessFailures,
     violations: Object.values(evaluation.violations).reduce((sum, count) => sum + count, 0),
+    evaluation,
   };
 }
 
