@@ -332,6 +332,7 @@ function toUnitResultView(row: typeof unitResults.$inferSelect): UnitResultView 
           reasoningTokens: row.reasoningTokens,
         }
       : null,
+    tokensByModel: row.tokensByModel,
     webSearches: row.webSearches,
     effort:
       row.effortConfirmed === null ? null : { reported: row.effortReported, confirmed: row.effortConfirmed },

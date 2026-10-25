@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { HARNESSES, type HarnessErrorKind, type TokenUsage } from "@/server/harness/adapter";
+import {
+  HARNESSES,
+  type HarnessErrorKind,
+  type TokensByModel,
+  type TokenUsage,
+} from "@/server/harness/adapter";
 import type { PreflightResult } from "@/server/harness/preflight";
 import { MODES, RUN_KINDS, type RunKind } from "@/server/prompt/benchmark-prompt";
 import type { UnitAnswer } from "@/server/prompt/output-schema";
@@ -66,6 +71,8 @@ export interface UnitResultView {
   rawResponse: string | null;
   log: string | null;
   tokens: TokenUsage | null;
+  /** Tokens je Modell (`null`, wenn der Harness sie nicht getrennt meldet). */
+  tokensByModel: TokensByModel | null;
   webSearches: number | null;
   effort: { reported: string | null; confirmed: boolean } | null;
   nativeCostUsd: number | null;

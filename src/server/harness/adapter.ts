@@ -58,6 +58,12 @@ export interface TokenUsage {
   reasoningTokens: number | null;
 }
 
+/**
+ * Tokens je Modell-ID laut Harness, wenn ein Aufruf mehrere Modelle nutzt (Claude Code: `modelUsage`, etwa
+ * ein Hilfsmodell neben dem Hauptmodell). Die Summe steht zusätzlich in `tokens`.
+ */
+export type TokensByModel = Record<string, TokenUsage>;
+
 /** Fehlerarten eines Aufrufs; `invalid_json` und `schema_violation` sind Format-Fehler. */
 export const HARNESS_ERROR_KINDS = [
   "invalid_json",
@@ -82,6 +88,8 @@ export interface HarnessResult {
   log: string;
   /** `null`, wenn der Harness keine Tokens gemeldet hat. */
   tokens: TokenUsage | null;
+  /** Tokens je Modell (nur Harnesses, die sie getrennt melden); die Kostenschätzung bepreist sie einzeln. */
+  tokensByModel?: TokensByModel | null;
   /** Zahl der Websuchen; `null`, wenn unbekannt. */
   webSearches: number | null;
   /** Effort laut Harness; `confirmed` nur, wenn der Harness die angeforderte Stufe selbst gemeldet hat. */

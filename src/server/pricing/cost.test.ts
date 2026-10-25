@@ -161,6 +161,94 @@ describe("fehlender Preis → unbekannt", () => {
   });
 });
 
+describe("Modell laut Harness", () => {
+  const opus = { input: 5, cacheRead: 0.5, cacheWrite: 10, output: 25 };
+  const prices = table({
+    models: {
+      "claude-haiku-5-5": [{ validFrom: "2026-10-01", ...haiku }],
+      "claude-opus-5-5": [{ validFrom: "2026-10-01", ...opus }],
+      haiku: [],
+    },
+  });
+  const base = { harness: "claude_code", at: runDate, tokens: million, webSearches: 0 } as const;
+
+  test("ein Alias der Konfiguration wird über das gemeldete Modell bepreist", () => {
+    expect(estimateUnitCost({ ...base, model: "haiku", modelReported: "claude-haiku-5-5" }, prices)).toEqual({
+      kind: "estimated",
+      usd: 0.1,
+    });
+    expect(estimateUnitCost({ ...base, model: "haiku", modelReported: null }, prices)).toEqual({
+      kind: "unknown",
+      reason: "kein Preis für Modell haiku",
+    });
+  });
+
+  test("hat das gemeldete Modell keinen Preis, gilt der Preis des konfigurierten", () => {
+    expect(
+      estimateUnitCost({ ...base, model: "claude-opus-5-5", modelReported: "claude-opus-5-5-neu" }, prices),
+    ).toEqual({ kind: "estimated", usd: 5 });
+  });
+
+  test("Tokens mehrerer Modelle werden je Modell bepreist; fehlt ein Preis, ist die Unit unbekannt", () => {
+    const tokens = { ...million, inputTokens: 2_000_000 };
+    expect(
+      estimateUnitCost(
+        {
+          ...base,
+          model: "opus",
+          modelReported: "claude-opus-5-5",
+          tokens,
+          tokensByModel: { "claude-opus-5-5": million, "claude-haiku-5-5": million },
+        },
+        prices,
+      ),
+    ).toEqual({ kind: "estimated", usd: 5.1 });
+    expect(
+      estimateUnitCost(
+        {
+          ...base,
+          model: "opus",
+          modelReported: "claude-opus-5-5",
+          tokens,
+          tokensByModel: { "claude-opus-5-5": million, "claude-unbekannt-1": million },
+        },
+        prices,
+      ),
+    ).toEqual({ kind: "unknown", reason: "kein Preis für Modell claude-unbekannt-1" });
+  });
+
+  test("die Laufkosten bepreisen jede Unit nach ihrem gemeldeten Modell und ihren Modellanteilen", () => {
+    const costs = estimateRunCost(
+      {
+        configuration: { harness: "claude_code", model: "haiku" },
+        createdAt: runDate,
+        units: [
+          {
+            unitId: "a",
+            status: "done",
+            tokens: million,
+            webSearches: 0,
+            nativeCostUsd: null,
+            modelReported: "claude-haiku-5-5",
+          },
+          {
+            unitId: "b",
+            status: "done",
+            tokens: { ...million, inputTokens: 2_000_000 },
+            tokensByModel: { "claude-haiku-5-5": million, "claude-opus-5-5": million },
+            webSearches: 0,
+            nativeCostUsd: null,
+            modelReported: "claude-haiku-5-5",
+          },
+        ],
+      },
+      prices,
+    );
+    expect(costs.units.a).toEqual({ kind: "estimated", usd: 0.1 });
+    expect(costs.units.b).toEqual({ kind: "estimated", usd: 5.1 });
+  });
+});
+
 describe("Kosten eines Laufs", () => {
   const prices = table({
     models: { m: [{ validFrom: "2026-01-01", input: 1, cacheRead: 0.1, cacheWrite: null, output: 2 }] },

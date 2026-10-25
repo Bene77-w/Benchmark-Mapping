@@ -509,6 +509,46 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
     });
   });
 
+  test("Tokens je Modell werden über die Versuche summiert und gespeichert", async () => {
+    const db = await databaseWithSnapshot();
+    const usage = (input: number) => ({
+      inputTokens: input,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      outputTokens: 1,
+      reasoningTokens: null,
+    });
+    const responses = ["kein JSON", JSON.stringify(noMappingAnswer("house--ethics"))];
+    const adapter: HarnessAdapter = {
+      harness: "fake",
+      run: async (task) => ({
+        outcome: parseAnswerText(responses.shift() ?? "", task.unitId),
+        rawResponse: null,
+        log: "",
+        tokens: usage(30),
+        tokensByModel: { "modell-a": usage(10), "modell-b": usage(20) },
+        webSearches: 0,
+        effort: { reported: null, confirmed: false },
+        nativeCostUsd: null,
+        durationMs: 1,
+        exitCode: 0,
+        cliVersion: null,
+        modelReported: "modell-a",
+      }),
+    };
+    const { runId } = await createRun(db, { configuration: fakeConfiguration, unitIds: ["house--ethics"] });
+
+    await processNextRun(db, { adapters: { fake: adapter } });
+
+    const [unit] = (await getRun(db, runId))?.units ?? [];
+    expect(unit).toMatchObject({ status: "done", attempts: 2 });
+    expect(unit.tokens).toMatchObject({ inputTokens: 60, outputTokens: 2 });
+    expect(unit.tokensByModel).toEqual({
+      "modell-a": { ...usage(20), outputTokens: 2 },
+      "modell-b": { ...usage(40), outputTokens: 2 },
+    });
+  });
+
   test("antwortet der Harness nicht innerhalb des Timeouts, bricht der Runner ab, wiederholt einmal und meldet Timeout", async () => {
     const db = await databaseWithSnapshot();
     const root = await fakeScenario("langsam", {
