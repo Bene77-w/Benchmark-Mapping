@@ -190,7 +190,7 @@ export const PRICES: PriceTable = {
   webSearch: {},
 };
 
-const ALL: AnalysisFilters = { group: null, mode: null, effort: "all" };
+const ALL: AnalysisFilters = { group: null, mode: null, effort: "all", perConfiguration: "all" };
 
 export function analyse(specs: RunSpec[], filters: Partial<AnalysisFilters> = {}) {
   return buildAnalysis({ runs: specs.map(evaluated), prices: PRICES, filters: { ...ALL, ...filters } });

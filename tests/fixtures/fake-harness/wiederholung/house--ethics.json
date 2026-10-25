@@ -1,0 +1,50 @@
+{
+  "calls": [
+    {
+      "delayMs": 100,
+      "tokens": {
+        "input": 3900,
+        "cacheRead": 31000,
+        "cacheWrite": 0,
+        "output": 180,
+        "reasoning": 60
+      },
+      "webSearches": 0,
+      "nativeCostUsd": 0.0071,
+      "response": {
+        "unit_id": "house--ethics",
+        "decision": "no_mapping",
+        "no_mapping_reason": "Die Zustaendigkeit betrifft das Verhalten der Abgeordneten, keine Industry.",
+        "broad_scope_exception": false,
+        "broad_scope_reason": null,
+        "assignments": [],
+        "sources": [],
+        "label_uncertain": false,
+        "uncertainty_note": null
+      }
+    },
+    {
+      "delayMs": 100,
+      "tokens": {
+        "input": 3900,
+        "cacheRead": 31000,
+        "cacheWrite": 0,
+        "output": 180,
+        "reasoning": 60
+      },
+      "webSearches": 0,
+      "nativeCostUsd": 0.0071,
+      "response": {
+        "unit_id": "house--ethics",
+        "decision": "mapped",
+        "no_mapping_reason": null,
+        "broad_scope_exception": false,
+        "broad_scope_reason": null,
+        "assignments": [],
+        "sources": [],
+        "label_uncertain": false,
+        "uncertainty_note": null
+      }
+    }
+  ]
+}

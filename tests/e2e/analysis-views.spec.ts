@@ -3,8 +3,8 @@ import { runIds, startRun } from "./helpers";
 
 /**
  * Auswertung: Kategorie-Diagramm, Heatmap und Verlauf mit Fake-Läufen. `rangliste-a` liefert für
- * house--veterans-affairs--health einen Format-Fehler, `rangliste-b` mappt Ethics falsch. Die Worktree-Datenbank
- * sammelt Läufe früherer Durchläufe; geprüft wird über die eigenen Lauf-IDs und ein eindeutiges Effort.
+ * house--veterans-affairs--health einen Format-Fehler, `rangliste-b` mappt Ethics falsch. Parallele Specs legen in
+ * derselben Test-Datenbank weitere Läufe an; geprüft wird über die eigenen Lauf-IDs und ein eindeutiges Effort.
  */
 
 const FORMAT_ERROR_UNIT = "house--veterans-affairs--health";
@@ -24,10 +24,10 @@ test("Kategorien, Heatmap und Verlauf folgen den Filtern; Heatmap-Zellen führen
   const rows = page.getByTestId("leaderboard-row");
   await expect(rows.and(page.locator(`[data-run-id="${b}"]`))).toBeVisible();
 
-  // Heatmap: dieselben Läufe wie die Rangliste (je Konfiguration der neueste, a1 ist ersetzt).
+  // Heatmap: dieselben Läufe wie die Rangliste – standardmäßig alle, auch der wiederholte Lauf a1.
   const heatmapRows = page.getByTestId("heatmap-row");
   expect(await runIds(heatmapRows)).toEqual(await runIds(rows));
-  await expect(heatmapRows.and(page.locator(`[data-run-id="${a1}"]`))).toHaveCount(0);
+  await expect(heatmapRows.and(page.locator(`[data-run-id="${a1}"]`))).toHaveCount(1);
 
   // Format-Fehler erkennbar anders als bewertete Antworten (auch Score 0).
   const rowA2 = heatmapRows.and(page.locator(`[data-run-id="${a2}"]`));

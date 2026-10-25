@@ -7,14 +7,22 @@ export const EFFORT_FILTERS = ["all", "best"] as const;
 /** `all` = jede Effort-Stufe; `best` = je Harness und Modell nur die Stufe mit dem höchsten Score. */
 export type EffortFilter = (typeof EFFORT_FILTERS)[number];
 
+export const PER_CONFIGURATION_FILTERS = ["all", "latest", "best"] as const;
+/**
+ * Wiederholte Läufe einer Konfiguration: `all` = alle (Standard), `latest` = nur der neueste, `best` = nur der
+ * mit dem höchsten Score. Die beiden Einschränkungen schließen sich gegenseitig aus.
+ */
+export type PerConfigurationFilter = (typeof PER_CONFIGURATION_FILTERS)[number];
+
 /**
  * Filter der Auswertungsseite (Rangliste, Scatter-Plot und weitere Ansichten): vergleichbare Gruppe
- * (Prompt- und Snapshot-Hash), Modus und Effort. `null` = Standard wählen.
+ * (Prompt- und Snapshot-Hash), Modus, Effort und Auswahl je Konfiguration. `null` = Standard wählen.
  */
 export interface AnalysisFilters {
   group: string | null;
   mode: Mode | null;
   effort: EffortFilter;
+  perConfiguration: PerConfigurationFilter;
 }
 
 export interface AnalysisInput {
@@ -75,7 +83,10 @@ export interface Analysis {
   filters: AnalysisFilters;
   /** Modi mit auswertbaren Läufen in der gewählten Gruppe. */
   modes: Mode[];
-  /** Rangliste und Punkte des Scatter-Plots: dieselben Läufe, absteigend nach Score. */
+  /**
+   * Rangliste, Punkte des Scatter-Plots und Zeilen der Heatmap: dieselben Läufe, absteigend nach Score.
+   * Standardmäßig alle Läufe, auch wiederholte einer Konfiguration (siehe `PerConfigurationFilter`).
+   */
   entries: AnalysisEntry[];
   /**
    * Effizientester Bereich je x-Achse: Läufe, die kein anderer bei höchstens gleichem Aufwand im Score
@@ -84,7 +95,7 @@ export interface Analysis {
   efficient: Record<XAxis, number[]>;
   /**
    * Alle auswertbaren Läufe der gewählten Gruppe und des Modus, auch wiederholte Läufe einer Konfiguration
-   * (vor der Auswahl des neuesten), neueste zuerst; Grundlage des Verlaufs.
+   * (unabhängig von den Filtern Effort und je Konfiguration), neueste zuerst; Grundlage des Verlaufs.
    */
   scope: AnalysisEntry[];
 }
@@ -100,15 +111,24 @@ export function buildAnalysis(input: AnalysisInput): Analysis {
     input.filters.mode && modes.includes(input.filters.mode) ? input.filters.mode : (modes[0] ?? null);
   const inScope = inGroup.filter(({ run }) => run.configuration.mode === mode);
 
-  let selected = latestPerConfiguration(inScope);
-  if (input.filters.effort === "best") selected = bestPerModel(selected);
+  const { effort, perConfiguration } = input.filters;
+  // „Beste Stufe je Modell“ wählt aus allen Läufen (auch älteren Wiederholungen); sonst gilt die Auswahl je
+  // Konfiguration.
+  const selected =
+    effort === "best"
+      ? bestPerModel(inScope)
+      : perConfiguration === "latest"
+        ? latestPerConfiguration(inScope)
+        : perConfiguration === "best"
+          ? bestPerConfiguration(inScope)
+          : inScope;
   const scope = inScope.map(({ run, evaluation }) => toEntry(run, evaluation, input.prices));
   const selectedIds = new Set(selected.map(({ run }) => run.id));
   const entries = scope.filter((entry) => selectedIds.has(entry.runId)).sort(byScore);
   scope.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return {
     groups,
-    filters: { group: group?.key ?? null, mode, effort: input.filters.effort },
+    filters: { group: group?.key ?? null, mode, effort, perConfiguration },
     modes,
     entries,
     efficient: {
@@ -154,19 +174,19 @@ function pickPer(
   return [...picked.values()];
 }
 
-/** Wiederholte Läufe einer Konfiguration: in Rangliste und Scatter-Plot zählt der neueste. */
+function configurationKey(run: RunView): string {
+  const { harness, model, effort, mode } = run.configuration;
+  return JSON.stringify([harness, model, effort, mode]);
+}
+
+/** „Nur neueste je Konfiguration“: von wiederholten Läufen einer Konfiguration der neueste. */
 function latestPerConfiguration(runs: EvaluatedRunView[]): EvaluatedRunView[] {
-  return pickPer(
-    runs,
-    (run) =>
-      JSON.stringify([
-        run.configuration.harness,
-        run.configuration.model,
-        run.configuration.effort,
-        run.configuration.mode,
-      ]),
-    (a, b) => a.run.createdAt > b.run.createdAt,
-  );
+  return pickPer(runs, configurationKey, (a, b) => a.run.createdAt > b.run.createdAt);
+}
+
+/** „Nur beste je Konfiguration“: von wiederholten Läufen einer Konfiguration der mit dem höchsten Score. */
+function bestPerConfiguration(runs: EvaluatedRunView[]): EvaluatedRunView[] {
+  return pickPer(runs, configurationKey, (a, b) => byScore(scored(a), scored(b)) < 0);
 }
 
 /** „Beste Stufe je Modell“: je Harness und Modell der Lauf mit dem höchsten Score. */
@@ -262,11 +282,15 @@ export interface AnalysisState {
 type SearchParams = Record<string, string | string[] | undefined>;
 
 const EFFORT_PARAMS: Record<EffortFilter, string> = { all: "alle", best: "beste" };
+const PER_CONFIGURATION_PARAMS: Record<Exclude<PerConfigurationFilter, "all">, string> = {
+  latest: "neueste",
+  best: "beste",
+};
 const X_AXIS_PARAMS: Record<XAxis, string> = { cost: "kosten", tokens: "tokens", duration: "dauer" };
 
 /**
- * Liest den Zustand aus den Suchparametern (`gruppe`, `modus`, `effort`, `x`, `laeufe`, `verlauf`);
- * Unbekanntes wird zum Standard.
+ * Liest den Zustand aus den Suchparametern (`gruppe`, `modus`, `effort`, `je-konfiguration`, `x`, `laeufe`,
+ * `verlauf`); Unbekanntes wird zum Standard.
  */
 export function parseAnalysisParams(params: SearchParams): AnalysisState {
   const first = (name: string) => {
@@ -279,6 +303,7 @@ export function parseAnalysisParams(params: SearchParams): AnalysisState {
       group: first("gruppe") || null,
       mode: MODES.find((candidate) => candidate === mode) ?? null,
       effort: keyOf(EFFORT_PARAMS, first("effort")) ?? "all",
+      perConfiguration: keyOf(PER_CONFIGURATION_PARAMS, first("je-konfiguration")) ?? "all",
     },
     xAxis: keyOf(X_AXIS_PARAMS, first("x")) ?? "cost",
     categoryRuns: (first("laeufe") ?? "")
@@ -299,6 +324,8 @@ export function analysisSearch(state: AnalysisState): string {
   if (state.filters.group) params.set("gruppe", state.filters.group);
   if (state.filters.mode) params.set("modus", state.filters.mode);
   params.set("effort", EFFORT_PARAMS[state.filters.effort]);
+  const { perConfiguration } = state.filters;
+  if (perConfiguration !== "all") params.set("je-konfiguration", PER_CONFIGURATION_PARAMS[perConfiguration]);
   params.set("x", X_AXIS_PARAMS[state.xAxis]);
   if (state.categoryRuns.length > 0) params.set("laeufe", state.categoryRuns.join(","));
   if (state.historyConfiguration !== null) params.set("verlauf", String(state.historyConfiguration));
