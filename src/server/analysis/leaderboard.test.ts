@@ -144,13 +144,42 @@ describe("Filter Modus und Effort", () => {
     expect(nurWeb.entries.map((entry) => entry.runId)).toEqual([2]);
   });
 
-  test("zeigt je Konfiguration nur ihren neuesten Lauf", () => {
-    const entries = analyse([
-      { id: 1, score: 0.9, effort: "high", createdAt: "2026-10-20T10:00:00Z" },
-      { id: 2, score: 0.4, effort: "high", createdAt: "2026-10-22T10:00:00Z" },
-      { id: 3, score: 0.5, effort: "low", createdAt: "2026-10-21T10:00:00Z" },
-    ]).entries;
-    expect(entries.map((entry) => entry.runId)).toEqual([3, 2]);
+  // Wiederholte Läufe der Konfiguration (m, high): der ältere ist besser als der neuere.
+  const repeated: RunSpec[] = [
+    { id: 1, score: 0.9, effort: "high", createdAt: "2026-10-20T10:00:00Z" },
+    { id: 2, score: 0.4, effort: "high", createdAt: "2026-10-22T10:00:00Z" },
+    { id: 3, score: 0.5, effort: "low", createdAt: "2026-10-21T10:00:00Z" },
+  ];
+
+  test("zeigt standardmäßig alle Läufe, auch wiederholte derselben Konfiguration", () => {
+    const analysis = analyse(repeated);
+    expect(analysis.filters.perConfiguration).toBe("all");
+    expect(analysis.entries.map((entry) => entry.runId)).toEqual([1, 3, 2]);
+  });
+
+  test("„nur neueste je Konfiguration“ behält je Konfiguration den neuesten Lauf", () => {
+    const analysis = analyse(repeated, { perConfiguration: "latest" });
+    expect(analysis.filters.perConfiguration).toBe("latest");
+    expect(analysis.entries.map((entry) => entry.runId)).toEqual([3, 2]);
+    expect(analysis.efficient.tokens).toEqual([3]);
+  });
+
+  test("„nur beste je Konfiguration“ behält je Konfiguration den Lauf mit dem höchsten Score", () => {
+    const analysis = analyse(repeated, { perConfiguration: "best" });
+    expect(analysis.entries.map((entry) => entry.runId)).toEqual([1, 3]);
+  });
+
+  test("„beste Stufe je Modell“ betrachtet alle Läufe, auch ältere Wiederholungen", () => {
+    for (const perConfiguration of ["all", "latest", "best"] as const) {
+      const analysis = analyse(repeated, { effort: "best", perConfiguration });
+      expect(analysis.entries.map((entry) => entry.runId)).toEqual([1]);
+    }
+  });
+
+  test("der Verlauf umfasst unabhängig vom Umschalter alle Läufe des Modus", () => {
+    expect(analyse(repeated, { perConfiguration: "latest" }).scope.map((entry) => entry.runId)).toEqual([
+      2, 3, 1,
+    ]);
   });
 
   test("„beste Stufe je Modell“ behält je Harness und Modell die Effort-Stufe mit dem höchsten Score", () => {
@@ -208,23 +237,29 @@ describe("effizientester Bereich", () => {
 describe("Filter aus der Adresse", () => {
   test("liest Gruppe, Modus, Effort und x-Achse; Unbekanntes wird zum Standard", () => {
     expect(parseAnalysisParams({ gruppe: "abc", modus: "web", effort: "beste", x: "dauer" })).toEqual({
-      filters: { group: "abc", mode: "web", effort: "best" },
+      filters: { group: "abc", mode: "web", effort: "best", perConfiguration: "all" },
       xAxis: "duration",
       categoryRuns: [],
       historyConfiguration: null,
     });
     expect(parseAnalysisParams({ modus: "quatsch", effort: ["alle"], x: "tokens" })).toEqual({
-      filters: { group: null, mode: null, effort: "all" },
+      filters: { group: null, mode: null, effort: "all", perConfiguration: "all" },
       xAxis: "tokens",
       categoryRuns: [],
       historyConfiguration: null,
     });
     expect(parseAnalysisParams({})).toEqual({
-      filters: { group: null, mode: null, effort: "all" },
+      filters: { group: null, mode: null, effort: "all", perConfiguration: "all" },
       xAxis: "cost",
       categoryRuns: [],
       historyConfiguration: null,
     });
+  });
+
+  test("liest den Umschalter je Konfiguration; Unbekanntes heißt alle Läufe", () => {
+    expect(parseAnalysisParams({ "je-konfiguration": "neueste" }).filters.perConfiguration).toBe("latest");
+    expect(parseAnalysisParams({ "je-konfiguration": "beste" }).filters.perConfiguration).toBe("best");
+    expect(parseAnalysisParams({ "je-konfiguration": "quatsch" }).filters.perConfiguration).toBe("all");
   });
 
   test("liest die Läufe des Kategorie-Diagramms und die Konfiguration des Verlaufs; Unlesbares entfällt", () => {
@@ -240,7 +275,7 @@ describe("Filter aus der Adresse", () => {
 
   test("schreibt die Filter so in die Adresse, dass sie wieder gelesen werden", () => {
     const state = {
-      filters: { group: "abc", mode: "web", effort: "best" },
+      filters: { group: "abc", mode: "web", effort: "best", perConfiguration: "all" },
       xAxis: "tokens",
       categoryRuns: [],
       historyConfiguration: null,
@@ -253,5 +288,11 @@ describe("Filter aus der Adresse", () => {
     const viewSearch = analysisSearch(withViews);
     expect(viewSearch).toBe("gruppe=abc&modus=web&effort=beste&x=tokens&laeufe=7%2C3&verlauf=12");
     expect(parseAnalysisParams(Object.fromEntries(new URLSearchParams(viewSearch)))).toEqual(withViews);
+
+    // Der Umschalter steht nur in der Adresse, wenn er gesetzt ist (Standard: alle Läufe).
+    const latest = { ...state, filters: { ...state.filters, perConfiguration: "latest" } } as const;
+    const latestSearch = analysisSearch(latest);
+    expect(latestSearch).toBe("gruppe=abc&modus=web&effort=beste&je-konfiguration=neueste&x=tokens");
+    expect(parseAnalysisParams(Object.fromEntries(new URLSearchParams(latestSearch)))).toEqual(latest);
   });
 });

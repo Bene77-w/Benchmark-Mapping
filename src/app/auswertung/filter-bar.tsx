@@ -6,6 +6,7 @@ import {
   analysisSearch,
   EFFORT_FILTERS,
   type EffortFilter,
+  type PerConfigurationFilter,
   X_AXES,
 } from "@/server/analysis/leaderboard";
 import { MODES } from "@/server/prompt/benchmark-prompt";
@@ -15,6 +16,12 @@ import { X_AXIS_LABELS } from "./format";
 const EFFORT_LABELS: Record<EffortFilter, string> = {
   all: "alle Stufen",
   best: "beste Stufe je Modell",
+};
+
+/** Die beiden Umschalter für wiederholte Läufe; sie schließen sich aus, ohne beide gelten alle Läufe. */
+const PER_CONFIGURATION_LABELS: Record<Exclude<PerConfigurationFilter, "all">, string> = {
+  latest: "nur neueste je Konfiguration",
+  best: "nur beste je Konfiguration",
 };
 
 /** Adresse der Auswertungsseite mit geändertem Zustand; Filter bleiben beim Umschalten erhalten. */
@@ -76,6 +83,31 @@ export function FilterBar({ analysis, state }: { analysis: Analysis; state: Anal
             {EFFORT_LABELS[effort]}
           </FilterLink>
         ))}
+      </FilterGroup>
+      <FilterGroup label="Wiederholte Läufe">
+        {(["latest", "best"] as const).map((perConfiguration) => {
+          const active = state.filters.perConfiguration === perConfiguration;
+          const ignored = state.filters.effort === "best";
+          return (
+            <FilterLink
+              key={perConfiguration}
+              href={analysisHref(state, { perConfiguration: active ? "all" : perConfiguration })}
+              active={active}
+              disabled={ignored}
+              title={
+                ignored
+                  ? "„Beste Stufe je Modell“ wählt aus allen Läufen; der Umschalter wirkt dann nicht"
+                  : active
+                    ? "Klick zeigt wieder alle Läufe"
+                    : undefined
+              }
+              data-testid="per-configuration-toggle"
+              data-value={perConfiguration}
+            >
+              {PER_CONFIGURATION_LABELS[perConfiguration]}
+            </FilterLink>
+          );
+        })}
       </FilterGroup>
       <FilterGroup label="x-Achse">
         {X_AXES.map((xAxis) => (

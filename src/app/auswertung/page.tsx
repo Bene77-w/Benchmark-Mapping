@@ -78,8 +78,10 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
       <p className="max-w-3xl text-sm text-muted-foreground">
         Abgeschlossene Benchmark-Läufe, bewertet gegen{" "}
         <span data-testid="analysis-gold">{current.goldVersion}</span>. Verglichen werden nur Läufe mit
-        gleichem Prompt- und Snapshot-Hash und gleichem Modus; je Konfiguration zählt der neueste Lauf. Kosten{" "}
-        {ESTIMATE_NOTE}, pro Unit der Gold-Version.
+        gleichem Prompt- und Snapshot-Hash und gleichem Modus. Rangliste, Scatter-Plot und Heatmap zeigen alle
+        Läufe, auch wiederholte einer Konfiguration; die Umschalter „nur neueste“ und „nur beste je
+        Konfiguration“ beschränken sie auf einen Lauf je Konfiguration („beste Stufe je Modell“ wählt immer
+        aus allen Läufen). Kosten {ESTIMATE_NOTE}, pro Unit der Gold-Version.
         {current.incomplete.length > 0 && (
           <>
             {" "}
@@ -155,6 +157,8 @@ function CategorySelection({
   chart: CategoryChart;
 }) {
   const selected = chart.series.map((series) => series.runId);
+  // Wiederholte Läufe einer Konfiguration bekommen ihre Lauf-ID dazu, damit sie unterscheidbar bleiben.
+  const runsPerConfiguration = Map.groupBy(analysis.entries, (entry) => entry.configuration.id);
   return (
     <FilterGroup label={`Läufe (höchstens ${MAX_CATEGORY_RUNS})`}>
       {analysis.entries.map((entry) => {
@@ -181,6 +185,7 @@ function CategorySelection({
               />
             )}
             {entry.configuration.model} · {entry.configuration.effort}
+            {(runsPerConfiguration.get(entry.configuration.id)?.length ?? 0) > 1 && ` · #${entry.runId}`}
           </FilterLink>
         );
       })}

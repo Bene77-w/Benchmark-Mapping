@@ -138,7 +138,11 @@ export function buildScoreHistory(
 ): ScoreHistory {
   const runsOf = (configurationId: number) =>
     analysis.scope.filter((entry) => entry.configuration.id === configurationId);
-  const configurations = analysis.entries.map(({ configuration }) => ({
+  // Wiederholte Läufe einer Konfiguration stehen mehrfach in der Rangliste; wählbar ist jede einmal.
+  const unique = [
+    ...new Map(analysis.entries.map(({ configuration }) => [configuration.id, configuration])).values(),
+  ];
+  const configurations = unique.map((configuration) => ({
     configuration,
     runCount: runsOf(configuration.id).length,
   }));
