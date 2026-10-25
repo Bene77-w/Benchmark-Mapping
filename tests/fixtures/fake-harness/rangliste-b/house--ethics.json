@@ -1,0 +1,29 @@
+{
+  "delayMs": 100,
+  "tokens": {
+    "input": 3900,
+    "cacheRead": 31000,
+    "cacheWrite": 0,
+    "output": 180,
+    "reasoning": 60
+  },
+  "webSearches": 0,
+  "nativeCostUsd": 0.0071,
+  "response": {
+    "unit_id": "house--ethics",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "banks-regional",
+        "evidence_excerpt": "Committee on Ethics",
+        "rationale_short": "Falsche Zuordnung fuer den Ranglisten-Test."
+      }
+    ],
+    "sources": [],
+    "label_uncertain": false,
+    "uncertainty_note": null
+  }
+}
