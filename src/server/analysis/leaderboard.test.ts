@@ -142,9 +142,9 @@ function evaluated(spec: RunSpec): { run: RunView; evaluation: RunEvaluation } {
       named: [],
       deviations: { matchedPositive: [], missingPositive: [], namedAcceptable: [], namedWrong: [] },
       violations: [],
-      evidenceFidelity: null,
+      evidence: { checked: 0, verbatim: 0 },
     })),
-  } as RunEvaluation;
+  };
   return { run, evaluation };
 }
 
