@@ -130,6 +130,11 @@ export const runs = pgTable("runs", {
   outputSchemaHash: text("output_schema_hash").notNull(),
   parallelism: integer("parallelism").notNull(),
   timeoutMs: integer("timeout_ms").notNull(),
+  /**
+   * Gold-Version, deren Units der Lauf beim Start übernommen hat (`gold-v1`, …); `null` bei Vorschlagsläufen
+   * und Läufen von vor dieser Spalte. Bewertet wird trotzdem gegen die neueste Gold-Version.
+   */
+  goldVersion: text("gold_version"),
   /** Ergebnis des letzten Preflights vor der Ausführung (`null`, solange keiner lief oder der Adapter keinen hat). */
   preflight: jsonb("preflight").$type<PreflightResult>(),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

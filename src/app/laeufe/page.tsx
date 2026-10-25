@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
-import { getActiveGold } from "@/server/gold/active";
+import { getActiveGold, listStartableGold } from "@/server/gold/active";
 import { HARNESS_LABELS } from "@/server/harness/adapter";
 import { AVAILABLE_HARNESSES } from "@/server/harness/registry";
 import {
@@ -36,8 +36,9 @@ export default function RunsPage() {
 async function RunsContent() {
   await connection();
   const db = getDatabase();
-  const [gold, configurations, runs] = await Promise.all([
+  const [gold, startableGold, configurations, runs] = await Promise.all([
     getActiveGold(db),
+    listStartableGold(db),
     listConfigurations(db),
     listRuns(db),
   ]);
@@ -53,7 +54,9 @@ async function RunsContent() {
         <p className="text-sm text-muted-foreground">
           {gold ? (
             <>
-              Gold: <span data-testid="gold-version">{gold.version}</span> ({gold.units.length} Units).
+              Neueste Gold-Version: <span data-testid="gold-version">{gold.version}</span> (
+              {gold.units.length} Units); bewertet wird immer gegen sie, ein Lauf übernimmt die Units der
+              gewählten Gold-Version.
             </>
           ) : (
             <>Noch keine Gold-Version – Läufe brauchen eine abgeschlossene Gold-Review unter „Gold“.</>
@@ -76,6 +79,7 @@ async function RunsContent() {
             value: harness,
             label: HARNESS_LABELS[harness],
           }))}
+          goldVersions={startableGold}
           defaults={{
             parallelism: DEFAULT_PARALLELISM,
             timeoutMinutes: DEFAULT_TIMEOUT_MS / 60_000,

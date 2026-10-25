@@ -14,9 +14,12 @@ const selectClass = "h-8 rounded-lg border bg-background px-2 text-sm";
 
 export function NewRunForm({
   harnesses,
+  goldVersions,
   defaults,
 }: {
   harnesses: HarnessOption[];
+  /** Wählbare Gold-Versionen, neueste zuerst (vorausgewählt). */
+  goldVersions: { version: string; unitCount: number }[];
   defaults: { parallelism: number; timeoutMinutes: number; minParallelism: number; maxParallelism: number };
 }) {
   const [state, action, pending] = useActionState<StartRunState, FormData>(startRun, { error: null });
@@ -44,6 +47,16 @@ export function NewRunForm({
           <select name="mode" className={selectClass} defaultValue="text_only">
             <option value="text_only">nur Zuständigkeitstext</option>
             <option value="web">mit Websuche</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Gold-Version
+          <select name="goldVersion" className={selectClass} defaultValue={goldVersions[0]?.version}>
+            {goldVersions.map((gold) => (
+              <option key={gold.version} value={gold.version}>
+                {gold.version} ({gold.unitCount} Units)
+              </option>
+            ))}
           </select>
         </label>
         <Field id="run-parallelism" label="Parallelität">

@@ -132,6 +132,7 @@ export function evaluated(spec: RunSpec): { run: RunView; evaluation: RunEvaluat
     outputSchemaHash: "c".repeat(64),
     parallelism: 3,
     timeoutMs: 60_000,
+    goldVersion: "gold-test",
     preflight: null,
     createdAt,
     startedAt: createdAt,

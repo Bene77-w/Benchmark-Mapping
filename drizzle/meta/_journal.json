@@ -57,6 +57,13 @@
       "when": 1792851810579,
       "tag": "0007_gold_ausgangspunkt",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792945238819,
+      "tag": "0008_lauf_gold_version",
+      "breakpoints": true
     }
   ]
 }

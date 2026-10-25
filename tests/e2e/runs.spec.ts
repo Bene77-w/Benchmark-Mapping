@@ -15,6 +15,7 @@ async function startFakeRun(page: Page, scenario: string, parallelism: number): 
   await page.getByLabel("Modell").fill(scenario);
   await page.getByLabel("Effort").fill(effort);
   await page.getByLabel("Modus").selectOption("text_only");
+  await page.getByLabel("Gold-Version").selectOption("test-gold");
   await page.getByLabel("Parallelität").fill(String(parallelism));
   await page.getByLabel("Timeout pro Unit (Minuten)").fill("5");
   await page.getByRole("button", { name: "Lauf starten" }).click();
@@ -22,6 +23,7 @@ async function startFakeRun(page: Page, scenario: string, parallelism: number): 
   await expect(page).toHaveURL(/\/laeufe\/\d+$/);
   await expect(page.getByTestId("run-configuration")).toContainText(`Fake (Test) · ${scenario} · ${effort}`);
   await expect(page.getByTestId("progress-total")).toHaveText("5");
+  await expect(page.getByTestId("run-gold-version")).toHaveText("test-gold");
   return effort;
 }
 

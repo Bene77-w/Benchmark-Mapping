@@ -34,6 +34,8 @@ export const runRequestSchema = z.object({
   kind: z.enum(RUN_KINDS).default("benchmark"),
   parallelism: z.number().int().min(MIN_PARALLELISM).max(MAX_PARALLELISM).default(DEFAULT_PARALLELISM),
   timeoutMs: z.number().int().positive().default(DEFAULT_TIMEOUT_MS),
+  /** Gold-Version, aus der die Units stammen (am Lauf gespeichert); `null` bei Vorschlagsläufen. */
+  goldVersion: z.string().min(1).nullable().default(null),
   /** Units des Laufs; jede muss im aktuellen Snapshot vorkommen. */
   unitIds: z
     .array(z.string().min(1))
@@ -89,6 +91,8 @@ export interface RunSummary {
   outputSchemaHash: string;
   parallelism: number;
   timeoutMs: number;
+  /** Gold-Version, deren Units der Lauf beim Start übernommen hat; `null` bei Vorschlagsläufen. */
+  goldVersion: string | null;
   /** Ergebnis des Preflights vor der Ausführung; `null`, solange keiner lief. */
   preflight: PreflightResult | null;
   createdAt: Date;
