@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { analyse } from "./test-runs";
-import { buildHeatmap } from "./views";
+import { buildCategoryChart, buildHeatmap, MAX_CATEGORY_RUNS } from "./views";
 
 /**
  * Seam 2 – weitere Ansichten der Auswertung (Kategorien, Heatmap, Verlauf) aus derselben Aggregation wie
@@ -63,5 +63,50 @@ describe("Heatmap", () => {
 
   test("ohne Läufe ist die Heatmap leer", () => {
     expect(buildHeatmap([])).toEqual({ units: [], rows: [] });
+  });
+});
+
+describe("Score je Kategorie", () => {
+  const categorized = (id: number, score: number, scores: [number, number, number]) => ({
+    id,
+    model: `m${id}`,
+    score,
+    units: UNITS,
+    unitEvaluations: {
+      u1: { category: "f" as const, score: scores[0] },
+      u2: { category: "a" as const, score: scores[1] },
+      u3: { category: "a" as const, score: scores[2] },
+    },
+  });
+  const specs = [
+    categorized(1, 0.5, [0, 1, 0.5]),
+    categorized(2, 0.9, [1, 1, 0.7]),
+    categorized(3, 0.7, [0.4, 0.8, 0.9]),
+    categorized(4, 0.6, [0.2, 0.6, 1]),
+    categorized(5, 0.3, [0, 0.5, 0.4]),
+  ];
+
+  test("ohne Auswahl die drei besten Läufe der Rangliste; Kategorien des Golds in fester Reihenfolge", () => {
+    const chart = buildCategoryChart(analyse(specs).entries, []);
+    expect(chart.categories).toEqual([
+      { category: "a", unitCount: 2 },
+      { category: "f", unitCount: 1 },
+    ]);
+    expect(chart.series.map((series) => series.runId)).toEqual([2, 3, 4]);
+    expect(chart.series[0].scores).toEqual([0.85, 1]);
+    expect(chart.series[1].scores.map((score) => score?.toFixed(2))).toEqual(["0.85", "0.40"]);
+  });
+
+  test("zeigt die gewählten Läufe in der Reihenfolge der Auswahl; Unbekanntes und Überzähliges entfällt", () => {
+    const entries = analyse(specs).entries;
+    expect(buildCategoryChart(entries, [5, 1]).series.map((series) => series.runId)).toEqual([5, 1]);
+    expect(buildCategoryChart(entries, [99, 1, 1]).series.map((series) => series.runId)).toEqual([1]);
+    expect(MAX_CATEGORY_RUNS).toBe(4);
+    expect(buildCategoryChart(entries, [5, 4, 3, 2, 1]).series.map((series) => series.runId)).toEqual([
+      5, 4, 3, 2,
+    ]);
+    // Gewählte Läufe, die die Filter ausblenden: zurück zum Standard.
+    expect(buildCategoryChart(entries, [99]).series.map((series) => series.runId)).toEqual([2, 3, 4]);
+    expect(buildCategoryChart([], [1]).series).toEqual([]);
   });
 });
