@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
-import { analyse } from "./test-runs";
-import { buildCategoryChart, buildHeatmap, MAX_CATEGORY_RUNS } from "./views";
+import type { Analysis } from "./leaderboard";
+import { analyse, PROMPT_B } from "./test-runs";
+import { buildCategoryChart, buildHeatmap, buildScoreHistory, MAX_CATEGORY_RUNS } from "./views";
 
 /**
  * Seam 2 – weitere Ansichten der Auswertung (Kategorien, Heatmap, Verlauf) aus derselben Aggregation wie
@@ -108,5 +109,85 @@ describe("Score je Kategorie", () => {
     // Gewählte Läufe, die die Filter ausblenden: zurück zum Standard.
     expect(buildCategoryChart(entries, [99]).series.map((series) => series.runId)).toEqual([2, 3, 4]);
     expect(buildCategoryChart([], [1]).series).toEqual([]);
+  });
+});
+
+describe("Verlauf", () => {
+  // Konfiguration m/high: drei Läufe (einer in anderer Gruppe, einer im Modus mit Web), m/low und n/high: je einer.
+  const specs = [
+    { id: 1, model: "m", effort: "high", score: 0.5, createdAt: "2026-10-20T10:00:00Z" },
+    { id: 2, model: "m", effort: "high", score: 0.7, createdAt: "2026-10-22T10:00:00Z" },
+    { id: 3, model: "m", effort: "high", score: 0.6, createdAt: "2026-10-21T10:00:00Z" },
+    { id: 4, model: "m", effort: "low", score: 0.8, createdAt: "2026-10-21T12:00:00Z" },
+    { id: 5, model: "n", effort: "high", score: 0.4, createdAt: "2026-10-21T13:00:00Z" },
+    {
+      id: 6,
+      model: "m",
+      effort: "high",
+      score: 0.9,
+      createdAt: "2026-10-19T10:00:00Z",
+      promptHash: PROMPT_B,
+    },
+    {
+      id: 7,
+      model: "m",
+      effort: "high",
+      score: 0.9,
+      createdAt: "2026-10-18T10:00:00Z",
+      mode: "web" as const,
+    },
+  ];
+
+  function configurationId(analysis: Analysis, model: string, effort: string): number {
+    const entry = analysis.entries.find(
+      ({ configuration }) => configuration.model === model && configuration.effort === effort,
+    );
+    if (!entry) throw new Error(`keine Konfiguration ${model}/${effort}`);
+    return entry.configuration.id;
+  }
+
+  test("zeigt je Konfiguration alle Läufe der Gruppe und des Modus nach Datum, nicht nur den neuesten", () => {
+    const analysis = analyse(specs);
+    const mHigh = configurationId(analysis, "m", "high");
+    const history = buildScoreHistory(analysis, mHigh);
+    expect(history.configuration?.id).toBe(mHigh);
+    expect(history.points.map((point) => [point.runId, point.score])).toEqual([
+      [1, 0.5],
+      [3, 0.6],
+      [2, 0.7],
+    ]);
+    expect(history.points[0]).toMatchObject({
+      createdAt: new Date("2026-10-20T10:00:00Z"),
+      interval: { low: 0.4, high: 0.6 },
+    });
+  });
+
+  test("wählbar sind die Konfigurationen der Rangliste; ohne gültige Auswahl die des besten Laufs", () => {
+    const analysis = analyse(specs);
+    const history = buildScoreHistory(analysis, null);
+    expect(history.configurations.map((item) => [item.configuration.effort, item.runCount])).toEqual([
+      ["low", 1],
+      ["high", 3],
+      ["high", 1],
+    ]);
+    expect(history.configuration).toMatchObject({ model: "m", effort: "low" });
+    expect(history.points.map((point) => point.runId)).toEqual([4]);
+    expect(buildScoreHistory(analysis, 999).configuration).toMatchObject({ effort: "low" });
+
+    // „beste Stufe je Modell“: m/high steht nicht in der Rangliste und ist nicht wählbar.
+    const best = buildScoreHistory(
+      analyse(specs, { effort: "best" }),
+      configurationId(analysis, "m", "high"),
+    );
+    expect(best.configurations.map((item) => item.configuration.model)).toEqual(["m", "n"]);
+    expect(best.configuration).toMatchObject({ model: "m", effort: "low" });
+  });
+
+  test("ohne Läufe gibt es keinen Verlauf", () => {
+    expect(buildScoreHistory(analyse([]), null)).toEqual({
+      configurations: [],
+      configuration: null,
+      points: [],
+    });
   });
 });

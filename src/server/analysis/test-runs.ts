@@ -93,6 +93,20 @@ function unitResult(spec: UnitSpec): UnitResultView {
   };
 }
 
+const configurationIds = new Map<string, number>();
+
+/** Wie in der Datenbank: eine Konfiguration (und ID) je Harness, Modell, Effort und Modus. */
+function configuration(
+  harness: RunView["configuration"]["harness"],
+  model: string,
+  effort: string,
+  mode: Mode,
+) {
+  const key = JSON.stringify([harness, model, effort, mode]);
+  if (!configurationIds.has(key)) configurationIds.set(key, configurationIds.size + 1);
+  return { id: configurationIds.get(key) ?? 0, harness, model, effort, mode };
+}
+
 export function evaluated(spec: RunSpec): { run: RunView; evaluation: RunEvaluation } {
   const units = spec.units ?? DEFAULT_UNITS;
   const mode = spec.mode ?? "text_only";
@@ -108,13 +122,7 @@ export function evaluated(spec: RunSpec): { run: RunView; evaluation: RunEvaluat
     kind: "benchmark",
     status: "completed",
     error: null,
-    configuration: {
-      id: spec.id * 10,
-      harness: spec.harness ?? "fake",
-      model: spec.model ?? "m",
-      effort: spec.effort ?? "high",
-      mode,
-    },
+    configuration: configuration(spec.harness ?? "fake", spec.model ?? "m", spec.effort ?? "high", mode),
     snapshotId: 1,
     snapshotHash: spec.snapshotHash ?? SNAPSHOT_A,
     promptVersion: "prompt-v1",

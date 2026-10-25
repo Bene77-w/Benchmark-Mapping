@@ -1,7 +1,7 @@
 import type { HarnessErrorKind } from "@/server/harness/adapter";
 import type { ConfigurationView } from "@/server/runs/model";
 import { CATEGORIES, type Category } from "@/server/scoring/model";
-import type { AnalysisEntry } from "./leaderboard";
+import type { Analysis, AnalysisEntry } from "./leaderboard";
 
 /**
  * Weitere Ansichten der Auswertung (Kategorie-Diagramm, Heatmap, Verlauf). Sie bauen auf `buildAnalysis` auf
@@ -111,4 +111,45 @@ export function buildCategoryChart(entries: AnalysisEntry[], requested: number[]
     };
   });
   return { categories, series };
+}
+
+export interface ScoreHistoryPoint {
+  runId: number;
+  createdAt: Date;
+  score: number;
+  interval: { low: number; high: number } | null;
+}
+
+export interface ScoreHistory {
+  /** Wählbar: die Konfigurationen der Rangliste in deren Reihenfolge, mit der Zahl ihrer Läufe. */
+  configurations: { configuration: ConfigurationView; runCount: number }[];
+  configuration: ConfigurationView | null;
+  /** Alle auswertbaren Läufe der Konfiguration (gleiche Gruppe und Modus), ältester zuerst. */
+  points: ScoreHistoryPoint[];
+}
+
+/**
+ * Verlauf des Scores einer Konfiguration über das Laufdatum. Ohne gültige Auswahl die Konfiguration des
+ * besten Laufs der Rangliste.
+ */
+export function buildScoreHistory(
+  analysis: Pick<Analysis, "entries" | "scope">,
+  requestedConfigurationId: number | null,
+): ScoreHistory {
+  const runsOf = (configurationId: number) =>
+    analysis.scope.filter((entry) => entry.configuration.id === configurationId);
+  const configurations = analysis.entries.map(({ configuration }) => ({
+    configuration,
+    runCount: runsOf(configuration.id).length,
+  }));
+  const configuration =
+    configurations.find((item) => item.configuration.id === requestedConfigurationId)?.configuration ??
+    configurations[0]?.configuration ??
+    null;
+  const points = configuration
+    ? runsOf(configuration.id)
+        .map(({ runId, createdAt, score, interval }) => ({ runId, createdAt, score, interval }))
+        .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+    : [];
+  return { configurations, configuration, points };
 }
