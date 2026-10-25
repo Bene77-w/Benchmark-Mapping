@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { e2eDatabaseUrl } from "./src/server/db/url";
+import { databaseUrl, e2eDatabaseUrl } from "./src/server/db/url";
 
 // GUI-Tests in einer eigenen Umgebung: eigene Datenbank (`benchmark_e2e`, bei jedem Aufruf leer neu angelegt),
 // eigener Dev-Server auf E2E_APP_PORT (eigenes Build-Verzeichnis `.next-e2e`) und eigener Worker (führt die
@@ -13,6 +13,8 @@ if (process.env.APP_PORT && Number(process.env.APP_PORT) === port) {
 const baseURL = `http://127.0.0.1:${port}`;
 const env = {
   DATABASE_URL: e2eDatabaseUrl(process.env),
+  // Datenbank der App: `pnpm e2e:reset-db` prüft vor dem Löschen erneut, dass es nicht diese ist.
+  APP_DATABASE_URL: databaseUrl(process.env),
   APP_PORT: String(port),
   NEXT_DIST_DIR: ".next-e2e",
   TEST_GOLD_PATH: "tests/fixtures/test-gold.json",
