@@ -18,7 +18,12 @@ import {
   readOpencodeStream,
 } from "./opencode-output";
 import { opencodePreflight } from "./opencode-preflight";
-import { OPENCODE_COMMAND, type OpencodeCallResult, runOpencodeCall } from "./opencode-sandbox";
+import {
+  MISSING_FORMAT_INSTRUCTION,
+  OPENCODE_COMMAND,
+  type OpencodeCallResult,
+  runOpencodeCall,
+} from "./opencode-sandbox";
 
 /**
  * OpenCode-Adapter: schickt eine Unit isoliert an `opencode run` (Aufruf und Konfiguration:
@@ -73,8 +78,12 @@ export function createOpencodeAdapter(options: OpencodeAdapterOptions = {}): Har
   };
   return {
     harness: "opencode",
+    inlinesOutputSchema: true,
     async run(task) {
-      if (task.mode === "web" && !resolved.websearchProvider) return noSearchProvider(task);
+      if (!task.formatInstruction) return notStarted(task, MISSING_FORMAT_INSTRUCTION);
+      if (task.mode === "web" && !resolved.websearchProvider) {
+        return notStarted(task, `Modus mit Web nicht möglich: ${NO_SEARCH_PROVIDER}`);
+      }
       const call = await runOpencodeCall(task, resolved);
       return toResult(task, call, await cliVersion());
     },
@@ -109,11 +118,11 @@ export async function opencodeVersion(
 export const NO_SEARCH_PROVIDER =
   "kein Suchanbieter eingerichtet: OPENCODE_WEBSEARCH_PROVIDER setzen (exa, firecrawl, parallel, tavily, tinyfish oder random)";
 
-function noSearchProvider(task: HarnessTask): HarnessResult {
+function notStarted(task: HarnessTask, message: string): HarnessResult {
   return {
-    outcome: { kind: "harness_error", message: `Modus mit Web nicht möglich: ${NO_SEARCH_PROVIDER}` },
+    outcome: { kind: "harness_error", message },
     rawResponse: null,
-    log: `Nicht gestartet: ${NO_SEARCH_PROVIDER} (Unit ${task.unitId})`,
+    log: `Nicht gestartet: ${message} (Unit ${task.unitId})`,
     tokens: null,
     webSearches: null,
     effort: { reported: null, confirmed: false },

@@ -285,6 +285,55 @@ describe("Lauf mit Fake-Harness", { timeout: 30_000 }, () => {
   });
 });
 
+describe("Harness ohne Schema-Option (OpenCode)", { timeout: 30_000 }, () => {
+  /** Fake unter `opencode`, der wie der OpenCode-Adapter das Schema im System-Prompt mitschickt. */
+  function inliningAdapter(seen: HarnessTask[]): HarnessAdapter {
+    const fake = createFakeAdapter();
+    return {
+      harness: "opencode",
+      inlinesOutputSchema: true,
+      run: (task) => {
+        seen.push(task);
+        return fake.run(task);
+      },
+    };
+  }
+  const opencodeConfiguration = { ...fakeConfiguration, harness: "opencode" } as const;
+
+  test("bekommt den Formatierungsauftrag; der Unit-Hash deckt ihn ab, der Prompt-Hash nicht", async () => {
+    const db = await databaseWithSnapshot();
+    const prompt = await buildBenchmarkPrompt(snapshot, { runKind: "benchmark", mode: "text_only" });
+    const changedRoot = await mkdtemp(path.join(tmpdir(), "prompts-"));
+    await cp(path.join(PROMPT_ROOT, PROMPT_VERSION), path.join(changedRoot, PROMPT_VERSION), {
+      recursive: true,
+    });
+    await writeFile(
+      path.join(changedRoot, PROMPT_VERSION, "format-instruction.md"),
+      "## Ausgabeformat\n\nNur JSON, sonst nichts.\n",
+    );
+
+    const seen: HarnessTask[] = [];
+    const first = await createRun(db, { configuration: opencodeConfiguration, unitIds: ["house--ethics"] });
+    await processNextRun(db, { adapters: { opencode: inliningAdapter(seen) } });
+    const second = await createRun(db, { configuration: opencodeConfiguration, unitIds: ["house--ethics"] });
+    await processNextRun(db, { adapters: { opencode: inliningAdapter(seen) }, promptRoot: changedRoot });
+
+    expect(seen.map((task) => task.formatInstruction)).toEqual([
+      prompt.formatInstruction,
+      "## Ausgabeformat\n\nNur JSON, sonst nichts.",
+    ]);
+    const [firstRun, secondRun] = await Promise.all([getRun(db, first.runId), getRun(db, second.runId)]);
+    expect(firstRun?.status).toBe("completed");
+    expect(secondRun?.status).toBe("completed");
+    expect(secondRun?.promptHash).toBe(firstRun?.promptHash);
+    expect(firstRun?.units[0].unitPromptHash).toBe(
+      prompt.forUnit("house--ethics", { inlineSchema: true }).unitPromptHash,
+    );
+    expect(firstRun?.units[0].unitPromptHash).not.toBe(prompt.forUnit("house--ethics").unitPromptHash);
+    expect(secondRun?.units[0].unitPromptHash).not.toBe(firstRun?.units[0].unitPromptHash);
+  });
+});
+
 describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
   test("Timeout, ungültiges JSON oder Schemaverstoß lösen genau einen Wiederholversuch aus; gelingt er, zählt seine Antwort", async () => {
     const db = await databaseWithSnapshot();

@@ -2,10 +2,13 @@ import { existsSync } from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
+import { withInlineSchema } from "@/server/prompt/benchmark-prompt";
 import type { HarnessTask } from "./adapter";
 import { cliOutcome } from "./cli-fixture";
 import { createOpencodeAdapter } from "./opencode";
 import { opencodeFixture, opencodeFixtureRunner } from "./opencode-fixture";
+
+const FORMAT = "## Format\n\nNur JSON.";
 
 /**
  * Seam 3: der OpenCode-Adapter gegen aufgezeichnete echte Ausgaben (tests/fixtures/harness/opencode): Stream
@@ -24,6 +27,7 @@ async function runFixture(name: string, overrides: Partial<HarnessTask> = {}, en
     systemPrompt: "System",
     userPrompt: "User",
     outputSchema: { type: "object" },
+    formatInstruction: FORMAT,
     model: fixture.meta.task.model,
     effort: fixture.meta.task.effort,
     mode: fixture.meta.task.mode as HarnessTask["mode"],
@@ -213,7 +217,12 @@ describe("OpenCode-Adapter: Isolation und Sitzung", () => {
       },
     });
     const result = await adapter.run(
-      task({ systemPrompt: "Vertrag", userPrompt: "Daten der Unit", effort: "high" }),
+      task({
+        systemPrompt: "Vertrag",
+        userPrompt: "Daten der Unit",
+        effort: "high",
+        formatInstruction: "## Ausgabeformat\n\nNur ein JSON-Objekt.",
+      }),
     );
 
     const [call] = replay.runs;
@@ -250,8 +259,10 @@ describe("OpenCode-Adapter: Isolation und Sitzung", () => {
     expect(config.websearch).toBe(false);
     expect(config.permissions).toEqual([{ action: "*", resource: "*", effect: "deny" }]);
     const agent = (config.agents as Record<string, { system: string; permissions: unknown }>).benchmark;
-    expect(agent.system.startsWith("Vertrag\n\n## Ausgabeformat")).toBe(true);
-    expect(agent.system).toContain('{"type":"object"}');
+    // Der versionierte Formatierungsauftrag der Aufgabe, so wie ihn auch der Unit-Hash abdeckt.
+    expect(agent.system).toBe(
+      withInlineSchema("Vertrag", "## Ausgabeformat\n\nNur ein JSON-Objekt.", { type: "object" }),
+    );
     expect(agent.permissions).toEqual(config.permissions);
     // Sitzung exportiert und gelöscht, alles Temporäre weg.
     expect(sessionCalls(replay)).toEqual([
@@ -260,6 +271,18 @@ describe("OpenCode-Adapter: Isolation und Sitzung", () => {
     ]);
     expect(result.log).toContain("Sitzung ses_000000 gelöscht");
     expect(existsSync(path.dirname(call.cwd))).toBe(false);
+  });
+
+  test("ohne Formatierungsauftrag startet kein Aufruf (der Unit-Hash träfe den gesendeten Text nicht)", async () => {
+    const replay = opencodeFixtureRunner([]);
+    const adapter = createOpencodeAdapter({ runCli: replay, env: {} });
+    const result = await adapter.run(task({ formatInstruction: undefined }));
+    expect(result.outcome.kind).toBe("harness_error");
+    expect(replay.runs).toEqual([]);
+  });
+
+  test("schickt das Ausgabeschema im System-Prompt mit und sagt das dem Runner", () => {
+    expect(createOpencodeAdapter({ env: {} }).inlinesOutputSchema).toBe(true);
   });
 
   test("im Modus mit Web ist nur websearch erlaubt", async () => {
@@ -301,6 +324,7 @@ function task(overrides: Partial<HarnessTask> = {}): HarnessTask {
     systemPrompt: "System",
     userPrompt: "User",
     outputSchema: { type: "object" },
+    formatInstruction: FORMAT,
     model: "deepseek/deepseek-flash",
     effort: "default",
     mode: "text_only",

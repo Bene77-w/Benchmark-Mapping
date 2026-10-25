@@ -212,7 +212,9 @@ const RETRYABLE = new Set<HarnessResult["outcome"]["kind"]>(["timeout", "invalid
  */
 async function runUnit(context: RunContext, unitId: string): Promise<void> {
   const { db, runId, claimId, prompt, rateLimit } = context;
-  const unitPrompt = prompt.forUnit(unitId);
+  // Harnesses ohne Schema-Option bekommen Formatierungsauftrag und Schema im System-Prompt; der Unit-Hash
+  // deckt dann genau diesen Text ab.
+  const unitPrompt = prompt.forUnit(unitId, { inlineSchema: context.adapter.inlinesOutputSchema });
   // Jedes Schreiben nur, solange dieser Worker den Lauf hält (gleiche claimId): hat ein anderer Worker den
   // Lauf übernommen, verfallen späte Ergebnisse und Statuswechsel, auch während er die Unit selbst ausführt.
   const owned = and(
@@ -233,6 +235,7 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
     systemPrompt: unitPrompt.systemPrompt,
     userPrompt: unitPrompt.userPrompt,
     outputSchema: prompt.outputSchema,
+    formatInstruction: prompt.formatInstruction,
   };
   const attempts: HarnessResult[] = [];
   /**
