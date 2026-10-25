@@ -82,6 +82,11 @@ export interface Analysis {
    * übertrifft (Pareto-Front), aufsteigend nach Aufwand. Läufe mit unbekanntem Wert gehören nie dazu.
    */
   efficient: Record<XAxis, number[]>;
+  /**
+   * Alle auswertbaren Läufe der gewählten Gruppe und des Modus, auch wiederholte Läufe einer Konfiguration
+   * (vor der Auswahl des neuesten), neueste zuerst; Grundlage des Verlaufs.
+   */
+  scope: AnalysisEntry[];
 }
 
 type EvaluatedRunView = AnalysisInput["runs"][number];
@@ -97,8 +102,10 @@ export function buildAnalysis(input: AnalysisInput): Analysis {
 
   let selected = latestPerConfiguration(inScope);
   if (input.filters.effort === "best") selected = bestPerModel(selected);
-  const entries = selected.map(({ run, evaluation }) => toEntry(run, evaluation, input.prices));
-  entries.sort(byScore);
+  const scope = inScope.map(({ run, evaluation }) => toEntry(run, evaluation, input.prices));
+  const selectedIds = new Set(selected.map(({ run }) => run.id));
+  const entries = scope.filter((entry) => selectedIds.has(entry.runId)).sort(byScore);
+  scope.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return {
     groups,
     filters: { group: group?.key ?? null, mode, effort: input.filters.effort },
@@ -109,6 +116,7 @@ export function buildAnalysis(input: AnalysisInput): Analysis {
       tokens: paretoFront(entries, "tokens"),
       duration: paretoFront(entries, "duration"),
     },
+    scope,
   };
 }
 
