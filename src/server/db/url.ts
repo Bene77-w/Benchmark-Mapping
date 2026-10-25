@@ -1,8 +1,10 @@
+type Environment = Readonly<Record<string, string | undefined>>;
+
 /**
  * Verbindungs-URL der lokalen Datenbank: `DATABASE_URL` oder der Container aus docker-compose.yml
  * auf `127.0.0.1:${DB_PORT:-5432}` (Compose veröffentlicht den Port nur auf der Loopback-Adresse).
  */
-export function databaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+export function databaseUrl(env: Environment = process.env): string {
   return env.DATABASE_URL ?? `postgres://benchmark:benchmark@127.0.0.1:${env.DB_PORT ?? "5432"}/benchmark`;
 }
 
@@ -14,7 +16,7 @@ export const E2E_DATABASE_SUFFIX = "_e2e";
  * `127.0.0.1:${E2E_DB_PORT:-DB_PORT:-5432}`. Bricht ab, wenn das keine Test-Datenbank ist oder die
  * Datenbank der App wäre — die Tests verwerfen Entwürfe und legen Gold-Versionen an.
  */
-export function e2eDatabaseUrl(env: NodeJS.ProcessEnv = process.env): string {
+export function e2eDatabaseUrl(env: Environment = process.env): string {
   const url =
     env.E2E_DATABASE_URL ??
     `postgres://benchmark:benchmark@127.0.0.1:${env.E2E_DB_PORT ?? env.DB_PORT ?? "5432"}/benchmark${E2E_DATABASE_SUFFIX}`;
