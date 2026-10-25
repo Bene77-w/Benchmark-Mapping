@@ -13,7 +13,8 @@ import { runPreflight } from "./preflight";
  * Das Szenario ist das Modell der Konfiguration (z. B. Modell `standard` → `<root>/standard/`). Eine Datei
  * beschreibt einen Aufruf (siehe `fakeScenarioSchema`): entweder eine Antwort (`response`; ein Objekt wird
  * als JSON gesendet, ein String wörtlich – so entstehen auch Format-Fehler) oder ein simulierter Fehler
- * (`simulate`: timeout, rate_limit, harness_error), dazu Tokens, Websuchen, native Kosten und Wartezeit.
+ * (`simulate`: timeout, rate_limit, harness_error), dazu Tokens, Websuchen, native Kosten, Vermerke und
+ * Wartezeit.
  * Statt eines Aufrufs kann die Datei eine Folge `{ "calls": [...] }` enthalten: der n-te Aufruf derselben
  * Unit im selben Szenario bekommt den n-ten Eintrag, danach immer den letzten (z. B. Fehler, dann Antwort).
  */
@@ -37,6 +38,8 @@ export const fakeScenarioSchema = z
     tokens: tokensSchema.optional(),
     webSearches: z.number().int().nonnegative().default(0),
     nativeCostUsd: z.number().nonnegative().nullable().default(null),
+    /** Vermerke des Aufrufs (z. B. eine simulierte, nicht gelöschte Sitzung). */
+    warnings: z.array(z.string()).default([]),
     /** Simulierte Dauer des Aufrufs. */
     delayMs: z.number().int().nonnegative().default(0),
   })
@@ -102,6 +105,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
             }
           : null,
         webSearches: scenario.webSearches,
+        warnings: scenario.warnings,
         effort: { reported: task.effort, confirmed: true },
         nativeCostUsd: scenario.nativeCostUsd,
         durationMs: Date.now() - started,

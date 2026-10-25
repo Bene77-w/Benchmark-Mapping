@@ -74,6 +74,8 @@ export interface UnitResultView {
   /** Tokens je Modell (`null`, wenn der Harness sie nicht getrennt meldet). */
   tokensByModel: TokensByModel | null;
   webSearches: number | null;
+  /** Vermerke aller Versuche (leer, wenn es keine gab). */
+  warnings: string[];
   effort: { reported: string | null; confirmed: boolean } | null;
   nativeCostUsd: number | null;
   durationMs: number | null;

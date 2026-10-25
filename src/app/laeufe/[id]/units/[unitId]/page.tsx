@@ -5,6 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { getActiveGold } from "@/server/gold/active";
+import { type CostEstimate, estimateRunCost } from "@/server/pricing/cost";
+import { formatUsd } from "@/server/pricing/format";
+import { getPriceTable } from "@/server/pricing/store";
 import type { UnitResultView } from "@/server/runs/model";
 import { getRun } from "@/server/runs/store";
 import type { GoldUnit, UnitEvaluation, Violation } from "@/server/scoring/model";
@@ -22,6 +25,7 @@ import {
   UNIT_STATUS_LABELS,
   VIOLATION_LABELS,
 } from "../../../labels";
+import { ESTIMATE_NOTE, nativeCostLabel } from "../../costs";
 
 export const metadata = { title: "Unit-Ergebnis – Benchmark-Mapping" };
 
@@ -42,10 +46,13 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
   const result = run?.units.find((unit) => unit.unitId === unitId);
   if (!run || !result) notFound();
   const gold = await getActiveGold(db);
-  const [evaluation, snapshot] = await Promise.all([
+  const [evaluation, snapshot, prices] = await Promise.all([
     gold ? ensureEvaluation(db, run.id, gold) : null,
     getSnapshotContent(db, run.snapshotId),
+    getPriceTable(db),
   ]);
+  // Wie auf der Lauf-Seite: Schätzung über den ganzen Lauf, davon diese Unit.
+  const cost = estimateRunCost(run, prices).units[unitId] ?? null;
   const source = snapshot?.units.find((unit) => unit.unitId === unitId);
   if (!snapshot || !source) notFound();
   const industries = new Map(snapshot.industries.map((industry) => [industry.industryId, industry]));
@@ -91,6 +98,24 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
           )}
         </dd>
       </dl>
+
+      {result.warnings.length > 0 && (
+        <Section title="Vermerke">
+          <ul
+            className="list-disc space-y-1 pl-5 text-sm text-amber-700 dark:text-amber-400"
+            data-testid="unit-detail-warnings"
+          >
+            {result.warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">Das Ergebnis der Unit bleibt gültig.</p>
+        </Section>
+      )}
+
+      <Section title="Kosten">
+        <UnitCosts cost={cost} result={result} model={run.configuration.model} />
+      </Section>
 
       <Section title="Antwort">
         <AnswerView result={result} scored={scored} goldUnit={goldUnit} industries={industries} mode={mode} />
@@ -313,6 +338,41 @@ function ViolationList({ violations }: { violations: Violation[] }) {
   );
 }
 
+function UnitCosts({
+  cost,
+  result,
+  model,
+}: {
+  cost: CostEstimate | null;
+  result: UnitResultView;
+  model: string;
+}) {
+  return (
+    <dl className="flex flex-wrap gap-x-10 gap-y-3 text-sm" data-testid="unit-detail-costs">
+      <div>
+        <dt className="text-muted-foreground">Geschätzte Kosten ({ESTIMATE_NOTE})</dt>
+        <dd className="text-xl font-semibold" data-testid="unit-detail-cost-estimated">
+          {cost === null ? "–" : cost.kind === "estimated" ? formatUsd(cost.usd) : "unbekannt"}
+        </dd>
+        {cost?.kind === "unknown" && (
+          <dd className="text-muted-foreground" data-testid="unit-detail-cost-unknown">
+            {cost.reason}.{" "}
+            <Link href={`/modelle?${new URLSearchParams({ modell: model })}`} className="underline">
+              Preis pflegen
+            </Link>
+          </dd>
+        )}
+      </div>
+      <div>
+        <dt className="text-muted-foreground">Native Kosten laut Harness (Gegenprobe)</dt>
+        <dd className="text-xl font-semibold" data-testid="unit-detail-cost-native">
+          {nativeCostLabel(result)}
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
 function Metadata({ result }: { result: UnitResultView }) {
   const rows: [string, string][] = [
     ["Modell laut Harness", result.modelReported ?? "–"],
@@ -329,8 +389,13 @@ function Metadata({ result }: { result: UnitResultView }) {
         ? `${result.tokens.inputTokens} / ${result.tokens.cacheReadTokens} / ${result.tokens.cacheWriteTokens} / ${result.tokens.outputTokens} / ${result.tokens.reasoningTokens ?? "–"}`
         : missingMeasurementLabel(result),
     ],
+    ...(result.tokensByModel
+      ? Object.entries(result.tokensByModel).map(([model, tokens]): [string, string] => [
+          `Tokens ${model}`,
+          `${tokens.inputTokens} / ${tokens.cacheReadTokens} / ${tokens.cacheWriteTokens} / ${tokens.outputTokens} / ${tokens.reasoningTokens ?? "–"}`,
+        ])
+      : []),
     ["Websuchen", result.webSearches === null ? missingMeasurementLabel(result) : String(result.webSearches)],
-    ["Native Kosten", result.nativeCostUsd === null ? "–" : `${result.nativeCostUsd} USD`],
     ["Dauer", result.durationMs === null ? "–" : `${(result.durationMs / 1000).toFixed(1)} s`],
     ["Exit-Code", result.exitCode === null ? "–" : String(result.exitCode)],
     ["Gestartet / beendet", `${formatDateTime(result.startedAt)} / ${formatDateTime(result.finishedAt)}`],

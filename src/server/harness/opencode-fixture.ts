@@ -29,8 +29,8 @@ export interface OpencodeReplayOptions {
   version?: string;
   /** Integrationen für `auth list --format json` (nur IDs). */
   integrations?: string[];
-  /** Ergebnis von `session delete`. */
-  deleteOutcome?: CliOutcome;
+  /** Ergebnis von `session delete`; eine Liste der Reihe nach (das letzte wiederholt sich). */
+  deleteOutcome?: CliOutcome | CliOutcome[];
   /** stdout von `session list` (erhält den Titel des letzten `run`). */
   listSessions?: (title: string) => string;
 }
@@ -43,6 +43,7 @@ export function opencodeFixtureRunner(
   const runs: CliInvocation[] = [];
   const configs: Array<Record<string, unknown>> = [];
   let title = "";
+  let deletes = 0;
   let current: Pick<OpencodeFixture, "outcome" | "exported"> | null = null;
   const runner = async (invocation: CliInvocation): Promise<CliOutcome> => {
     calls.push(invocation);
@@ -56,7 +57,11 @@ export function opencodeFixtureRunner(
       if (current?.exported) return cliOutcome({ stdout: current.exported });
       return cliOutcome({ exitCode: 1, stderr: "Session not found" });
     }
-    if (first === "session" && second === "delete") return options.deleteOutcome ?? cliOutcome();
+    if (first === "session" && second === "delete") {
+      const outcomes = [options.deleteOutcome ?? cliOutcome()].flat();
+      deletes += 1;
+      return outcomes[Math.min(deletes, outcomes.length) - 1];
+    }
     if (first === "session" && second === "list")
       return cliOutcome({ stdout: options.listSessions?.(title) ?? "" });
     if (first !== "run")

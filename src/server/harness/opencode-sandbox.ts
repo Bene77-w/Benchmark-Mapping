@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import type { Mode } from "@/server/prompt/benchmark-prompt";
 import type { JsonSchema } from "@/server/prompt/output-schema";
 import { type CliEnv, type CliOutcome, type CliRunner, isolatedEnv } from "./cli-process";
@@ -118,6 +119,8 @@ export interface OpencodeCallOptions {
   dataHome?: string;
   /** Suchanbieter im Modus mit Web (Standard `random`). */
   websearchProvider?: string | null;
+  /** Pause vor einem erneuten `session delete` (Standard `SESSION_RETRY_DELAY_MS`). */
+  sessionRetryDelayMs?: number;
 }
 
 export interface OpencodeCallResult {
@@ -129,11 +132,17 @@ export interface OpencodeCallResult {
   cleanup: string[];
   /** Die Sitzung wurde gelöscht (bzw. es gab keine). */
   sessionDeleted: boolean;
+  /** Sitzungen, die auch nach allen Versuchen nicht gelöscht wurden. */
+  undeletedSessions: string[];
   commandLine: string;
 }
 
 export const MISSING_FORMAT_INSTRUCTION =
   "Ohne Formatierungsauftrag (format-instruction.md) kann OpenCode kein Ausgabeschema bekommen";
+
+/** Versuche für `session delete` (die Sitzung liegt im Datenverzeichnis des Nutzers). */
+export const SESSION_DELETE_ATTEMPTS = 3;
+const SESSION_RETRY_DELAY_MS = 2_000;
 
 /** Höchstdauer für `session export|list|delete`. */
 const SESSION_TIMEOUT_MS = 60_000;
@@ -192,7 +201,7 @@ export async function runOpencodeCall(
       }
 
       let exported: string | null = null;
-      let sessionDeleted = true;
+      const undeletedSessions: string[] = [];
       for (const id of sessionIds) {
         if (exported === null) {
           const exportCli = await session(["export", id]);
@@ -202,16 +211,28 @@ export async function runOpencodeCall(
               `session export ${id} scheiterte (Exit-Code ${exportCli.exitCode ?? "–"}): ${(exportCli.stderr || exportCli.stdout).trim().slice(-300)}`,
             );
         }
-        const deleted = await session(["delete", id]);
-        if (deleted.exitCode === 0) cleanup.push(`Sitzung ${id} gelöscht`);
-        else {
-          sessionDeleted = false;
+        let deleted = false;
+        for (let attempt = 1; attempt <= SESSION_DELETE_ATTEMPTS && !deleted; attempt += 1) {
+          if (attempt > 1) await sleep(options.sessionRetryDelayMs ?? SESSION_RETRY_DELAY_MS);
+          const outcome = await session(["delete", id]);
+          deleted = outcome.exitCode === 0;
           cleanup.push(
-            `session delete ${id} scheiterte (Exit-Code ${deleted.exitCode ?? "–"}): ${(deleted.stderr || deleted.stdout).trim().slice(-300)}`,
+            deleted
+              ? `Sitzung ${id} gelöscht`
+              : `session delete ${id} scheiterte (Versuch ${attempt} von ${SESSION_DELETE_ATTEMPTS}, Exit-Code ${outcome.exitCode ?? "–"}): ${(outcome.stderr || outcome.stdout).trim().slice(-300)}`,
           );
         }
+        if (!deleted) undeletedSessions.push(id);
       }
-      return { cli, sessionId: sessionIds[0] ?? null, exported, cleanup, sessionDeleted, commandLine };
+      return {
+        cli,
+        sessionId: sessionIds[0] ?? null,
+        exported,
+        cleanup,
+        sessionDeleted: undeletedSessions.length === 0,
+        undeletedSessions,
+        commandLine,
+      };
     },
     options.dataHome,
   );

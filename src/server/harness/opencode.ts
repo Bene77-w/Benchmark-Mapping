@@ -47,6 +47,8 @@ export interface OpencodeAdapterOptions {
   runCli?: CliRunner;
   /** Höchstdauer je Preflight-Aufruf, Standard 3 Minuten. */
   preflightTimeoutMs?: number;
+  /** Pause vor einem erneuten Löschen der Sitzung (Tests: 0). */
+  sessionRetryDelayMs?: number;
 }
 
 export interface ResolvedOpencodeOptions {
@@ -56,6 +58,7 @@ export interface ResolvedOpencodeOptions {
   dataHome: string | undefined;
   websearchProvider: string | null;
   preflightTimeoutMs: number;
+  sessionRetryDelayMs?: number;
 }
 
 const PREFLIGHT_TIMEOUT_MS = 3 * 60_000;
@@ -70,6 +73,7 @@ export function createOpencodeAdapter(options: OpencodeAdapterOptions = {}): Har
     dataHome: options.dataHome,
     websearchProvider: options.websearchProvider || env.OPENCODE_WEBSEARCH_PROVIDER || null,
     preflightTimeoutMs: options.preflightTimeoutMs ?? PREFLIGHT_TIMEOUT_MS,
+    sessionRetryDelayMs: options.sessionRetryDelayMs,
   };
   let version: Promise<string | null> | null = null;
   const cliVersion = () => {
@@ -152,6 +156,9 @@ export function toResult(
     ]),
     tokens: exported?.tokens ?? null,
     webSearches: exported ? exported.webSearches : null,
+    warnings: call.undeletedSessions.map(
+      (id) => `OpenCode-Sitzung ${id} nicht gelöscht: liegt noch im Datenverzeichnis des Nutzers`,
+    ),
     effort: {
       reported: exported?.variant ?? null,
       confirmed: exported?.variant != null && exported.variant === (task.effort || DEFAULT_VARIANT),

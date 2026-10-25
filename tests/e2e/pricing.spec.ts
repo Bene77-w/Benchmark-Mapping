@@ -47,6 +47,11 @@ test("Preis anlegen und ändern; Lauf zeigt geschätzte und native Kosten, Preis
   const ethics = page.getByTestId("unit-row").filter({ hasText: "house--ethics" });
   await expect(ethics.getByTestId("unit-cost-estimated")).toHaveText("$0.0092");
   await expect(ethics.getByTestId("unit-cost-native")).toHaveText("$0.0071");
+  // Dieselben Kosten auf der Unit-Detailseite, gleich gekennzeichnet.
+  await ethics.getByRole("link", { name: "house--ethics" }).click();
+  await expect(page.getByTestId("unit-detail-cost-estimated")).toHaveText("$0.0092");
+  await expect(page.getByTestId("unit-detail-costs")).toContainText("geschätzt zum API-Listenpreis");
+  await expect(page.getByTestId("unit-detail-cost-native")).toHaveText("$0.0071");
 
   // Preis ändern (gleiches Gültig-ab-Datum): Input 2 statt 1 → +(24 600 + 5 600) µ$ = 0,1024 USD.
   await savePrice(page, { input: "2", output: "12" });
