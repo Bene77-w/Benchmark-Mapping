@@ -112,19 +112,18 @@ export function buildAnalysis(input: AnalysisInput): Analysis {
   const inScope = inGroup.filter(({ run }) => run.configuration.mode === mode);
 
   const { effort, perConfiguration } = input.filters;
+  const scope = inScope.map(({ run, evaluation }) => toEntry(run, evaluation, input.prices));
   // „Beste Stufe je Modell“ wählt aus allen Läufen (auch älteren Wiederholungen); sonst gilt die Auswahl je
   // Konfiguration.
-  const selected =
+  const entries = (
     effort === "best"
-      ? bestPerModel(inScope)
+      ? bestPerModel(scope)
       : perConfiguration === "latest"
-        ? latestPerConfiguration(inScope)
+        ? latestPerConfiguration(scope)
         : perConfiguration === "best"
-          ? bestPerConfiguration(inScope)
-          : inScope;
-  const scope = inScope.map(({ run, evaluation }) => toEntry(run, evaluation, input.prices));
-  const selectedIds = new Set(selected.map(({ run }) => run.id));
-  const entries = scope.filter((entry) => selectedIds.has(entry.runId)).sort(byScore);
+          ? bestPerConfiguration(scope)
+          : [...scope]
+  ).sort(byRank);
   scope.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   return {
     groups,
@@ -155,51 +154,59 @@ function paretoFront(entries: AnalysisEntry[], axis: XAxis): number[] {
   return front;
 }
 
-/** Höherer Score zuerst; bei Gleichstand der neuere Lauf. */
-function byScore(a: { score: number; createdAt: Date }, b: { score: number; createdAt: Date }): number {
-  return b.score - a.score || b.createdAt.getTime() - a.createdAt.getTime();
+/**
+ * Höherer Score zuerst; bei Gleichstand der günstigere Lauf (bekannte Kosten vor unbekannten), dann der neuere.
+ * Gilt für die Reihenfolge der Rangliste und für die Auswahl „nur beste“.
+ */
+function byRank(a: AnalysisEntry, b: AnalysisEntry): number {
+  return (
+    b.score - a.score ||
+    compareCost(a.costPerUnit, b.costPerUnit) ||
+    b.createdAt.getTime() - a.createdAt.getTime()
+  );
+}
+
+function compareCost(a: CostPerUnit, b: CostPerUnit): number {
+  if (a.kind === "estimated" && b.kind === "estimated") return a.usd - b.usd;
+  if (a.kind === b.kind) return 0;
+  return a.kind === "estimated" ? -1 : 1;
 }
 
 function pickPer(
-  runs: EvaluatedRunView[],
-  keyOf: (run: RunView) => string,
-  better: (a: EvaluatedRunView, b: EvaluatedRunView) => boolean,
+  entries: AnalysisEntry[],
+  keyOf: (configuration: ConfigurationView) => string,
+  better: (a: AnalysisEntry, b: AnalysisEntry) => boolean,
 ) {
-  const picked = new Map<string, EvaluatedRunView>();
-  for (const entry of runs) {
-    const key = keyOf(entry.run);
+  const picked = new Map<string, AnalysisEntry>();
+  for (const entry of entries) {
+    const key = keyOf(entry.configuration);
     const current = picked.get(key);
     if (!current || better(entry, current)) picked.set(key, entry);
   }
   return [...picked.values()];
 }
 
-function configurationKey(run: RunView): string {
-  const { harness, model, effort, mode } = run.configuration;
+function configurationKey({ harness, model, effort, mode }: ConfigurationView): string {
   return JSON.stringify([harness, model, effort, mode]);
 }
 
 /** „Nur neueste je Konfiguration“: von wiederholten Läufen einer Konfiguration der neueste. */
-function latestPerConfiguration(runs: EvaluatedRunView[]): EvaluatedRunView[] {
-  return pickPer(runs, configurationKey, (a, b) => a.run.createdAt > b.run.createdAt);
+function latestPerConfiguration(entries: AnalysisEntry[]): AnalysisEntry[] {
+  return pickPer(entries, configurationKey, (a, b) => a.createdAt > b.createdAt);
 }
 
-/** „Nur beste je Konfiguration“: von wiederholten Läufen einer Konfiguration der mit dem höchsten Score. */
-function bestPerConfiguration(runs: EvaluatedRunView[]): EvaluatedRunView[] {
-  return pickPer(runs, configurationKey, (a, b) => byScore(scored(a), scored(b)) < 0);
+/** „Nur beste je Konfiguration“: von wiederholten Läufen einer Konfiguration der beste nach `byRank`. */
+function bestPerConfiguration(entries: AnalysisEntry[]): AnalysisEntry[] {
+  return pickPer(entries, configurationKey, (a, b) => byRank(a, b) < 0);
 }
 
-/** „Beste Stufe je Modell“: je Harness und Modell der Lauf mit dem höchsten Score. */
-function bestPerModel(runs: EvaluatedRunView[]): EvaluatedRunView[] {
+/** „Beste Stufe je Modell“: je Harness und Modell der beste Lauf nach `byRank`. */
+function bestPerModel(entries: AnalysisEntry[]): AnalysisEntry[] {
   return pickPer(
-    runs,
-    (run) => JSON.stringify([run.configuration.harness, run.configuration.model]),
-    (a, b) => byScore(scored(a), scored(b)) < 0,
+    entries,
+    ({ harness, model }) => JSON.stringify([harness, model]),
+    (a, b) => byRank(a, b) < 0,
   );
-}
-
-function scored({ run, evaluation }: EvaluatedRunView) {
-  return { score: evaluation.score ?? 0, createdAt: run.createdAt };
 }
 
 /** Schlüssel der Vergleichsgruppe: die vollständigen Hashes (ein Präfix könnte verschiedene Prompts vereinen). */

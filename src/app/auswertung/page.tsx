@@ -81,7 +81,7 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
         gleichem Prompt- und Snapshot-Hash und gleichem Modus. Rangliste, Scatter-Plot und Heatmap zeigen alle
         Läufe, auch wiederholte einer Konfiguration; die Umschalter „nur neueste“ und „nur beste je
         Konfiguration“ beschränken sie auf einen Lauf je Konfiguration („beste Stufe je Modell“ wählt immer
-        aus allen Läufen). Kosten {ESTIMATE_NOTE}, pro Unit der Gold-Version.
+        aus allen Läufen). Bei gleichem Score steht der günstigere Lauf vorn. Kosten {ESTIMATE_NOTE}, pro Unit der Gold-Version.
         {current.incomplete.length > 0 && (
           <>
             {" "}
