@@ -133,3 +133,20 @@ test("ein fehlgeschlagener Preflight blockiert den Lauf und wird angezeigt", asy
   await expect(page.getByText("Preflight fehlgeschlagen: Szenario vorhanden")).toBeVisible();
   await expect(page.getByTestId("progress-pending")).toHaveText("5");
 });
+
+test("Laufseite zeigt den Abschluss, auch wenn jede Aktualisierung länger als das Abfrageintervall dauert", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  // Langsamer Server (z. B. Dev-Server unter Last): jede Aktualisierung der Laufseite braucht 2 s, länger als
+  // das Abfrageintervall (1 s). Startete jede Sekunde eine neue Aktualisierung, verdrängte sie die vorige und
+  // die Seite bliebe beim ersten Stand stehen, obwohl der Lauf längst abgeschlossen ist.
+  await page.route(/\/laeufe\/\d+\?_rsc=/, async (route) => {
+    const response = await route.fetch();
+    await new Promise((resolve) => setTimeout(resolve, 2_000));
+    await route.fulfill({ response }).catch(() => undefined);
+  });
+  await startFakeRun(page, "langsam", 1);
+  await expect(page.getByTestId("run-status")).not.toHaveText("abgeschlossen");
+  await expect(page.getByTestId("run-status")).toHaveText("abgeschlossen", { timeout: 60_000 });
+});
