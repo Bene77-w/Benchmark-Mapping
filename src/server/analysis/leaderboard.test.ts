@@ -169,6 +169,22 @@ describe("Filter Modus und Effort", () => {
     expect(analysis.entries.map((entry) => entry.runId)).toEqual([1, 3]);
   });
 
+  test("bei gleichem Score gewinnt der günstigere Lauf, bekannte Kosten vor unbekannten, sonst der neuere", () => {
+    const unit = (input: number | null) => [
+      { unitId: "u1", tokens: input === null ? null : tokens(input, 0), durationMs: 1000 },
+    ];
+    const tied: RunSpec[] = [
+      { id: 1, score: 0.8, units: unit(1000), createdAt: "2026-10-20T10:00:00Z" },
+      { id: 2, score: 0.8, units: unit(3000), createdAt: "2026-10-22T10:00:00Z" },
+      { id: 3, score: 0.8, units: unit(null), createdAt: "2026-10-23T10:00:00Z" },
+      { id: 4, score: 0.8, units: unit(1000), effort: "low", createdAt: "2026-10-20T10:00:00Z" },
+      { id: 5, score: 0.8, units: unit(1000), effort: "low", createdAt: "2026-10-21T10:00:00Z" },
+    ];
+    expect(analyse(tied).entries.map((entry) => entry.runId)).toEqual([5, 1, 4, 2, 3]);
+    expect(analyse(tied, { perConfiguration: "best" }).entries.map((entry) => entry.runId)).toEqual([5, 1]);
+    expect(analyse(tied, { effort: "best" }).entries.map((entry) => entry.runId)).toEqual([5]);
+  });
+
   test("„beste Stufe je Modell“ betrachtet alle Läufe, auch ältere Wiederholungen", () => {
     for (const perConfiguration of ["all", "latest", "best"] as const) {
       const analysis = analyse(repeated, { effort: "best", perConfiguration });
