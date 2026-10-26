@@ -84,6 +84,67 @@ describe("sameDatabase", () => {
   });
 });
 
+describe("Verbindungsziel wie pg (Query-Parameter überschreiben die Adresse)", () => {
+  it("erkennt dieselbe Datenbank, wenn ?host= und ?port= die Adresse überschreiben", () => {
+    expect(
+      sameDatabase(
+        "postgres://u:p@127.0.0.1:5432/benchmark_e2e",
+        "postgres://u:p@anderer-host:6543/benchmark_e2e?host=127.0.0.1&port=5432",
+      ),
+    ).toBe(true);
+    expect(
+      sameDatabase(
+        "postgres://benchmark:benchmark@127.0.0.1:5432/benchmark_e2e",
+        "postgres://benchmark:benchmark@127.0.0.1:55451/benchmark_e2e?port=5432",
+      ),
+    ).toBe(true);
+  });
+
+  it.each([
+    [
+      "?host= und ?port= (Befund Logik)",
+      "postgres://u:p@127.0.0.1:5432/benchmark_e2e",
+      "postgres://u:p@anderer-host:6543/benchmark_e2e?host=127.0.0.1&port=5432",
+    ],
+    [
+      "?port= (Befund Konformität)",
+      "postgres://benchmark:benchmark@127.0.0.1:5432/benchmark_e2e",
+      "postgres://benchmark:benchmark@127.0.0.1:55451/benchmark_e2e?port=5432",
+    ],
+  ])("e2eDatabaseUrl lehnt die App-Datenbank hinter %s ab", (_, app, e2e) => {
+    expect(() => e2eDatabaseUrl({ DATABASE_URL: app, E2E_DATABASE_URL: e2e })).toThrow();
+  });
+
+  it.each([
+    ["host", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?host=localhost"],
+    ["hostaddr", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?hostaddr=127.0.0.1"],
+    ["port", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?port=5432"],
+    ["database", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?database=benchmark"],
+    ["dbname", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?dbname=benchmark"],
+    ["user", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?user=benchmark"],
+    ["Großschreibung", "postgres://u:p@127.0.0.1:55451/benchmark_e2e?sslmode=disable&PORT=5432"],
+  ])("die Test-Datenbank darf ihr Ziel nicht über Query-Parameter ändern (%s)", (_, url) => {
+    expect(() => assertE2eDatabaseUrl(url)).toThrow(/Query-Parameter/);
+  });
+
+  it("Optionen ohne Einfluss auf das Ziel bleiben erlaubt", () => {
+    expect(() =>
+      assertE2eDatabaseUrl(
+        "postgres://u:p@127.0.0.1:55451/benchmark_e2e?sslmode=disable&application_name=e2e",
+      ),
+    ).not.toThrow();
+  });
+
+  it("assertNotAppDatabase lehnt die über ?port= erreichte App-Datenbank ab", () => {
+    expect(() =>
+      assertNotAppDatabase(
+        "postgres://benchmark:benchmark@127.0.0.1:55451/benchmark_e2e?port=5432",
+        "postgres://benchmark:benchmark@127.0.0.1:5432/benchmark_e2e",
+      ),
+    ).toThrow(/Datenbank der App/);
+  });
+});
+
 describe("assertNotAppDatabase (vor dem Löschen der Test-Datenbank)", () => {
   it("bricht bei gleichwertiger URL der App-Datenbank ab", () => {
     expect(() =>
