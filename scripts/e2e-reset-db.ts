@@ -8,16 +8,22 @@
  * wie die der App (`APP_DATABASE_URL`, Pflicht; Playwright setzt sie) — die Datenbank der App wird nie gelöscht.
  */
 import { Client } from "pg";
-import { assertE2eDatabaseUrl, assertNotAppDatabase } from "@/server/db/url";
+import { assertE2eDatabaseUrl, assertNotAppDatabase, connectionTarget } from "@/server/db/url";
 
 const url = process.env.DATABASE_URL;
 const appUrl = process.env.APP_DATABASE_URL;
 assertE2eDatabaseUrl(url);
 assertNotAppDatabase(url as string, appUrl);
-const target = new URL(url as string);
-const name = decodeURIComponent(target.pathname.slice(1));
-const admin = new URL(target);
+// Ziel so, wie pg es auswertet (die URL der Test-Datenbank ändert es nicht über Query-Parameter, siehe oben).
+const target = connectionTarget(url as string);
+if (!target) throw new Error(`Verbindungs-URL ${url} nicht lesbar`);
+const name = target.database;
+const admin = new URL(url as string);
 admin.pathname = "/postgres";
+const adminTarget = connectionTarget(admin.toString());
+if (!adminTarget || adminTarget.host !== target.host || adminTarget.port !== target.port) {
+  throw new Error("Die Verwaltungsverbindung zielt auf einen anderen Server als die Test-Datenbank.");
+}
 
 const client = new Client({ connectionString: admin.toString() });
 await client.connect();

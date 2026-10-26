@@ -1,3 +1,5 @@
+import { Client } from "pg";
+
 type Environment = Readonly<Record<string, string | undefined>>;
 
 /**
@@ -40,40 +42,74 @@ export function assertNotAppDatabase(url: string, appUrl: string | undefined): v
 }
 
 /**
- * Ob zwei Verbindungs-URLs dieselbe PostgreSQL-Datenbank bezeichnen: gleicher Host (localhost, 127.0.0.1 und ::1
- * gelten als derselbe), gleicher Port (ohne Angabe 5432) und gleicher Datenbankname. Schema-Schreibweise
- * (`postgres://`/`postgresql://`), Zugangsdaten und Query-Optionen spielen keine Rolle. Nicht lesbare URLs gelten
+ * Ob zwei Verbindungs-URLs dieselbe PostgreSQL-Datenbank bezeichnen. Maßgeblich ist das Ziel, mit dem `pg` sich
+ * tatsächlich verbindet (`connectionTarget`, also auch `?host=`/`?port=` und PG*-Umgebungsvariablen): gleicher
+ * Host (localhost, 127.0.0.1 und ::1 gelten als derselbe), gleicher Port und gleicher Datenbankname.
+ * Schema-Schreibweise, Zugangsdaten und Optionen wie `sslmode` spielen keine Rolle. Nicht lesbare URLs gelten
  * vorsichtshalber als dieselbe Datenbank.
  */
 export function sameDatabase(a: string, b: string): boolean {
-  const left = databaseIdentity(a);
-  const right = databaseIdentity(b);
+  const left = connectionTarget(a);
+  const right = connectionTarget(b);
   if (!left || !right) return true;
   return left.host === right.host && left.port === right.port && left.database === right.database;
 }
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
-function databaseIdentity(url: string): { host: string; port: string; database: string } | null {
-  let parsed: URL;
+/** Was `pg` aus Verbindungsangaben macht (`ConnectionParameters`; in den Typen von `pg` nicht enthalten). */
+interface PgConnectionParameters {
+  host?: string;
+  port?: number;
+  database?: string;
+  user?: string;
+}
+
+/**
+ * Ziel einer Verbindungs-URL, ausgewertet vom installierten `pg` selbst (ohne Verbindung): Host (Loopback
+ * vereinheitlicht), Port und Datenbank. `null`, wenn `pg` die URL nicht lesen kann.
+ */
+export function connectionTarget(url: string): { host: string; port: number; database: string } | null {
+  let params: PgConnectionParameters;
   try {
-    parsed = new URL(url);
+    params = (
+      new Client({ connectionString: url }) as unknown as { connectionParameters: PgConnectionParameters }
+    ).connectionParameters;
   } catch {
     return null;
   }
-  // Ohne Host in der URL nimmt pg den Host aus `?host=` (z. B. ein Socket-Verzeichnis), sonst localhost.
-  const rawHost = parsed.hostname || parsed.searchParams.get("host") || "localhost";
-  const host = rawHost.toLowerCase().replace(/^\[|\]$/g, "");
-  const port = parsed.port || parsed.searchParams.get("port") || "5432";
-  // Ohne Datenbanknamen verbindet PostgreSQL mit der gleichnamigen Datenbank des Nutzers.
-  const database =
-    decodeURIComponent(parsed.pathname.replace(/^\//, "")) || decodeURIComponent(parsed.username);
-  return { host: LOOPBACK_HOSTS.has(host) ? "loopback" : host, port, database };
+  const host = (params.host ?? "localhost").toLowerCase().replace(/^\[|\]$/g, "");
+  const database = params.database ?? params.user ?? "";
+  if (!database || !params.port || Number.isNaN(params.port)) return null;
+  return { host: LOOPBACK_HOSTS.has(host) ? "loopback" : host, port: params.port, database };
 }
 
-/** Wirft, wenn `url` keine Test-Datenbank (Name mit Endung `_e2e`) bezeichnet. */
+/**
+ * Query-Parameter, mit denen eine URL ihr Ziel ändert (`pg` übernimmt sie vor Host, Port und Pfad); in der
+ * URL einer Test-Datenbank verboten, damit das Ziel allein aus Host, Port und Pfad hervorgeht.
+ */
+const TARGET_QUERY_PARAMETERS = new Set([
+  "host",
+  "hostaddr",
+  "port",
+  "database",
+  "dbname",
+  "user",
+  "service",
+]);
+
+/**
+ * Wirft, wenn `url` keine Test-Datenbank (Name mit Endung `_e2e`, wie ihn `pg` auswertet) bezeichnet oder ihr
+ * Ziel über Query-Parameter ändert.
+ */
 export function assertE2eDatabaseUrl(url: string | undefined): void {
-  const name = url ? databaseName(url) : "";
+  const overriding = url ? targetQueryParameters(url) : [];
+  if (overriding.length > 0) {
+    throw new Error(
+      `Die Test-Datenbank ${url} ändert ihr Ziel über Query-Parameter (${overriding.join(", ")}); Host, Port und Datenbank gehören in die Adresse.`,
+    );
+  }
+  const name = url ? (connectionTarget(url)?.database ?? "") : "";
   if (!name.endsWith(E2E_DATABASE_SUFFIX)) {
     throw new Error(
       `Keine Test-Datenbank: „${name || "(keine)"}“. E2E-Tests laufen nur gegen eine Datenbank mit der Endung ${E2E_DATABASE_SUFFIX}.`,
@@ -81,10 +117,9 @@ export function assertE2eDatabaseUrl(url: string | undefined): void {
   }
 }
 
-function databaseName(url: string): string {
-  try {
-    return decodeURIComponent(new URL(url).pathname.replace(/^\//, ""));
-  } catch {
-    return "";
-  }
+function targetQueryParameters(url: string): string[] {
+  const query = url.includes("?") ? url.slice(url.indexOf("?") + 1) : "";
+  return [...new URLSearchParams(query).keys()].filter((key) =>
+    TARGET_QUERY_PARAMETERS.has(key.toLowerCase()),
+  );
 }
