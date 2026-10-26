@@ -545,6 +545,43 @@ describe("Wiederholversuch und Format-Fehler", { timeout: 30_000 }, () => {
     });
   });
 
+  test("native Kosten 0 eines fehlgeschlagenen Versuchs gelten als unbekannt, auch bei Format-Fehlern", async () => {
+    const db = await databaseWithSnapshot();
+    const root = await fakeScenario("nullkosten", {
+      // CLI meldet Erfolg, die Antwort ist aber kein JSON (Kosten 0), der Wiederholversuch gelingt.
+      "house--ethics": {
+        calls: [
+          { response: "kein JSON", nativeCostUsd: 0 },
+          { response: noMappingAnswer("house--ethics"), nativeCostUsd: 0.02 },
+        ],
+      },
+      // Einziger Versuch mit Harness-Fehler und Kosten 0 (kein Wiederholversuch).
+      "joint--joint-economic-committee": { simulate: "harness_error", nativeCostUsd: 0 },
+      // Beide Versuche Schemaverstoß mit Kosten 0: Format-Fehler.
+      "house--veterans-affairs--health": { response: { falsch: true }, nativeCostUsd: 0 },
+    });
+    const { runId } = await createRun(db, {
+      configuration: { ...fakeConfiguration, model: "nullkosten" },
+      unitIds: ["house--ethics", "joint--joint-economic-committee", "house--veterans-affairs--health"],
+    });
+
+    await processNextRun(db, { adapters: { fake: createFakeAdapter({ root }) } });
+
+    const units = (await getRun(db, runId))?.units ?? [];
+    const unit = (id: string) => units.find((entry) => entry.unitId === id);
+    expect(unit("house--ethics")).toMatchObject({ status: "done", attempts: 2, nativeCostUsd: null });
+    expect(unit("joint--joint-economic-committee")).toMatchObject({
+      status: "failed",
+      attempts: 1,
+      nativeCostUsd: null,
+    });
+    expect(unit("house--veterans-affairs--health")).toMatchObject({
+      status: "failed",
+      attempts: 2,
+      nativeCostUsd: null,
+    });
+  });
+
   test("Tokens je Modell und Vermerke werden über die Versuche zusammengefasst und gespeichert", async () => {
     const db = await databaseWithSnapshot();
     const usage = (input: number) => ({

@@ -299,7 +299,7 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
       await db.update(unitResults).set({ status: "pending" }).where(whereRunning);
       return;
     }
-    attempts.push(result);
+    attempts.push(withKnownCost(result));
     if (attempts.length === 1 && RETRYABLE.has(result.outcome.kind)) continue;
     await db
       .update(unitResults)
@@ -307,6 +307,16 @@ async function runUnit(context: RunContext, unitId: string): Promise<void> {
       .where(whereRunning);
     return;
   }
+}
+
+/**
+ * Native Kosten 0 eines fehlgeschlagenen Versuchs (keine gültige Antwort, auch wenn die CLI Erfolg meldete)
+ * sind unbekannt: Harnesses melden bei abgebrochenen oder unbrauchbaren Aufrufen oft 0, obwohl Tokens
+ * verbraucht wurden.
+ */
+function withKnownCost(result: HarnessResult): HarnessResult {
+  if (result.outcome.kind === "answer" || result.nativeCostUsd !== 0) return result;
+  return { ...result, nativeCostUsd: null };
 }
 
 /** Ein Aufruf, der mit Ratenlimit endet, zählt nicht als Versuch: die Unit wartet wieder. */
