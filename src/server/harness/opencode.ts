@@ -91,13 +91,14 @@ export function createOpencodeAdapter(options: OpencodeAdapterOptions = {}): Har
       const call = await runOpencodeCall(task, resolved);
       return toResult(task, call, await cliVersion());
     },
-    preflight: (request) => opencodePreflight(request, resolved),
+    preflight: (request, preflightOptions = {}) => opencodePreflight(request, resolved, preflightOptions),
   };
 }
 
 /** `opencode --version` in einem leeren Verzeichnis. */
 export async function opencodeVersion(
   options: Pick<ResolvedOpencodeOptions, "command" | "env" | "runCli">,
+  signal?: AbortSignal,
 ): Promise<{ version: string | null; error: string | null }> {
   const cli = await withEmptyWorkdir("benchmark-opencode-version", (cwd) =>
     options.runCli({
@@ -106,6 +107,7 @@ export async function opencodeVersion(
       cwd,
       env: isolatedEnv(options.env),
       timeoutMs: VERSION_TIMEOUT_MS,
+      signal,
     }),
   );
   if (cli.spawnError) return { version: null, error: cli.spawnError };

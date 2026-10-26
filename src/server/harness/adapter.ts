@@ -1,6 +1,6 @@
 import type { Mode } from "@/server/prompt/benchmark-prompt";
 import { type JsonSchema, type UnitAnswer, unitAnswerSchema } from "@/server/prompt/output-schema";
-import type { PreflightRequest, PreflightResult } from "./preflight";
+import type { PreflightOptions, PreflightRequest, PreflightResult } from "./preflight";
 
 /**
  * Harness-Adapter: die gemeinsame Schnittstelle, über die der Runner eine Unit an eine Agent-CLI schickt.
@@ -120,8 +120,9 @@ export interface HarnessAdapter {
   /**
    * Prüft vor einem Lauf, ob die Konfiguration ausführbar ist (siehe preflight.ts). Der Runner speichert das
    * Ergebnis am Lauf und führt ihn bei `ok == false` nicht aus. Adapter ohne Preflight laufen ungeprüft.
+   * `options.signal` (Claim-Verlust) reicht der Adapter an jeden CLI-Aufruf weiter, `options` an `runPreflight`.
    */
-  preflight?(request: PreflightRequest): Promise<PreflightResult>;
+  preflight?(request: PreflightRequest, options?: PreflightOptions): Promise<PreflightResult>;
 }
 
 /** Adapter je Harness; fehlt einer, kann ein Lauf mit diesem Harness nicht ausgeführt werden. */

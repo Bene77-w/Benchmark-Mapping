@@ -8,7 +8,7 @@ import {
   SEARCH_PROVIDER_ENV,
   withOpencodeSandbox,
 } from "./opencode-sandbox";
-import { type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
+import { type PreflightOptions, type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
 
 /**
  * Preflight des OpenCode-Adapters. Reihenfolge so, dass Fehler ohne Modellaufruf zuerst auffallen:
@@ -38,7 +38,13 @@ const PROBE = {
   },
 } as const;
 
-export async function opencodePreflight(request: PreflightRequest, options: ResolvedOpencodeOptions) {
+/** `preflightOptions.signal` beendet Version, Anmeldung und Probe; das Aufräumen der Probe-Sitzung läuft weiter. */
+export async function opencodePreflight(
+  request: PreflightRequest,
+  options: ResolvedOpencodeOptions,
+  preflightOptions: PreflightOptions = {},
+) {
+  const { signal } = preflightOptions;
   const timeoutMs = options.preflightTimeoutMs;
   const web = request.mode === "web";
   const provider = request.model.split("/")[0] ?? "";
@@ -51,7 +57,7 @@ export async function opencodePreflight(request: PreflightRequest, options: Reso
       id: "cli",
       label: "CLI erreichbar",
       async run() {
-        const { version, error } = await opencodeVersion(options);
+        const { version, error } = await opencodeVersion(options, signal);
         if (!version) return { status: "failed", message: error ?? "Version unbekannt" };
         cliVersion = version;
         return { status: "ok", message: `OpenCode ${version}` };
@@ -71,6 +77,7 @@ export async function opencodePreflight(request: PreflightRequest, options: Reso
               cwd: workdir,
               env,
               timeoutMs,
+              signal,
             }),
           options.dataHome,
         );
@@ -120,7 +127,7 @@ export async function opencodePreflight(request: PreflightRequest, options: Reso
       label: "Modell, Variante und Anmeldung",
       async run() {
         const call = await runOpencodeCall(
-          { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs },
+          { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs, signal },
           options,
         );
         const stream = readOpencodeStream(call.cli.stdout);
@@ -205,7 +212,7 @@ export async function opencodePreflight(request: PreflightRequest, options: Reso
       },
     },
   ];
-  return runPreflight(steps, () => cliVersion);
+  return runPreflight(steps, () => cliVersion, preflightOptions);
 }
 
 /** IDs aus `auth list --format json` (Namen und Verbindungen werden nicht ausgewertet). */

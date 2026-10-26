@@ -1,8 +1,10 @@
-import { describe, expect, test } from "vitest";
+import { tmpdir } from "node:os";
+import { describe, expect, test, vi } from "vitest";
 import { createTestDatabase } from "@/server/db/test-database";
-import type { HarnessAdapter } from "@/server/harness/adapter";
+import type { HarnessAdapter, HarnessResult, HarnessTask } from "@/server/harness/adapter";
+import { type CliOutcome, runCli } from "@/server/harness/cli-process";
 import { createFakeAdapter } from "@/server/harness/fake";
-import type { PreflightRequest, PreflightResult } from "@/server/harness/preflight";
+import { type PreflightRequest, type PreflightResult, runPreflight } from "@/server/harness/preflight";
 import { readSnapshotFile, SNAPSHOT_PATH } from "@/server/snapshot/snapshot-file";
 import { loadSnapshot } from "@/server/snapshot/store";
 import { processNextRun } from "./runner";
@@ -98,5 +100,98 @@ describe("Preflight vor dem Lauf", { timeout: 30_000 }, () => {
     expect(run?.status).toBe("failed");
     expect(run?.error).toContain("Szenario gibt-es-nicht");
     expect(run?.preflight?.checks).toEqual([expect.objectContaining({ id: "scenario", status: "failed" })]);
+  });
+
+  test("verliert der Worker den Lauf vor der Probe, startet die Probe nicht", async () => {
+    const { db, runId } = await setup();
+    let releaseCli = () => {};
+    let cliStarted = () => {};
+    const started = new Promise<void>((resolve) => {
+      cliStarted = resolve;
+    });
+    let probes = 0;
+    const stale: HarnessAdapter = {
+      harness: "fake",
+      run: async () => {
+        throw new Error("darf nicht aufgerufen werden");
+      },
+      preflight: (_request, options) =>
+        runPreflight(
+          [
+            {
+              id: "cli",
+              label: "CLI erreichbar",
+              async run() {
+                cliStarted();
+                await new Promise<void>((resolve) => {
+                  releaseCli = resolve;
+                });
+                return { status: "ok", message: "da" };
+              },
+            },
+            {
+              id: "model",
+              label: "Modell, Effort und Anmeldung",
+              async run() {
+                probes += 1;
+                return { status: "ok", message: "antwortet" };
+              },
+            },
+          ],
+          () => null,
+          options,
+        ),
+    };
+
+    const staleWorker = processNextRun(db, { adapters: { fake: stale }, heartbeatMs: 3_600_000 });
+    await started;
+    expect(await processNextRun(db, { adapters: { fake: createFakeAdapter() }, staleAfterMs: 0 })).toBe(
+      runId,
+    );
+    releaseCli();
+    await staleWorker;
+
+    expect(probes).toBe(0);
+    expect((await getRun(db, runId))?.status).toBe("completed");
+  });
+
+  test("verliert der Worker während der Probe den Lauf, beendet das Abbruchsignal deren CLI-Prozess", async () => {
+    const { db, runId } = await setup();
+    const processes: Promise<CliOutcome>[] = [];
+    const stale: HarnessAdapter = {
+      harness: "fake",
+      run: async (task: HarnessTask): Promise<HarnessResult> => {
+        throw new Error(`darf nicht aufgerufen werden (${task.unitId})`);
+      },
+      preflight: async (_request, options) => {
+        // Stellvertreter-Probe (Node), die sich nicht von selbst beendet.
+        const cli = runCli({
+          command: process.execPath,
+          args: ["-e", "setTimeout(() => {}, 20000)"],
+          cwd: tmpdir(),
+          env: { PATH: process.env.PATH },
+          timeoutMs: 60_000,
+          signal: options?.signal,
+        });
+        processes.push(cli);
+        await cli;
+        return failed;
+      },
+    };
+
+    const staleWorker = processNextRun(db, { adapters: { fake: stale }, heartbeatMs: 50 });
+    await vi.waitFor(() => expect(processes).toHaveLength(1));
+    expect(await processNextRun(db, { adapters: { fake: createFakeAdapter() }, staleAfterMs: 0 })).toBe(
+      runId,
+    );
+
+    const ended = await Promise.race([
+      processes[0],
+      new Promise<"läuft noch">((resolve) => setTimeout(() => resolve("läuft noch"), 5_000)),
+    ]);
+    expect(ended).toEqual(expect.objectContaining({ aborted: true }));
+    await staleWorker;
+    // Der späte Preflight-Fehler des alten Workers ändert den abgeschlossenen Lauf nicht.
+    expect(await getRun(db, runId)).toMatchObject({ status: "completed", error: null });
   });
 });

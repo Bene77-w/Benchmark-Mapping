@@ -43,20 +43,38 @@ export interface PreflightStep {
   run(): Promise<{ status: PreflightStatus; message: string }>;
 }
 
+/**
+ * Abbruch eines Preflights von außen: `signal` beendet laufende CLI-Aufrufe (der Adapter reicht es an jeden
+ * Aufruf weiter), `shouldContinue` fragt vor jedem Schritt, ob er noch starten darf (der Runner prüft dort seinen
+ * Claim). Nach einem Abbruch entfallen der Schritt und alle folgenden (`skipped`), das Ergebnis ist nicht `ok`.
+ */
+export interface PreflightOptions {
+  signal?: AbortSignal;
+  shouldContinue?: () => Promise<boolean>;
+}
+
 export async function runPreflight(
   steps: PreflightStep[],
   getCliVersion: () => string | null,
-  now: () => Date = () => new Date(),
+  options: PreflightOptions & { now?: () => Date } = {},
 ): Promise<PreflightResult> {
   const checks: PreflightCheck[] = [];
   let failed: PreflightCheck | null = null;
+  let aborted = false;
   for (const step of steps) {
-    if (failed) {
+    if (!failed && !aborted) {
+      aborted =
+        options.signal?.aborted === true ||
+        (options.shouldContinue !== undefined && !(await options.shouldContinue()));
+    }
+    if (failed || aborted) {
       checks.push({
         id: step.id,
         label: step.label,
         status: "skipped",
-        message: `nicht geprüft, weil „${failed.label}“ fehlgeschlagen ist`,
+        message: aborted
+          ? "nicht geprüft, weil der Preflight abgebrochen wurde"
+          : `nicht geprüft, weil „${failed?.label}“ fehlgeschlagen ist`,
       });
       continue;
     }
@@ -70,7 +88,13 @@ export async function runPreflight(
     checks.push(check);
     if (check.status === "failed") failed = check;
   }
-  return { ok: failed === null, checkedAt: now().toISOString(), cliVersion: getCliVersion(), checks };
+  const now = options.now ?? (() => new Date());
+  return {
+    ok: failed === null && !aborted,
+    checkedAt: now().toISOString(),
+    cliVersion: getCliVersion(),
+    checks,
+  };
 }
 
 /** Kurzfassung der fehlgeschlagenen Prüfungen für die Fehlermeldung des Laufs. */

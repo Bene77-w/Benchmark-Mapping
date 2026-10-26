@@ -24,7 +24,7 @@ import {
   readCodexStream,
 } from "./codex-output";
 import { CODEX_COMMAND, type CodexCallResult, codexAuthHome, runCodexCall } from "./codex-sandbox";
-import { type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
+import { type PreflightOptions, type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
 
 /**
  * Codex-Adapter: schickt eine Unit isoliert an `codex exec` (Aufruf: codex-command.ts, temporäres Verzeichnis
@@ -58,7 +58,8 @@ export function createCodexAdapter(options: CodexAdapterOptions = {}): HarnessAd
       const call = await runCodexCall(task, callOptions);
       return toResult(task, call);
     },
-    preflight: (request) => codexPreflight(request, { ...options, ...callOptions }),
+    preflight: (request, preflightOptions = {}) =>
+      codexPreflight(request, { ...options, ...callOptions }, preflightOptions),
   };
 }
 
@@ -80,7 +81,9 @@ const PROBE = {
 async function codexPreflight(
   request: PreflightRequest,
   options: CodexAdapterOptions & { runCli: CliRunner; env: CliEnv },
+  preflightOptions: PreflightOptions,
 ) {
+  const { signal } = preflightOptions;
   const command = options.command ?? CODEX_COMMAND;
   const timeoutMs = options.preflightTimeoutMs ?? PREFLIGHT_TIMEOUT_MS;
   const authHome = options.authHome ?? codexAuthHome(options.env);
@@ -94,7 +97,14 @@ async function codexPreflight(
       label: "CLI erreichbar",
       async run() {
         const cli = await withEmptyWorkdir("benchmark-codex-version", (cwd) =>
-          options.runCli({ command, args: ["--version"], cwd, env: isolatedEnv(options.env), timeoutMs }),
+          options.runCli({
+            command,
+            args: ["--version"],
+            cwd,
+            env: isolatedEnv(options.env),
+            timeoutMs,
+            signal,
+          }),
         );
         if (cli.spawnError) return { status: "failed", message: cli.spawnError };
         const version = /\d+\.\d+\.\d+/.exec(cli.stdout)?.[0] ?? null;
@@ -126,7 +136,7 @@ async function codexPreflight(
       label: "Modell, Effort und Anmeldung",
       async run() {
         const call = await runCodexCall(
-          { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs },
+          { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs, signal },
           { ...options, authHome },
         );
         const stream = readCodexStream(call.cli.stdout);
@@ -210,7 +220,7 @@ async function codexPreflight(
       },
     },
   ];
-  return runPreflight(steps, () => cliVersion);
+  return runPreflight(steps, () => cliVersion, preflightOptions);
 }
 
 /** Fehlermeldung der Probe oder `null`, wenn sie geantwortet hat. */
