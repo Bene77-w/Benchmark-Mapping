@@ -1,0 +1,568 @@
+[
+  {
+    "unitId": "house--energy-and-commerce",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee hat hinsichtlich der Regulierung von Nuklearanlagen und Nuklearenergie dieselbe Jurisdiktion wie hinsichtlich nicht-nuklearer Anlagen und Energie.",
+    "after": "The committee shall have the same jurisdiction with respect to regulation of nuclear facilities and of use of nuclear energy as it has with respect to regulation of nonnuclear facilities and of use of nonnuclear energy.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut des Schlusssatzes von House Rule X clause 1(f), der nach der nummerierten Liste (1)–(15) steht (House Rules and Manual, govinfo HMAN-118, § 721)."
+  },
+  {
+    "unitId": "senate--agriculture-nutrition-and-forestry",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Fragen zu Food, Nutrition und Hunger (im In- und Ausland) sowie Rural Affairs.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to food, nutrition, and hunger, both in the United States and in foreign countries, and rural affairs, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(a)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--armed-services",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Fragen zur Common Defense Policy der USA.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to the common defense policy of the United States, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(c)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--banking-housing-and-urban-affairs",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend internationale Wirtschaftspolitik, soweit sie US-Geldpolitik, Kredit und Finanzinstitute betrifft; ebenso Wirtschaftswachstum, Urban Affairs und Kredit.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to international economic policy as it affects United States monetary affairs, credit, and financial institutions; economic growth, urban affairs, and credit, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(d)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--commerce-science-and-transportation",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Science and Technology, Oceans Policy, Transportation, Communications und Consumer Affairs.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, all matters relating to science and technology, oceans policy, transportation, communications, and consumer affairs, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(f)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--energy-and-natural-resources",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Energy and Resources Development.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to energy and resources development, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(g)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--environment-and-public-works",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Environmental Protection sowie Resource Utilization and Conservation.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to environmental protection and resource utilization and conservation, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(h)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--foreign-relations",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend National Security Policy, Foreign Policy und International Economic Policy (soweit sie Außenpolitik betrifft) sowie Food, Hunger und Nutrition im Ausland.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to the national security policy, foreign policy, and international economic policy as it relates to foreign policy of the United States, and matters relating to food, hunger, and nutrition in foreign countries, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(j)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--health-education-labor-and-pensions",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> *Zusatz:* Das Committee studiert und überprüft umfassend Health, Education and Training sowie Public Welfare.",
+    "after": "Such committee shall also study and review, on a comprehensive basis, matters relating to health, education and training, and public welfare, and report thereon from time to time.",
+    "reason": "Deutsche Kuratorennotiz ersetzt durch den Originalwortlaut von Senate Rule XXV 1(l)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--foreign-relations",
+    "kind": "deutscher_text",
+    "action": "replace",
+    "before": "(bei entsprechendem Antrag des Committee on Banking, Housing, and Urban Affairs wird zugehörige Legislation an dieses überwiesen)",
+    "after": "(except that, at the request of the Committee on Banking, Housing, and Urban Affairs, any proposed legislation relating to such subjects reported by the Committee on Foreign Relations shall be referred to the Committee on Banking, Housing, and Urban Affairs)",
+    "reason": "Deutsch paraphrasierter Vorbehalt ersetzt durch den Originalwortlaut von Senate Rule XXV 1(j)(1) Nr. 10 (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "senate--homeland-security-and-governmental-affairs",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "> **Hinweis:** Der offizielle heutige Name lautet **„Committee on Homeland Security and Governmental Affairs\"** (seit 2004). Der gepastete Text nutzt noch die ältere Bezeichnung — Jurisdiktion unten wie im Original übernommen. ",
+    "after": "",
+    "reason": "Deutsche Kuratorennotiz zum Committee-Namen entfernt; sie gehört nicht zum Zuständigkeitstext."
+  },
+  {
+    "unitId": "senate--homeland-security-and-governmental-affairs",
+    "kind": "deutscher_text",
+    "action": "replace",
+    "before": "**Pflichten:** 1. Empfang und Prüfung von Berichten des Comptroller General; Abgabe von Empfehlungen an den Senat. 2. Untersuchung von Effizienz, Wirtschaftlichkeit und Wirksamkeit aller Regierungsbehörden. 3. Bewertung der Effekte von Reorganisationsgesetzen der Legislative und Exekutive. 4. Untersuchung der zwischenstaatlichen Beziehungen zwischen den USA und Bundesstaaten/Kommunen sowie zwischen den USA und internationalen Organisationen.",
+    "after": "Such committee shall have the duty of— (A) receiving and examining reports of the Comptroller General of the United States and of submitting such recommendations to the Senate as it deems necessary or desirable in connection with the subject matter of such reports; (B) studying the efficiency, economy, and effectiveness of all agencies and departments of the Government; (C) evaluating the effects of laws enacted to reorganize the legislative and executive branches of the Government; and (D) studying the intergovernmental relationships between the United States and the States and municipalities, and between the United States and international organizations of which the United States is a member.",
+    "reason": "Deutsche Übersetzung der Pflichten ersetzt durch den Originalwortlaut von Senate Rule XXV 1(k)(2) (Senate Manual (S. Doc. 113-18), govinfo CDOC-113sdoc18)."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "kuratorennotiz",
+    "action": "replace",
+    "before": "Kein Standing Committee aus Clause 1, sondern ein **Select Committee** mit eigener Jurisdiktionsregel: > ",
+    "after": "",
+    "reason": "Deutsche Einleitung der Kuratoren entfernt; es folgt der Originalwortlaut von House Rule X clause 11(b)."
+  },
+  {
+    "unitId": "joint--joint-economic-committee",
+    "kind": "deutscher_text",
+    "action": "replace",
+    "before": "- Employment Act of 1946 (§ 5); 20 Mitglieder (10 Senat, 10 House), Vorsitz rotiert kammerweise je Kongress - Keine Unterausschüsse mit eigener Jurisdiktion (anders als die 38 Standing Committees) - Aufgaben: Prüfung des Economic Report of the President + eigener Jahresbericht; Untersuchung gesamtwirtschaftlicher Entwicklungen; Anhörungen (Fed, CEA, BLS/BEA/CBO, externe Ökonomen), traditionell rund um zentrale Datenveröffentlichungen; Studien von Mehrheits- und Minderheitsstab (oft gegensätzlich); Empfehlungen an die Fachausschüsse ohne Umsetzungskompetenz",
+    "after": "It shall be the function of the joint committee— (1) to make a continuing study of matters relating to the Economic Report; (2) to study means of coordinating programs in order to further the policy of this chapter; and (3) as a guide to the several committees of the Congress dealing with legislation relating to the Economic Report, not later than March 1 of each year (beginning with the year 1947) to file a report with the Senate and the House of Representatives containing its findings and recommendations with respect to each of the main recommendations made by the President in the Economic Report, and from time to time to make such other reports and recommendations to the Senate and House of Representatives as it deems advisable.",
+    "reason": "Deutsche Zusammenfassung statt Originaltext; ersetzt durch den Wortlaut des Mandats in 15 U.S.C. § 1024(b) (Employment Act of 1946, § 5(b); govinfo USCODE-2023-title15)."
+  },
+  {
+    "unitId": "house--appropriations--agriculture-rural-development-food-and-drug-administration-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "DEVELOP- MENT",
+    "after": "DEVELOPMENT",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--agriculture-rural-development-food-and-drug-administration-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON AGRICULTURE, RURAL DEVELOPMENT, FOOD AND DRUG ADMINISTRATION, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--commerce-justice-science-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON COMMERCE, JUSTICE, SCIENCE, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--defense",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON DEFENSE ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--energy-and-water-development-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Regu- latory",
+    "after": "Regulatory",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--energy-and-water-development-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON ENERGY AND WATER DEVELOPMENT AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--financial-services-and-general-government",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Tech- nical",
+    "after": "Technical",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--financial-services-and-general-government",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Environ- mental",
+    "after": "Environmental",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--financial-services-and-general-government",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Develop- ment",
+    "after": "Development",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--financial-services-and-general-government",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON FINANCIAL SERVICES AND GENERAL GOVERNMENT ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--homeland-security",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON HOMELAND SECURITY ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--interior-environment-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Super- fund",
+    "after": "Superfund",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--interior-environment-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON INTERIOR, ENVIRONMENT, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--labor-health-and-human-services-education-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Adminis- tration",
+    "after": "Administration",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--labor-health-and-human-services-education-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "In- stitute",
+    "after": "Institute",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--labor-health-and-human-services-education-and-related-agencies",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Se- verely",
+    "after": "Severely",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--labor-health-and-human-services-education-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON LABOR, HEALTH AND HUMAN SERVICES, EDUCATION, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--legislative-branch",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON LEGISLATIVE BRANCH ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--military-construction-veterans-affairs-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON MILITARY CONSTRUCTION, VETERANS AFFAIRS, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--national-security-department-of-state-and-related-programs",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "CORPORA- TION",
+    "after": "CORPORATION",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--national-security-department-of-state-and-related-programs",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Can- ada",
+    "after": "Canada",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--national-security-department-of-state-and-related-programs",
+    "kind": "silbentrennung",
+    "action": "replace",
+    "before": "Commis- sion",
+    "after": "Commission",
+    "reason": "Silbentrennung aus dem PDF-Umbruch zusammengeführt."
+  },
+  {
+    "unitId": "house--appropriations--national-security-department-of-state-and-related-programs",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON NATIONAL SECURITY, DEPARTMENT OF STATE, AND RELATED PROGRAMS ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "house--appropriations--transportation-housing-and-urban-development-and-related-agencies",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "SUBCOMMITTEE ON TRANSPORTATION, AND HOUSING AND URBAN DEVELOPMENT, AND RELATED AGENCIES ",
+    "after": "",
+    "reason": "Überschrift aus dem PDF entfernt; sie wiederholt nur den Namen der Unit."
+  },
+  {
+    "unitId": "senate--appropriations--department-of-homeland-security",
+    "kind": "zu_kurzer_text",
+    "action": "name_only",
+    "reason": "Der Text (31 Zeichen) wiederholt nur den Namen der Unit und belegt nichts darüber hinaus; als name_only geführt."
+  },
+  {
+    "unitId": "house--transportation-and-infrastructure--economic-development-public-buildings-and-emergency-management",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "Link to T&I Republicans' GSA Resolutions Database ",
+    "after": "",
+    "reason": "Linktext der Website entfernt."
+  },
+  {
+    "unitId": "senate--health-education-labor-and-pensions--education-and-the-american-family",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "The Subcommittee Chairman is Senator Tommy Tuberville (R-AL) and the Ranking Member is Senator Lisa Blunt Rochester (D-DE) ",
+    "after": "",
+    "reason": "Angaben zu Vorsitz und Ranking Member entfernt; sie gehören nicht zur Zuständigkeit."
+  },
+  {
+    "unitId": "senate--health-education-labor-and-pensions--primary-health-and-retirement-security",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": "The Subcommittee Chairman is Senator Roger Marshall, M.D. (R-KS) and the Ranking Member is Senator Ed Markey (D-MA). ",
+    "after": "",
+    "reason": "Angaben zu Vorsitz und Ranking Member entfernt; sie gehören nicht zur Zuständigkeit."
+  },
+  {
+    "unitId": "house--judiciary--administrative-state-regulatory-reform-and-antitrust",
+    "kind": "artefakt",
+    "action": "replace",
+    "before": " It is chaired by Representative Scott Fitzgerald (WI-05).",
+    "after": "",
+    "reason": "Angabe zum Vorsitz entfernt; sie gehört nicht zur Zuständigkeit."
+  },
+  {
+    "unitId": "house--budget",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Primary Rule X jurisdiction",
+    "after": "Primary Rule X jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--budget",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Supplemental committee jurisdiction",
+    "after": "Supplemental committee jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--ethics",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Primary Rule X jurisdiction",
+    "after": "Primary Rule X jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--ethics",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Supplemental committee jurisdiction",
+    "after": "Supplemental committee jurisdiction",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (A) ",
+    "after": "(A) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (B) ",
+    "after": "(B) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (C) ",
+    "after": "(C) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (D) ",
+    "after": "(D) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (E) ",
+    "after": "(E) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (F) ",
+    "after": "(F) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--homeland-security",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "- (G) ",
+    "after": "(G) ",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (A) ",
+    "after": "(A) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (B) ",
+    "after": "(B) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (C) ",
+    "after": "(C) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (D) ",
+    "after": "(D) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (2) ",
+    "after": "(2) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (3) ",
+    "after": "(3) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> > (4) ",
+    "after": "(4) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (i) ",
+    "after": "(i) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (ii) ",
+    "after": "(ii) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "house--intelligence",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "> - (iii) ",
+    "after": "(iii) ",
+    "reason": "Markdown-Zitatmarker „> “ aus der Extraktion entfernt (Einrückung in House Rule X, clause 11(b)). Sonst gelten wörtliche Zitate über mehrere Absätze als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "including: - Assisting",
+    "after": "including: Assisting",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "; - Preparing",
+    "after": "; Preparing",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "; - Drafting",
+    "after": "; Drafting",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "joint--taxation",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "and - Investigating",
+    "after": "and Investigating",
+    "reason": "Markdown-Listenpunkt „- “ aus der Extraktion entfernt. Sonst gelten wörtliche Zitate über mehrere Listenpunkte als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Oversight of the Small Business Administration",
+    "after": "Oversight of the Small Business Administration",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Consideration of Non-SBA Legislation",
+    "after": "Consideration of Non-SBA Legislation",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  },
+  {
+    "unitId": "senate--small-business-and-entrepreneurship",
+    "kind": "markdown",
+    "action": "replace",
+    "before": "### Study of American Small Businesses",
+    "after": "Study of American Small Businesses",
+    "reason": "Markdown-Überschriftszeichen „### “ aus der Extraktion entfernt; der Wortlaut der Überschrift bleibt. Sonst gelten wörtliche Zitate über die Überschrift hinweg als nicht wörtlich."
+  }
+]

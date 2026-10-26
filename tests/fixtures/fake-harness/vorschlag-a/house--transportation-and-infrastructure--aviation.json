@@ -1,0 +1,39 @@
+{
+  "delayMs": 200,
+  "tokens": {
+    "input": 4200,
+    "cacheRead": 30000,
+    "cacheWrite": 0,
+    "output": 420,
+    "reasoning": 150
+  },
+  "webSearches": 1,
+  "nativeCostUsd": 0.012,
+  "response": {
+    "unit_id": "house--transportation-and-infrastructure--aviation",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "airlines",
+        "evidence_excerpt": "Aviation",
+        "rationale_short": "Die Luftfahrtzustaendigkeit reguliert Fluggesellschaften direkt."
+      },
+      {
+        "industry_id": "airports-air-services",
+        "evidence_excerpt": "Aviation",
+        "rationale_short": "Flughaefen und Flugsicherung sind Kern der Zustaendigkeit."
+      }
+    ],
+    "sources": [
+      {
+        "url": "https://transportation.house.gov/subcommittees/aviation",
+        "belegt": "Zustaendigkeit fuer zivile Luftfahrt"
+      }
+    ],
+    "label_uncertain": false,
+    "uncertainty_note": null
+  }
+}

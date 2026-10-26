@@ -9,7 +9,7 @@ Eine Einheit des Kongresses, die einzeln gemappt wird: ein Subcommittee, ein Com
 _Avoid_: Ausschuss (mehrdeutig), Committee (als Oberbegriff)
 
 **Zuständigkeitstext**:
-Der Wortlaut der Jurisdiktion einer Unit aus den Geschäftsordnungen von House und Senat; einzige zulässige Evidence neben dem Namen der Unit.
+Der Wortlaut der Jurisdiktion einer Unit aus den Geschäftsordnungen von House und Senat (beim Joint Economic Committee aus dem Gesetz, 15 U.S.C. § 1024(b), weil es keine Zuständigkeit in den Geschäftsordnungen hat); einzige zulässige Evidence neben dem Namen der Unit.
 _Avoid_: Jurisdiction-Text, Beschreibung
 
 **name_only**:
@@ -75,7 +75,10 @@ Die einmalige Ausführung einer Konfiguration über alle Units einer Gold-Versio
 _Avoid_: Run (in Texten), Durchgang
 
 **Benchmark-Prompt**:
-Der versionierte Modellvertrag samt Brief, den jedes Modell eines Laufs unverändert erhält.
+Der versionierte Modellvertrag samt Brief, den jedes Modell eines Laufs unverändert erhält; Harnesses ohne Schema-Option (OpenCode) erhalten zusätzlich den versionierten Formatierungsauftrag samt Ausgabeschema.
+
+**Vermerk**:
+Ein Hinweis des Harness an einem Unit-Ergebnis, der die Antwort nicht ungültig macht, aber sichtbar bleiben soll, etwa eine OpenCode-Sitzung, die sich nicht löschen ließ.
 
 **Snapshot**:
 Die eingefrorene, gehashte Kopie von Units, bereinigten Zuständigkeitstexten und Taxonomie.
@@ -92,4 +95,4 @@ Eine Antwort, die auch nach dem Wiederholversuch nicht dem Ausgabeschema entspri
 Eine schemakonforme Antwort, die eine Regel des Benchmark-Prompts bricht, etwa ein nicht wörtliches Zitat oder zu viele Zuordnungen; wird gezählt, nicht wiederholt.
 
 **Geschätzte Kosten**:
-Tokens eines Laufs × Preis aus der Preistabelle zum API-Listenpreis, unabhängig davon, ob über Abo oder API abgerechnet wurde.
+Tokens eines Laufs × Preis aus der Preistabelle zum API-Listenpreis (je Modell laut Harness), unabhängig davon, ob über Abo oder API abgerechnet wurde.

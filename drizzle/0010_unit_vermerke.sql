@@ -1,0 +1,1 @@
+ALTER TABLE "unit_results" ADD COLUMN "warnings" jsonb;

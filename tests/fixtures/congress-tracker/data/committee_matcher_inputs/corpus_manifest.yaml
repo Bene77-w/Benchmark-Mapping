@@ -1,0 +1,17 @@
+# Testauszug aus dem Corpusmanifest des Congress Trackers (drei Mapping-Dateien, unverändert kopiert).
+manifest_version: corpus-manifest-v1
+migration_version: input-basis-v1
+input_root: data/committee_matcher_inputs
+files:
+- path: md/house_veterans_affairs.md
+  role: mapping_input
+  bytes: 3824
+  sha256: 33b76b00cbf022694dc09ac55ca0650c24fc88b8c7b8209e110170116d1ef450
+- path: md/joint_taxation.md
+  role: mapping_input
+  bytes: 1462
+  sha256: 8892e9f23307c3e7a099c21a2830f1200640abc3e705646ce24523725f65dba6
+- path: md/senate_finance.md
+  role: mapping_input
+  bytes: 2943
+  sha256: 28b69bc8f5a88f637a8ace757e4f6032abb9327c85cd21d12c14f4dcc491f81f

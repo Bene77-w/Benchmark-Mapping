@@ -1,0 +1,21 @@
+# Lokale Datenbank, nur über die Loopback-Adresse erreichbar. Port per DB_PORT wählbar (Standard 5432), damit mehrere Worktrees parallel laufen können;
+# COMPOSE_PROJECT_NAME trennt die Volumes paralleler Worktrees.
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: benchmark
+      POSTGRES_PASSWORD: benchmark
+      POSTGRES_DB: benchmark
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U benchmark -d benchmark"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db-data:

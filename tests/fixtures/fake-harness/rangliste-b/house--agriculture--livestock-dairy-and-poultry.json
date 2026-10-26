@@ -1,0 +1,23 @@
+{
+  "delayMs": 100,
+  "tokens": { "input": 4800, "cacheRead": 31000, "cacheWrite": 1200, "output": 410, "reasoning": 120 },
+  "webSearches": 0,
+  "nativeCostUsd": 0.0101,
+  "response": {
+    "unit_id": "house--agriculture--livestock-dairy-and-poultry",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "farm-products",
+        "evidence_excerpt": "all livestock, poultry, dairy, and seafood",
+        "rationale_short": "Viehzucht, Gefluegel und Milch sind landwirtschaftliche Erzeugnisse."
+      }
+    ],
+    "sources": [],
+    "label_uncertain": true,
+    "uncertainty_note": "Verarbeitete Lebensmittel sind nur ueber die Produkte angesprochen."
+  }
+}

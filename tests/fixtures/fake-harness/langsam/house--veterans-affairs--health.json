@@ -1,0 +1,13 @@
+{
+  "delayMs": 3000,
+  "tokens": {
+    "input": 5600,
+    "cacheRead": 31000,
+    "cacheWrite": 0,
+    "output": 95,
+    "reasoning": 40
+  },
+  "webSearches": 0,
+  "nativeCostUsd": 0.0089,
+  "response": "Ich ordne die Unit Medical Care Facilities zu, weil sie die Veterans Health Administration betrifft."
+}

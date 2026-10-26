@@ -1,0 +1,2 @@
+ALTER TABLE "gold_versions" ADD COLUMN "base_version_id" integer;--> statement-breakpoint
+ALTER TABLE "gold_versions" ADD CONSTRAINT "gold_versions_base_version_id_gold_versions_id_fk" FOREIGN KEY ("base_version_id") REFERENCES "public"."gold_versions"("id") ON DELETE no action ON UPDATE no action;

@@ -1,0 +1,29 @@
+{
+  "delayMs": 200,
+  "tokens": {
+    "input": 4200,
+    "cacheRead": 30000,
+    "cacheWrite": 0,
+    "output": 420,
+    "reasoning": 150
+  },
+  "webSearches": 0,
+  "nativeCostUsd": 0.012,
+  "response": {
+    "unit_id": "house--ethics",
+    "decision": "mapped",
+    "no_mapping_reason": null,
+    "broad_scope_exception": false,
+    "broad_scope_reason": null,
+    "assignments": [
+      {
+        "industry_id": "specialty-business-services",
+        "evidence_excerpt": "Ethics",
+        "rationale_short": "Lobbyarbeit wird durch Ethikregeln beruehrt."
+      }
+    ],
+    "sources": [],
+    "label_uncertain": true,
+    "uncertainty_note": "Eher no_mapping."
+  }
+}

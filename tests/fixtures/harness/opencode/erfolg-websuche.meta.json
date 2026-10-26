@@ -1,0 +1,16 @@
+{
+  "recordedAt": "2026-10-24",
+  "constructed": false,
+  "note": "Ohne OPENCODE_WEBSEARCH_PROVIDER aufgenommen (Konfiguration websearch.provider = random); OpenCode wählte Exa ohne API-Schlüssel. 4 Websuchen; im Stream fehlt das step_finish des letzten Schritts.",
+  "command": "opencode run --standalone --format json --agent benchmark -m deepseek/deepseek-flash --title benchmark-mapping-<id>",
+  "task": {
+    "unitId": "senate--appropriations--department-of-homeland-security",
+    "model": "deepseek/deepseek-flash",
+    "effort": "default",
+    "mode": "web",
+    "promptVersion": "prompt-v1"
+  },
+  "exitCode": 0,
+  "timedOut": false,
+  "durationMs": 64885
+}
