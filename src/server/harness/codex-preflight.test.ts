@@ -52,6 +52,15 @@ describe("Codex-Preflight", () => {
     expect(probe).not.toContain("--output-schema");
   });
 
+  test("reicht das Abbruchsignal (Claim-Verlust) an jeden CLI-Aufruf weiter", async () => {
+    const { adapter, runner } = preflight(version, await codexFixture("erfolg-text-only"));
+    const { signal } = new AbortController();
+    await adapter.preflight?.({ model: "gpt-6-luna", effort: "low", mode: "text_only" }, { signal });
+
+    expect(runner.calls).toHaveLength(2);
+    expect(runner.calls.map((call) => call.signal)).toEqual([signal, signal]);
+  });
+
   test("scheitert, wenn plan_type nicht plus ist", async () => {
     const fixture = await codexFixture("erfolg-text-only");
     const free = {

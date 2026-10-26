@@ -55,6 +55,23 @@ describe("OpenCode-Preflight", () => {
     expect(agent.system).not.toContain("Ausgabeformat");
   });
 
+  test("reicht das Abbruchsignal (Claim-Verlust) an Version, Anmeldung und Probe weiter", async () => {
+    const runner = opencodeFixtureRunner([await opencodeFixture("erfolg-text-only")], {
+      integrations: ["deepseek"],
+    });
+    const adapter = createOpencodeAdapter({ runCli: runner, env: {} });
+    const { signal } = new AbortController();
+    await adapter.preflight?.(
+      { model: "deepseek/deepseek-flash", effort: "default", mode: "text_only" },
+      { signal },
+    );
+
+    const signalOf = (first: string) => runner.calls.find((call) => call.args[0] === first)?.signal;
+    expect(signalOf("--version")).toBe(signal);
+    expect(signalOf("auth")).toBe(signal);
+    expect(signalOf("run")).toBe(signal);
+  });
+
   test("lehnt den Modus mit Web ohne Suchanbieter vor der Probe mit klarer Meldung ab", async () => {
     const { result, runner } = await preflight({ mode: "web" }, [await opencodeFixture("erfolg-websuche")]);
 

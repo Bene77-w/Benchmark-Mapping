@@ -12,7 +12,7 @@ import {
   runCli,
   withEmptyWorkdir,
 } from "./cli-process";
-import { type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
+import { type PreflightOptions, type PreflightRequest, type PreflightStep, runPreflight } from "./preflight";
 
 /**
  * Claude-Code-Adapter: schickt eine Unit isoliert an `claude -p` (siehe claude-code-command.ts) und liest das
@@ -103,14 +103,17 @@ export function createClaudeCodeAdapter(options: ClaudeCodeAdapterOptions = {}):
       });
       return toResult(task, cli, commandLine);
     },
-    preflight: (request) => claudePreflight(request, { ...options, runCli: run, env }),
+    preflight: (request, preflightOptions = {}) =>
+      claudePreflight(request, { ...options, runCli: run, env }, preflightOptions),
   };
 }
 
 async function claudePreflight(
   request: PreflightRequest,
   options: ClaudeCodeAdapterOptions & { runCli: CliRunner; env: CliEnv },
+  preflightOptions: PreflightOptions,
 ) {
+  const { signal } = preflightOptions;
   const command = options.command ?? CLAUDE_COMMAND;
   const timeoutMs = options.preflightTimeoutMs ?? PREFLIGHT_TIMEOUT_MS;
   let cliVersion: string | null = null;
@@ -128,6 +131,7 @@ async function claudePreflight(
             cwd,
             env: isolatedEnv(options.env, CLAUDE_ENV),
             timeoutMs,
+            signal,
           }),
         );
         if (cli.spawnError) return { status: "failed", message: cli.spawnError };
@@ -146,7 +150,7 @@ async function claudePreflight(
       id: "model",
       label: "Modell, Effort und Anmeldung",
       async run() {
-        const call = { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs };
+        const call = { ...PROBE[request.mode], outputSchema: null, ...request, timeoutMs, signal };
         const cli = await withEmptyWorkdir(WORKDIR_PREFIX, (cwd) =>
           options.runCli(claudeInvocation(call, { cwd, env: options.env, command })),
         );
@@ -208,7 +212,7 @@ async function claudePreflight(
       },
     },
   ];
-  return runPreflight(steps, () => cliVersion);
+  return runPreflight(steps, () => cliVersion, preflightOptions);
 }
 
 function toResult(task: HarnessTask, cli: CliOutcome, commandLine: string): HarnessResult {

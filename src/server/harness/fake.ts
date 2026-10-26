@@ -158,7 +158,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
       return { ...result, log: log.join("\n") };
     },
     /** Preflight: das Szenario (Modell) muss als Verzeichnis existieren. */
-    preflight: ({ model }) =>
+    preflight: ({ model }, preflightOptions) =>
       runPreflight(
         [
           {
@@ -179,6 +179,7 @@ export function createFakeAdapter(options: FakeAdapterOptions = {}): HarnessAdap
           },
         ],
         () => FAKE_CLI_VERSION,
+        preflightOptions,
       ),
   };
 }

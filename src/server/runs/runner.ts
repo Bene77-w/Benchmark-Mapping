@@ -175,10 +175,16 @@ async function executeRun(db: Database, runId: number, claimId: string, deps: Ru
   };
   try {
     // Preflight vor jedem (auch fortgesetzten) Lauf, mit laufendem Lebenszeichen (echte Proben dauern Sekunden);
-    // ein Fehler blockiert die Ausführung, das Ergebnis bleibt am Lauf.
+    // ein Fehler blockiert die Ausführung, das Ergebnis bleibt am Lauf. Verliert der Worker den Lauf, bricht das
+    // Verlustsignal die CLI-Aufrufe des Preflights ab, und vor jedem Schritt (auch der Probe) prüft er seinen
+    // Claim. Ein Nutzerabbruch beendet den Preflight nicht; danach starten keine Units.
     if (adapter.preflight) {
       const { model, effort, mode } = configuration;
-      const preflight = await adapter.preflight({ model, effort, mode });
+      const preflight = await adapter.preflight(
+        { model, effort, mode },
+        { signal: lost.signal, shouldContinue: async () => (await heartbeat()) !== "lost" },
+      );
+      if (lost.signal.aborted) return;
       await db.update(runs).set({ preflight }).where(ownRun);
       if (!preflight.ok) throw new Error(describePreflightFailure(preflight));
     }

@@ -37,6 +37,15 @@ describe("Claude-Code-Preflight", () => {
     expect(probeArgs[probeArgs.indexOf("--tools") + 1]).toBe("");
   });
 
+  test("reicht das Abbruchsignal (Claim-Verlust) an jeden CLI-Aufruf weiter", async () => {
+    const { adapter, runner } = preflight(version, await probe("erfolg-text-only"));
+    const { signal } = new AbortController();
+    await adapter.preflight?.({ model: "haiku", effort: "low", mode: "text_only" }, { signal });
+
+    expect(runner.calls).toHaveLength(2);
+    expect(runner.calls.map((call) => call.signal)).toEqual([signal, signal]);
+  });
+
   test("besteht im Modus mit Web, wenn die Probe eine Websuche ausgeführt hat", async () => {
     const { adapter, runner } = preflight(version, await probe("erfolg-websuche"));
     const result = await adapter.preflight?.({ model: "haiku", effort: "low", mode: "web" });
