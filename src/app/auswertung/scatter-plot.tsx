@@ -233,8 +233,7 @@ export function ScatterPlot({
         {hoveredPoint && <Tooltip point={hoveredPoint} axis={axis} {...position(hoveredPoint)} />}
       </div>
       <figcaption className="text-xs text-muted-foreground">
-        Jeder Punkt ist ein Lauf (senkrechter Strich: Bootstrap-Intervall). Effizienzgrenze: Läufe, die kein
-        anderer bei höchstens gleichem Aufwand im Score übertrifft.
+        Punkt = Lauf, Strich = Bootstrap-Intervall, Linie = Effizienzgrenze.
         {unknown.length > 0 && " Hohle Punkte rechts: x-Wert unbekannt (nicht 0)."} Klick öffnet den Lauf.
       </figcaption>
     </figure>

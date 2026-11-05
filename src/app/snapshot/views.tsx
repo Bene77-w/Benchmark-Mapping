@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import type { Chamber, CleanupKind, Industry, UnitKind } from "@/server/snapshot/model";
 import type { UnitView } from "@/server/snapshot/store";
@@ -27,7 +28,7 @@ export function UnitList({ units }: { units: UnitView[] }) {
       <p className="text-sm text-muted-foreground">{units.length} Units</p>
       <ul className="space-y-3">
         {units.map((unit) => (
-          <li key={unit.unitId} className="rounded-lg border p-4" data-testid="unit">
+          <li key={unit.unitId} className="rounded-xl border bg-card p-4 shadow-xs" data-testid="unit">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-medium">{unit.unitName}</h2>
               <Badge variant="secondary">{KIND_LABEL[unit.kind]}</Badge>
@@ -47,9 +48,7 @@ export function UnitList({ units }: { units: UnitView[] }) {
             </p>
             <div className="mt-3 text-sm">
               {unit.jurisdictionText === null ? (
-                <p className="italic text-muted-foreground">
-                  Kein Zuständigkeitstext – Belege nur über den Namen der Unit.
-                </p>
+                <p className="italic text-muted-foreground">Kein Zuständigkeitstext</p>
               ) : (
                 <details>
                   <summary className="cursor-pointer text-muted-foreground">Zuständigkeitstext</summary>
@@ -106,27 +105,33 @@ export function IndustryTable({ industries }: { industries: Industry[] }) {
   return (
     <section className="space-y-3">
       <p className="text-sm text-muted-foreground">{industries.length} Industries</p>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Industry</TableHead>
-            <TableHead>Sektor</TableHead>
-            <TableHead>Beschreibung</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {industries.map((industry) => (
-            <TableRow key={industry.industryId} data-testid="industry">
-              <TableCell className="align-top">
-                <div className="font-medium">{industry.industryName}</div>
-                <div className="font-mono text-xs text-muted-foreground">{industry.industryId}</div>
-              </TableCell>
-              <TableCell className="align-top">{industry.sectorName}</TableCell>
-              <TableCell className="whitespace-normal align-top text-sm">{industry.description}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+      <Card>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Industry</TableHead>
+                <TableHead>Sektor</TableHead>
+                <TableHead>Beschreibung</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {industries.map((industry) => (
+                <TableRow key={industry.industryId} data-testid="industry">
+                  <TableCell className="align-top">
+                    <div className="font-medium">{industry.industryName}</div>
+                    <div className="font-mono text-xs text-muted-foreground">{industry.industryId}</div>
+                  </TableCell>
+                  <TableCell className="align-top">{industry.sectorName}</TableCell>
+                  <TableCell className="whitespace-normal align-top text-sm">
+                    {industry.description}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </section>
   );
 }

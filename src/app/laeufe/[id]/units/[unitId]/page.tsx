@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { type ReactNode, Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { getActiveGold } from "@/server/gold/active";
@@ -65,39 +67,46 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
       <Link href={`/laeufe/${run.id}`} className="text-sm text-muted-foreground hover:text-foreground">
         ← Lauf #{run.id}
       </Link>
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold">{source.unitName}</h1>
-        <p className="text-sm text-muted-foreground">
-          <span className="font-mono text-xs">{unitId}</span> · Lauf #{run.id} ·{" "}
-          {configurationLabel(run.configuration)}
-        </p>
-      </div>
+      <PageHeader
+        title={source.unitName}
+        description={
+          <>
+            <span className="font-mono text-xs">{unitId}</span> · {configurationLabel(run.configuration)}
+          </>
+        }
+      />
 
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-muted-foreground">Unit-Score</dt>
-        <dd data-testid="unit-detail-score" className="text-xl font-semibold">
-          {scored ? formatScore(scored.score) : "nicht im Gold"}
-        </dd>
-        <dt className="text-muted-foreground">Bewertung</dt>
-        <dd data-testid="unit-detail-status">
-          {scored ? UNIT_EVALUATION_STATUS_LABELS[scored.status] : "–"} gegen{" "}
-          {evaluation?.goldVersion ?? "– (keine Gold-Version)"} ({MODE_LABELS[mode]})
-        </dd>
-        <dt className="text-muted-foreground">Kategorie</dt>
-        <dd>{goldUnit ? CATEGORY_LABELS[goldUnit.category] : "–"}</dd>
-        <dt className="text-muted-foreground">Status / Versuche</dt>
-        <dd>
-          {UNIT_STATUS_LABELS[result.status]} / {result.attempts}
-          {result.error && (
-            <span className="text-destructive">
-              {" "}
-              – {result.error.kind}
-              {result.error.message ? `: ${result.error.message}` : ""}
-              {result.error.rateLimitResetAt ? ` (bis ${formatDateTime(result.error.rateLimitResetAt)})` : ""}
-            </span>
-          )}
-        </dd>
-      </dl>
+      <Card>
+        <CardContent>
+          <dl className="grid grid-cols-1 items-baseline gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+            <dt className="text-muted-foreground">Unit-Score</dt>
+            <dd data-testid="unit-detail-score" className="text-2xl font-semibold tabular-nums">
+              {scored ? formatScore(scored.score) : "nicht im Gold"}
+            </dd>
+            <dt className="text-muted-foreground">Bewertung</dt>
+            <dd data-testid="unit-detail-status">
+              {scored ? UNIT_EVALUATION_STATUS_LABELS[scored.status] : "–"} gegen{" "}
+              {evaluation?.goldVersion ?? "– (keine Gold-Version)"} ({MODE_LABELS[mode]})
+            </dd>
+            <dt className="text-muted-foreground">Kategorie</dt>
+            <dd>{goldUnit ? CATEGORY_LABELS[goldUnit.category] : "–"}</dd>
+            <dt className="text-muted-foreground">Status / Versuche</dt>
+            <dd>
+              {UNIT_STATUS_LABELS[result.status]} / {result.attempts}
+              {result.error && (
+                <span className="text-destructive">
+                  {" "}
+                  – {result.error.kind}
+                  {result.error.message ? `: ${result.error.message}` : ""}
+                  {result.error.rateLimitResetAt
+                    ? ` (bis ${formatDateTime(result.error.rateLimitResetAt)})`
+                    : ""}
+                </span>
+              )}
+            </dd>
+          </dl>
+        </CardContent>
+      </Card>
 
       {result.warnings.length > 0 && (
         <Section title="Vermerke">
@@ -109,7 +118,6 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
               <li key={warning}>{warning}</li>
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">Das Ergebnis der Unit bleibt gültig.</p>
         </Section>
       )}
 
@@ -136,9 +144,6 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
       </Section>
 
       <Section title="Quelle (Evidence)">
-        <p className="text-sm">
-          <span className="text-muted-foreground">Name der Unit:</span> {source.unitName}
-        </p>
         {source.jurisdictionText === null ? (
           <p className="text-sm italic text-muted-foreground">Kein Zuständigkeitstext (name_only).</p>
         ) : (
@@ -164,10 +169,12 @@ async function UnitResultDetail({ params }: Pick<PageProps<"/laeufe/[id]/units/[
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-medium">{title}</h2>
-      {children}
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 pt-3">{children}</CardContent>
+    </Card>
   );
 }
 
@@ -219,36 +226,40 @@ function AnswerView({
         </dd>
       </dl>
       {answer.assignments.length > 0 && (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Industry</TableHead>
-              <TableHead>Gold-Klasse</TableHead>
-              <TableHead>Evidence</TableHead>
-              <TableHead>Begründung</TableHead>
-              <TableHead>Verstöße</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {answer.assignments.map((assignment, index) => (
-              // Zuordnungen haben keine eigene ID; die Position ist stabil.
-              // biome-ignore lint/suspicious/noArrayIndexKey: Reihenfolge der Antwort
-              <TableRow key={index} data-testid="assignment-row">
-                <TableCell>{industryLabel(industries, assignment.industry_id)}</TableCell>
-                <TableCell>{goldClassLabel(goldUnit, assignment.industry_id, mode)}</TableCell>
-                <TableCell className="max-w-sm whitespace-normal">„{assignment.evidence_excerpt}“</TableCell>
-                <TableCell className="max-w-sm whitespace-normal">{assignment.rationale_short}</TableCell>
-                <TableCell className="whitespace-normal">
-                  {violationsOf(index).map((violation) => (
-                    <Badge key={violation.kind} variant="destructive" className="mr-1">
-                      {VIOLATION_LABELS[violation.kind]}
-                    </Badge>
-                  ))}
-                </TableCell>
+        <div className="-mx-5 border-y">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Industry</TableHead>
+                <TableHead>Gold-Klasse</TableHead>
+                <TableHead>Evidence</TableHead>
+                <TableHead>Begründung</TableHead>
+                <TableHead>Verstöße</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {answer.assignments.map((assignment, index) => (
+                // Zuordnungen haben keine eigene ID; die Position ist stabil.
+                // biome-ignore lint/suspicious/noArrayIndexKey: Reihenfolge der Antwort
+                <TableRow key={index} data-testid="assignment-row">
+                  <TableCell>{industryLabel(industries, assignment.industry_id)}</TableCell>
+                  <TableCell>{goldClassLabel(goldUnit, assignment.industry_id, mode)}</TableCell>
+                  <TableCell className="max-w-sm whitespace-normal">
+                    „{assignment.evidence_excerpt}“
+                  </TableCell>
+                  <TableCell className="max-w-sm whitespace-normal">{assignment.rationale_short}</TableCell>
+                  <TableCell className="whitespace-normal">
+                    {violationsOf(index).map((violation) => (
+                      <Badge key={violation.kind} variant="destructive" className="mr-1">
+                        {VIOLATION_LABELS[violation.kind]}
+                      </Badge>
+                    ))}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
       )}
       {answer.sources.length > 0 && (
         <div>
@@ -351,21 +362,24 @@ function UnitCosts({
     <dl className="flex flex-wrap gap-x-10 gap-y-3 text-sm" data-testid="unit-detail-costs">
       <div>
         <dt className="text-muted-foreground">Geschätzte Kosten ({ESTIMATE_NOTE})</dt>
-        <dd className="text-xl font-semibold" data-testid="unit-detail-cost-estimated">
+        <dd className="text-xl font-semibold tabular-nums" data-testid="unit-detail-cost-estimated">
           {cost === null ? "–" : cost.kind === "estimated" ? formatUsd(cost.usd) : "unbekannt"}
         </dd>
         {cost?.kind === "unknown" && (
           <dd className="text-muted-foreground" data-testid="unit-detail-cost-unknown">
             {cost.reason}.{" "}
-            <Link href={`/modelle?${new URLSearchParams({ modell: model })}`} className="underline">
+            <Link
+              href={`/modelle?${new URLSearchParams({ modell: model })}`}
+              className="text-primary hover:underline"
+            >
               Preis pflegen
             </Link>
           </dd>
         )}
       </div>
       <div>
-        <dt className="text-muted-foreground">Native Kosten laut Harness (Gegenprobe)</dt>
-        <dd className="text-xl font-semibold" data-testid="unit-detail-cost-native">
+        <dt className="text-muted-foreground">Native Kosten laut Harness</dt>
+        <dd className="text-xl font-semibold tabular-nums" data-testid="unit-detail-cost-native">
           {nativeCostLabel(result)}
         </dd>
       </div>

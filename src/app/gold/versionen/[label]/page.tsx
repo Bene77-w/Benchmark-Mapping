@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { toScoringGold } from "@/server/gold/model";
@@ -39,26 +41,32 @@ async function GoldVersionDetail({ params }: Pick<PageProps<"/gold/versionen/[la
   const reevaluation = isLatest ? await reevaluateAllRuns(db, toScoringGold(version)) : null;
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">
-        <span data-testid="gold-version-label">{version.label}</span>
-        {isLatest && <span className="ml-2 text-base font-normal text-muted-foreground">(aktuell)</span>}
-      </h1>
-      <p className="text-sm text-muted-foreground">
-        Eingefroren {formatDateTime(version.frozenAt)} · {version.units.length} Units · Snapshot{" "}
-        <span className="font-mono text-xs">{version.snapshotHash.slice(0, 12)}</span>
-        {version.baseLabel && (
+      <PageHeader
+        title={
           <>
-            {" · "}Ausgangspunkt{" "}
-            <Link
-              href={`/gold/versionen/${version.baseLabel}`}
-              className="underline underline-offset-4"
-              data-testid="gold-version-base"
-            >
-              {version.baseLabel}
-            </Link>
+            <span data-testid="gold-version-label">{version.label}</span>
+            {isLatest && <span className="ml-2 text-base font-normal text-muted-foreground">(aktuell)</span>}
           </>
-        )}
-      </p>
+        }
+        description={
+          <>
+            Eingefroren {formatDateTime(version.frozenAt)} · {version.units.length} Units · Snapshot{" "}
+            <span className="font-mono text-xs">{version.snapshotHash.slice(0, 12)}</span>
+            {version.baseLabel && (
+              <>
+                {" · "}Ausgangspunkt{" "}
+                <Link
+                  href={`/gold/versionen/${version.baseLabel}`}
+                  className="text-primary hover:underline"
+                  data-testid="gold-version-base"
+                >
+                  {version.baseLabel}
+                </Link>
+              </>
+            )}
+          </>
+        }
+      />
       {reevaluation ? (
         <ReevaluationStatusLine status={reevaluation} />
       ) : (
@@ -69,8 +77,7 @@ async function GoldVersionDetail({ params }: Pick<PageProps<"/gold/versionen/[la
       )}
       {draft ? (
         <p className="text-sm text-muted-foreground">
-          Es gibt bereits einen Gold-Entwurf; erst abschließen oder verwerfen, um diese Version als
-          Ausgangspunkt zu übernehmen.
+          Es gibt bereits einen Gold-Entwurf; erst abschließen oder verwerfen.
         </p>
       ) : (
         <ActionForm action={startDraftFromVersionAction}>
@@ -80,35 +87,37 @@ async function GoldVersionDetail({ params }: Pick<PageProps<"/gold/versionen/[la
           </Button>
         </ActionForm>
       )}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Unit</TableHead>
-            <TableHead>Kategorie</TableHead>
-            <TableHead>Gold</TableHead>
-            <TableHead>Notiz</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {version.units.map((unit) => (
-            <TableRow key={unit.unitId} data-testid="gold-version-unit">
-              <TableCell className="font-mono text-xs">{unit.unitId}</TableCell>
-              <TableCell>{CATEGORY_LABELS[unit.category]}</TableCell>
-              <TableCell className="text-xs">
-                {unit.noMapping
-                  ? "no_mapping"
-                  : unit.industries
-                      .map(
-                        (industry) =>
-                          `${industry.industryId} (${industry.class}${industry.webOnly ? ", web_only" : ""})`,
-                      )
-                      .join(", ")}
-              </TableCell>
-              <TableCell className="text-xs whitespace-normal">{unit.note}</TableCell>
+      <Card className="overflow-hidden p-0">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Unit</TableHead>
+              <TableHead>Kategorie</TableHead>
+              <TableHead>Gold</TableHead>
+              <TableHead>Notiz</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {version.units.map((unit) => (
+              <TableRow key={unit.unitId} data-testid="gold-version-unit">
+                <TableCell className="font-mono text-xs">{unit.unitId}</TableCell>
+                <TableCell>{CATEGORY_LABELS[unit.category]}</TableCell>
+                <TableCell className="text-xs">
+                  {unit.noMapping
+                    ? "no_mapping"
+                    : unit.industries
+                        .map(
+                          (industry) =>
+                            `${industry.industryId} (${industry.class}${industry.webOnly ? ", web_only" : ""})`,
+                        )
+                        .join(", ")}
+                </TableCell>
+                <TableCell className="text-xs whitespace-normal">{unit.note}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Card>
     </div>
   );
 }
