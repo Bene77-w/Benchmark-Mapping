@@ -42,6 +42,19 @@ const KILL_GRACE_MS = 5_000;
 
 export type CliRunner = (invocation: CliInvocation) => Promise<CliOutcome>;
 
+/** Signalfunktionen der Prozessgruppen aller laufenden Aufrufe dieses Prozesses (für `killRunningClis`). */
+const runningGroups = new Set<(signal: NodeJS.Signals) => void>();
+
+/**
+ * Sendet allen laufenden CLI-Aufrufen dieses Prozesses samt ihren Kindprozessen ein Signal, z. B. wenn der
+ * Worker beendet wird: Sie laufen in eigenen Prozessgruppen und würden ihn sonst überleben. Gibt die Zahl der
+ * erreichten Aufrufe zurück.
+ */
+export function killRunningClis(signal: NodeJS.Signals): number {
+  for (const killGroup of runningGroups) killGroup(signal);
+  return runningGroups.size;
+}
+
 export const runCli: CliRunner = (invocation) =>
   new Promise((resolve) => {
     const started = performance.now();
@@ -65,6 +78,7 @@ export const runCli: CliRunner = (invocation) =>
         // Prozess bereits beendet.
       }
     };
+    runningGroups.add(killGroup);
     let aborted = false;
     const stop = () => {
       killGroup("SIGTERM");
@@ -84,6 +98,7 @@ export const runCli: CliRunner = (invocation) =>
     const finish = (exitCode: number | null) => {
       if (settled) return;
       settled = true;
+      runningGroups.delete(killGroup);
       clearTimeout(timer);
       invocation.signal?.removeEventListener("abort", onAbort);
       resolve({

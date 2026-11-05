@@ -11,10 +11,9 @@ Stand: 2026-10-26. Die Umsetzung von Spec #1 ist fertig. Diese Punkte musst du s
 
 ## Vor dem ersten Benchmark
 
-- [ ] App und Worker starten (siehe [README](README.md#schnellstart)).
+- [ ] `.env.local` mit `CODEX_AUTH_HOME` und `OPENCODE_WEBSEARCH_PROVIDER` anlegen und alles mit `pnpm app` starten (siehe [README](README.md#schnellstart)).
 - [ ] Unter `/modelle` die Preise der Modelle prüfen, die du testen willst.
 - [ ] Unter `/modelle` Websuchpreise für Codex und OpenCode eintragen. Bisher hat nur Claude Code einen ($0,01 pro Suche). Ohne Preis sind die Kosten von Läufen mit Websuche „unbekannt“.
-- [ ] Für OpenCode mit Websuche einen Suchanbieter wählen, z. B. `OPENCODE_WEBSEARCH_PROVIDER=exa` beim Start des Workers.
 
 ## Gold-Set erstellen
 

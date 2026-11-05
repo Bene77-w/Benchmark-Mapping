@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "pnpm db:prepare && next dev --hostname 127.0.0.1 --port ${APP_PORT:-3000}",
+    "app": "tsx scripts/app.ts",
+    "dev": "pnpm db:prepare && pnpm dev:next",
+    "dev:next": "next dev --hostname 127.0.0.1 --port ${APP_PORT:-3000}",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port ${APP_PORT:-3000}",
     "worker": "tsx scripts/worker.ts",

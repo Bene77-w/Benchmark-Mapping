@@ -1,6 +1,6 @@
 import os from "node:os";
 import { describe, expect, test } from "vitest";
-import { isolatedEnv, runCli } from "./cli-process";
+import { isolatedEnv, killRunningClis, runCli } from "./cli-process";
 
 /** Prozessstart der echten Adapter, geprüft mit Node als Stellvertreter-CLI (keine Agent-CLI). */
 const node = process.execPath;
@@ -35,6 +35,28 @@ describe("runCli", () => {
     const outcome = await runCli({ ...base, command: "gibt-es-nicht-cli-xyz", args: [] });
     expect(outcome.spawnError).toContain("ENOENT");
     expect(outcome.exitCode).toBeNull();
+  });
+
+  test("killRunningClis beendet laufende Aufrufe samt deren Kindprozessen", async () => {
+    const forever = "setInterval(() => {}, 1000)";
+    const running = runCli({
+      ...base,
+      command: node,
+      args: [
+        "-e",
+        `const c = require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(forever)}], { stdio: "ignore" }); console.log(c.pid); ${forever}`,
+      ],
+      timeoutMs: 60_000,
+    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(killRunningClis("SIGKILL")).toBe(1);
+    const outcome = await running;
+    expect(outcome.exitCode).toBeNull();
+    expect(outcome.durationMs).toBeLessThan(5_000);
+    const grandchild = Number(outcome.stdout.trim());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(() => process.kill(grandchild, 0)).toThrow();
+    expect(killRunningClis("SIGTERM")).toBe(0);
   });
 });
 

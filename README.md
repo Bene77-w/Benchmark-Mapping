@@ -38,15 +38,17 @@ flowchart LR
 Voraussetzungen: Node 24, pnpm 11, Docker mit Compose v2 und mindestens eine angemeldete Agent-CLI (`claude`, `codex` oder `opencode`).
 
 ```sh
-pnpm install          # Abhängigkeiten installieren
-docker compose up -d  # Datenbank starten
-pnpm dev              # Datenbank vorbereiten und App starten: http://127.0.0.1:3000
+pnpm install   # einmalig: Abhängigkeiten installieren
+pnpm app       # Datenbank, App und Worker starten: http://127.0.0.1:3000
 ```
 
-In einem zweiten Terminal den Worker starten. Er führt die Läufe aus, die du in der App anlegst:
+`pnpm app` startet die Datenbank, bereitet sie vor und startet dann die App zusammen mit dem Worker. Der Worker führt die Läufe aus, die du in der App anlegst. Strg+C beendet App und Worker gemeinsam; endet einer der beiden unerwartet, wird der andere ebenfalls beendet. Die Datenbank läuft weiter (`docker compose stop` beendet sie).
+
+Einstellungen für den Worker trägst du einmalig in eine Datei `.env.local` im Projektordner ein (Pfade absolut, ohne `~`; gilt für `pnpm app`), zum Beispiel:
 
 ```sh
-pnpm worker
+CODEX_AUTH_HOME=/home/<du>/.codex-b
+OPENCODE_WEBSEARCH_PROVIDER=exa
 ```
 
 Die App ist nur auf diesem Rechner erreichbar (`127.0.0.1`), weil sie keine Anmeldung hat und kostenpflichtige Agent-Aufrufe auslösen kann.
