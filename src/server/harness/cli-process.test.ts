@@ -54,8 +54,19 @@ describe("runCli", () => {
     expect(outcome.exitCode).toBeNull();
     expect(outcome.durationMs).toBeLessThan(5_000);
     const grandchild = Number(outcome.stdout.trim());
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(() => process.kill(grandchild, 0)).toThrow();
+    const alive = () => {
+      try {
+        process.kill(grandchild, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    // Unter Last braucht das Ende des Enkelprozesses mitunter länger als ein fester Zeitraum.
+    for (let waited = 0; alive() && waited < 3_000; waited += 50) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(alive()).toBe(false);
     expect(killRunningClis("SIGTERM")).toBe(0);
   });
 });

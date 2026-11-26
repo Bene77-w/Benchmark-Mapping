@@ -3,17 +3,23 @@
  *
  *   pnpm snapshot:import [Pfad zum Congress Tracker]
  *
- * Ohne Argument gilt CONGRESS_TRACKER_ROOT bzw. der lokale Standardpfad. Schreibt data/snapshot/snapshot.json.
+ * Ohne Argument gilt CONGRESS_TRACKER_ROOT. Schreibt data/snapshot/snapshot.json.
  */
 import path from "node:path";
 import { SNAPSHOT_PATH, writeSnapshotFile } from "@/server/snapshot/snapshot-file";
 import { readCleanupRegister } from "@/server/snapshot-import/cleanup-register";
 import { importSnapshot } from "@/server/snapshot-import/import-snapshot";
 
-const DEFAULT_SOURCE = "/home/bene/Nextcloud/Projekte/bmb_trdprg/congress_tracker";
 const REGISTER_PATH = "data/snapshot/cleanup-register.json";
 
-const sourceRoot = path.resolve(process.argv[2] ?? process.env.CONGRESS_TRACKER_ROOT ?? DEFAULT_SOURCE);
+const source = process.argv[2] ?? process.env.CONGRESS_TRACKER_ROOT;
+if (!source) {
+  console.error(
+    "Pfad zum Congress Tracker fehlt: pnpm snapshot:import <Pfad> oder CONGRESS_TRACKER_ROOT setzen.",
+  );
+  process.exit(1);
+}
+const sourceRoot = path.resolve(source);
 const register = await readCleanupRegister(REGISTER_PATH);
 const snapshot = await importSnapshot({ sourceRoot, register });
 await writeSnapshotFile(SNAPSHOT_PATH, snapshot);

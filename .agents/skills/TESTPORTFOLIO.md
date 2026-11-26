@@ -9,7 +9,7 @@ Dieses Portfolio gilt für die lokale Testumgebung des Projekts AI-Benchmark Map
 | Planung | [wayfinder](wayfinder/SKILL.md), [grilling](grilling/SKILL.md), [domain-modeling](domain-modeling/SKILL.md) |
 | Übergabe zur Umsetzung | [to-spec](to-spec/SKILL.md), [to-tickets](to-tickets/SKILL.md) |
 | Implementierung | [implement-spec](implement-spec/SKILL.md), [tdd](tdd/SKILL.md) |
-| Review und Auswertung | [agent-review](/home/bene/.agents/MCP-skills-control/optional-skills/agent-review/SKILL.md) (global), [retro](retro/SKILL.md) |
+| Review und Auswertung | agent-review (globaler Skill, nicht im Repository), [retro](retro/SKILL.md) |
 | Gezielte Unterstützung | [prototype](prototype/SKILL.md), [codebase-design](codebase-design/SKILL.md), [diagnosing-bugs](diagnosing-bugs/SKILL.md) |
 | Orientierung und Einrichtung | [ask-matt](ask-matt/SKILL.md), [setup-matt-pocock-skills](setup-matt-pocock-skills/SKILL.md) |
 

@@ -1,13 +1,10 @@
 # TODO
 
-Stand: 2026-10-26. Die Umsetzung von Spec #1 ist fertig. Diese Punkte musst du selbst erledigen.
+Stand: 2026-11-26. Die Umsetzung von Spec #1 ist fertig und in `main` gemergt. Diese Punkte musst du selbst erledigen.
 
 ## Version 1 abschließen
 
-- [ ] [PR #15](https://github.com/Bene77-w/Benchmark-Mapping/pull/15) durchsehen und nach `main` mergen. Dadurch schließen sich die Issues #1–#14 automatisch.
 - [ ] Optional: in den Tickets die erfüllten Akzeptanzkriterien abhaken. Ausnahme: die Fixtures für das Ratenlimit in #7, #8 und #9 sind konstruiert und stammen nicht aus echten Aufzeichnungen.
-- [ ] Nach dem Merge den lokalen Checkout auf `main` umstellen: `git switch main && git pull`.
-- [ ] Nicht mehr benötigte Branches löschen: `ticket/*`, `fix/*`, `worktree-agent-*`.
 
 ## Vor dem ersten Benchmark
 

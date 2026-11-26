@@ -35,7 +35,7 @@ flowchart LR
 
 ## Schnellstart
 
-Voraussetzungen: Node 24, pnpm 11, Docker mit Compose v2 und mindestens eine angemeldete Agent-CLI (`claude`, `codex` oder `opencode`).
+Voraussetzungen: Linux oder macOS, Node 24, pnpm 11, Docker mit Compose v2 und mindestens eine angemeldete Agent-CLI (`claude`, `codex` oder `opencode`).
 
 ```sh
 pnpm install   # einmalig: Abhängigkeiten installieren
@@ -51,7 +51,13 @@ CODEX_AUTH_HOME=/home/<du>/.codex-b
 OPENCODE_WEBSEARCH_PROVIDER=exa
 ```
 
-Die App ist nur auf diesem Rechner erreichbar (`127.0.0.1`), weil sie keine Anmeldung hat und kostenpflichtige Agent-Aufrufe auslösen kann.
+## Sicherheit
+
+Die App hat keine Anmeldung. Jeder, der sie erreicht, kann Agent-Läufe starten, die auf dein Abo oder deinen API-Schlüssel laufen. App und Datenbank binden deshalb nur an `127.0.0.1`. Die Datenbank nutzt das lokale Standardpasswort aus `docker-compose.yml`.
+
+- Binde die App nicht an `0.0.0.0` und stelle sie nicht hinter einen öffentlichen Proxy.
+- Zugangsdaten gehören nur in `.env.local`. Die Datei ist per `.gitignore` ausgeschlossen.
+- Die Agents laufen in temporären Arbeitsverzeichnissen mit einer Positivliste an Umgebungsvariablen. Sie sind trotzdem nicht vollständig vom System getrennt. Starte Läufe nur auf einem Rechner, dem du diese CLIs ohnehin anvertraust.
 
 ## Die Seiten der App
 
@@ -94,3 +100,7 @@ Vor dem ersten Browser-Test einmal `pnpm exec playwright install chromium` ausf�
 - Planung und Tickets: [GitHub Issues](https://github.com/Bene77-w/Benchmark-Mapping/issues); Arbeitsablauf für Agents: [AGENTS.md](AGENTS.md)
 
 Die Aufgabe stammt aus dem Committee Matcher des Congress Trackers.
+
+## Lizenz
+
+[MIT](LICENSE). Übernommene Agent-Skills und Datenquellen mit ihren Lizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -25,10 +25,18 @@ export const MAX_PARALLELISM = 5;
 export const DEFAULT_PARALLELISM = 3;
 export const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
+/** Modell und Effort landen als CLI-Argumente bzw. in Codex-Konfigurationswerten; erlaubt sind nur Bezeichner-Zeichen. */
+const MODEL_PATTERN = /^[A-Za-z0-9._:/@[\]-]+$/;
+const EFFORT_PATTERN = /^[A-Za-z0-9_-]+$/;
+
 export const configurationSchema = z.object({
   harness: z.enum(HARNESSES),
-  model: z.string().trim().min(1, "Modell fehlt"),
-  effort: z.string().trim().min(1, "Effort fehlt"),
+  model: z.string().trim().min(1, "Modell fehlt").regex(MODEL_PATTERN, "Modell enthält unzulässige Zeichen"),
+  effort: z
+    .string()
+    .trim()
+    .min(1, "Effort fehlt")
+    .regex(EFFORT_PATTERN, "Effort enthält unzulässige Zeichen"),
   mode: z.enum(MODES),
 });
 export type Configuration = z.infer<typeof configurationSchema>;
