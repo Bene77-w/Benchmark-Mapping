@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type CostEstimate, nativeCostOf, type RunCosts } from "@/server/pricing/cost";
 import { formatUsd } from "@/server/pricing/format";
 
@@ -9,35 +10,44 @@ export const ESTIMATE_NOTE = "geschätzt zum API-Listenpreis";
 export function RunCostSummary({ costs, model }: { costs: RunCosts; model: string }) {
   const { estimated, native } = costs;
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-medium">Kosten</h2>
-      <dl className="flex flex-wrap gap-x-10 gap-y-3 text-sm">
-        <div>
-          <dt className="text-muted-foreground">Geschätzte Kosten ({ESTIMATE_NOTE})</dt>
-          <dd className="text-xl font-semibold" data-testid="run-cost-estimated">
-            {estimated.kind === "estimated" ? formatUsd(estimated.usd) : "unbekannt"}
-          </dd>
-          {estimated.kind === "unknown" && (
-            <dd className="text-muted-foreground" data-testid="run-cost-unknown">
-              {estimated.unknownUnits} Unit(s) ohne Schätzung ({estimated.reasons.join("; ")}); bekannt{" "}
-              {formatUsd(estimated.knownUsd)}.{" "}
-              <Link href={`/modelle?${new URLSearchParams({ modell: model })}`} className="underline">
-                Preis pflegen
-              </Link>
+    <Card>
+      <CardHeader>
+        <CardTitle>Kosten</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-lg border bg-muted/40 px-4 py-3">
+            <dt className="text-xs text-muted-foreground">Geschätzte Kosten ({ESTIMATE_NOTE})</dt>
+            <dd className="text-2xl font-semibold tabular-nums" data-testid="run-cost-estimated">
+              {estimated.kind === "estimated" ? formatUsd(estimated.usd) : "unbekannt"}
             </dd>
-          )}
-        </div>
-        <div>
-          <dt className="text-muted-foreground">Native Kosten laut Harness (Gegenprobe)</dt>
-          <dd className="text-xl font-semibold" data-testid="run-cost-native">
-            {native.usd === null ? "–" : formatUsd(native.usd)}
-          </dd>
-          {native.usd !== null && native.unitsWithout > 0 && (
-            <dd className="text-muted-foreground">{native.unitsWithout} Unit(s) ohne Angabe</dd>
-          )}
-        </div>
-      </dl>
-    </section>
+            {estimated.kind === "unknown" && (
+              <dd className="mt-1 text-xs text-muted-foreground" data-testid="run-cost-unknown">
+                {estimated.unknownUnits} Unit(s) ohne Schätzung ({estimated.reasons.join("; ")}); bekannt{" "}
+                {formatUsd(estimated.knownUsd)}.{" "}
+                <Link
+                  href={`/modelle?${new URLSearchParams({ modell: model })}`}
+                  className="text-primary hover:underline"
+                >
+                  Preis pflegen
+                </Link>
+              </dd>
+            )}
+          </div>
+          <div className="rounded-lg border bg-muted/40 px-4 py-3">
+            <dt className="text-xs text-muted-foreground">Native Kosten laut Harness (Gegenprobe)</dt>
+            <dd className="text-2xl font-semibold tabular-nums" data-testid="run-cost-native">
+              {native.usd === null ? "–" : formatUsd(native.usd)}
+            </dd>
+            {native.usd !== null && native.unitsWithout > 0 && (
+              <dd className="mt-1 text-xs text-muted-foreground">
+                {native.unitsWithout} Unit(s) ohne Angabe
+              </dd>
+            )}
+          </div>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 

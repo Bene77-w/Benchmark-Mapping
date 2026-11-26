@@ -199,8 +199,7 @@ export function ScoreHistoryChart({ points, label }: { points: ScoreHistoryPoint
         </table>
       </details>
       <figcaption className="text-xs text-muted-foreground">
-        Alle auswertbaren Läufe dieser Konfiguration mit gleichem Prompt, Snapshot und Modus, nach Datum
-        (senkrechter Strich: Bootstrap-Intervall). Klick öffnet den Lauf.
+        Läufe dieser Konfiguration nach Datum, Strich = Bootstrap-Intervall. Klick öffnet den Lauf.
       </figcaption>
     </figure>
   );

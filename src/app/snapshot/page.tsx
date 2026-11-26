@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { getDatabase } from "@/server/db/client";
 import { getCurrentSnapshot, searchIndustries, searchUnits } from "@/server/snapshot/store";
@@ -11,8 +14,8 @@ type View = "units" | "taxonomie";
 
 export default function SnapshotPage({ searchParams }: PageProps<"/snapshot">) {
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Snapshot</h1>
+    <div>
+      <PageHeader title="Snapshot" />
       <Suspense fallback={<p className="text-muted-foreground">Lade Snapshot …</p>}>
         <SnapshotContent searchParams={searchParams} />
       </Suspense>
@@ -36,17 +39,18 @@ async function SnapshotContent({ searchParams }: Pick<PageProps<"/snapshot">, "s
 
   return (
     <div className="space-y-6">
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-muted-foreground">Version</dt>
-        <dd>{summary.version}</dd>
-        <dt className="text-muted-foreground">Content-Hash</dt>
-        <dd className="font-mono text-xs break-all">{summary.contentHash}</dd>
-        <dt className="text-muted-foreground">Inhalt</dt>
-        <dd>
-          {summary.unitCount} Units (davon {summary.nameOnlyCount} name_only), {summary.industryCount}{" "}
-          Industries, {summary.cleanupCount} Bereinigungen
-        </dd>
-      </dl>
+      <Card>
+        <CardContent className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+          <Badge variant="secondary">{summary.version}</Badge>
+          <span className="tabular-nums">
+            {summary.unitCount} Units (davon {summary.nameOnlyCount} name_only), {summary.industryCount}{" "}
+            Industries, {summary.cleanupCount} Bereinigungen
+          </span>
+          <span className="font-mono text-xs break-all text-muted-foreground" title="Content-Hash">
+            {summary.contentHash}
+          </span>
+        </CardContent>
+      </Card>
 
       <nav className="flex gap-4 border-b text-sm">
         <ViewLink view="units" current={view} query={query}>
@@ -68,7 +72,7 @@ async function SnapshotContent({ searchParams }: Pick<PageProps<"/snapshot">, "s
             view === "units" ? "Units suchen (Name, Committee, Zuständigkeitstext)" : "Industries suchen"
           }
         />
-        <button type="submit" className="rounded-lg border px-3 text-sm hover:bg-muted">
+        <button type="submit" className="rounded-lg border bg-card px-3 text-sm font-medium hover:bg-muted">
           Suchen
         </button>
       </form>
@@ -101,7 +105,7 @@ function ViewLink({
       aria-current={active ? "page" : undefined}
       className={
         active
-          ? "-mb-px border-b-2 border-foreground pb-2 font-medium"
+          ? "-mb-px border-b-2 border-primary pb-2 font-medium text-primary"
           : "pb-2 text-muted-foreground hover:text-foreground"
       }
     >

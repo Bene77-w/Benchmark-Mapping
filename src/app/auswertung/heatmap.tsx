@@ -170,8 +170,7 @@ export function HeatmapView({ heatmap }: { heatmap: Heatmap }) {
         {hover && <Tooltip hover={hover} />}
       </div>
       <figcaption className="text-xs text-muted-foreground">
-        Je Zeile ein Lauf (Reihenfolge der Rangliste), je Spalte eine Unit der Gold-Version. Klick auf eine
-        Zelle öffnet die Antwort des Laufs zu dieser Unit.
+        Zeile = Lauf, Spalte = Unit. Klick öffnet die Antwort.
       </figcaption>
     </figure>
   );

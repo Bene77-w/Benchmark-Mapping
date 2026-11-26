@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getDatabase } from "@/server/db/client";
 import { buildBenchmarkPrompt, type Mode, type RunKind } from "@/server/prompt/benchmark-prompt";
 import { getCurrentSnapshot, getSnapshotContent } from "@/server/snapshot/store";
@@ -14,14 +16,11 @@ type Variant = (typeof VARIANTS)[number]["value"];
 
 export default function PromptPage({ searchParams }: PageProps<"/prompt">) {
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Benchmark-Prompt</h1>
-      <p className="max-w-3xl text-muted-foreground">
-        Vorschau des fertigen System- und User-Prompts, den ein Modell für eine Unit erhält. Der Prompt-Hash
-        gilt für den ganzen Lauf und deckt die festen Anweisungstexte ab (Vertrag, Brief, Vorlage des
-        User-Prompts, Formatierungsauftrag, Ausgabeschema); die Daten deckt der Snapshot-Hash ab. Der
-        Unit-Hash gilt für den exakt gesendeten Text dieser Unit.
-      </p>
+    <div>
+      <PageHeader
+        title="Benchmark-Prompt"
+        description="Vorschau des System- und User-Prompts für eine Unit."
+      />
       <Suspense fallback={<p className="text-muted-foreground">Lade Prompt …</p>}>
         <PromptPreview searchParams={searchParams} />
       </Suspense>
@@ -55,77 +54,104 @@ async function PromptPreview({ searchParams }: Pick<PageProps<"/prompt">, "searc
 
   return (
     <div className="space-y-6">
-      <form className="flex flex-wrap items-end gap-3" action="/prompt">
-        <label className="flex flex-col gap-1 text-sm">
-          Unit
-          <select name="unit" defaultValue={unitId} className="h-9 max-w-xl rounded-lg border px-2">
-            {units.map((unit) => (
-              <option key={unit.unitId} value={unit.unitId}>
-                {unit.unitId} – {unit.unitName}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Lauf
-          <select name="lauf" defaultValue={variant} className="h-9 rounded-lg border px-2">
-            {VARIANTS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="h-9 rounded-lg border px-3 text-sm hover:bg-muted">
-          Anzeigen
-        </button>
-      </form>
+      <Card>
+        <CardContent>
+          <form className="flex flex-wrap items-end gap-3" action="/prompt">
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
+              Unit
+              <select
+                name="unit"
+                defaultValue={unitId}
+                className="h-9 max-w-xl rounded-lg border bg-background px-2"
+              >
+                {units.map((unit) => (
+                  <option key={unit.unitId} value={unit.unitId}>
+                    {unit.unitId} – {unit.unitName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm text-muted-foreground">
+              Lauf
+              <select name="lauf" defaultValue={variant} className="h-9 rounded-lg border bg-background px-2">
+                {VARIANTS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="submit"
+              className="h-9 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Anzeigen
+            </button>
+          </form>
+        </CardContent>
+      </Card>
 
-      <dl className="grid grid-cols-1 gap-x-6 gap-y-1 text-sm sm:grid-cols-[auto_1fr]">
-        <dt className="text-muted-foreground">Prompt-Version</dt>
-        <dd data-testid="prompt-version">{prompt.version}</dd>
-        <dt className="text-muted-foreground">Prompt-Hash (Lauf)</dt>
-        <dd data-testid="prompt-hash" className="font-mono text-xs break-all">
-          {prompt.promptHash}
-        </dd>
-        <dt className="text-muted-foreground">Unit-Hash</dt>
-        <dd data-testid="unit-prompt-hash" className="font-mono text-xs break-all">
-          {unitPrompt.unitPromptHash}
-        </dd>
-        <dt className="text-muted-foreground">Ausgabeschema</dt>
-        <dd>
-          {prompt.outputSchemaVersion}{" "}
-          <span className="font-mono text-xs break-all text-muted-foreground">{prompt.outputSchemaHash}</span>
-        </dd>
-        <dt className="text-muted-foreground">Snapshot</dt>
-        <dd>
-          {snapshot.version}{" "}
-          <span className="font-mono text-xs break-all text-muted-foreground">{snapshot.contentHash}</span>
-        </dd>
-      </dl>
+      <Card>
+        <CardContent>
+          <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[auto_1fr]">
+            <dt className="text-muted-foreground">Prompt-Version</dt>
+            <dd data-testid="prompt-version">{prompt.version}</dd>
+            <dt className="text-muted-foreground">Prompt-Hash (Lauf)</dt>
+            <dd data-testid="prompt-hash" className="font-mono text-xs break-all">
+              {prompt.promptHash}
+            </dd>
+            <dt className="text-muted-foreground">Unit-Hash</dt>
+            <dd data-testid="unit-prompt-hash" className="font-mono text-xs break-all">
+              {unitPrompt.unitPromptHash}
+            </dd>
+            <dt className="text-muted-foreground">Ausgabeschema</dt>
+            <dd>
+              {prompt.outputSchemaVersion}{" "}
+              <span className="font-mono text-xs break-all text-muted-foreground">
+                {prompt.outputSchemaHash}
+              </span>
+            </dd>
+            <dt className="text-muted-foreground">Snapshot</dt>
+            <dd>
+              {snapshot.version}{" "}
+              <span className="font-mono text-xs break-all text-muted-foreground">
+                {snapshot.contentHash}
+              </span>
+            </dd>
+          </dl>
+        </CardContent>
+      </Card>
 
       <PromptText title="System-Prompt" testId="system-prompt" text={unitPrompt.systemPrompt} />
       <PromptText title="User-Prompt" testId="user-prompt" text={unitPrompt.userPrompt} />
-      <details className="space-y-2">
-        <summary className="cursor-pointer text-lg font-medium">Ausgabeschema (JSON-Schema)</summary>
-        <pre className="max-h-[32rem] overflow-auto rounded-lg border bg-muted/40 p-4 text-xs">
-          {JSON.stringify(prompt.outputSchema, null, 2)}
-        </pre>
-      </details>
+      <Card>
+        <CardContent>
+          <details className="space-y-3">
+            <summary className="cursor-pointer text-sm font-semibold">Ausgabeschema (JSON-Schema)</summary>
+            <pre className="max-h-[32rem] overflow-auto rounded-lg border bg-muted/40 p-4 text-xs">
+              {JSON.stringify(prompt.outputSchema, null, 2)}
+            </pre>
+          </details>
+        </CardContent>
+      </Card>
     </div>
   );
 }
 
 function PromptText({ title, testId, text }: { title: string; testId: string; text: string }) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-medium">{title}</h2>
-      <pre
-        data-testid={testId}
-        className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-4 text-xs"
-      >
-        {text}
-      </pre>
-    </section>
+    <Card>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <pre
+          data-testid={testId}
+          className="max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg border bg-muted/40 p-4 text-xs"
+        >
+          {text}
+        </pre>
+      </CardContent>
+    </Card>
   );
 }

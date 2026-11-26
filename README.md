@@ -1,99 +1,106 @@
 # Benchmark-Mapping
 
-Lokaler Benchmark, der AI-Agents (Claude Code, Codex, OpenCode) headless an einer Mapping-Aufgabe misst: Einheiten des US-Kongresses werden anhand ihres Zuständigkeitstexts den Industries einer festen Branchentaxonomie zugeordnet. Bewertet wird gegen ein von Hand abgenommenes Gold-Set; eine GUI zeigt Score, Kosten und Verlauf aller Läufe.
+**Wie gut ordnen KI-Agents Ausschüsse des US-Kongresses den richtigen Branchen zu?**
 
-Die Aufgabe stammt aus dem Committee Matcher des Congress Trackers (submapper). Planung, Spec und Tickets stehen in den [GitHub Issues](https://github.com/Bene77-w/Benchmark-Mapping/issues); der Arbeitsablauf in [AGENTS.md](AGENTS.md).
+Dieses Projekt ist ein lokaler Benchmark. Es lässt die KI-Agents Claude Code, Codex und OpenCode dieselbe Aufgabe lösen, vergleicht ihre Antworten mit einer von Hand geprüften Musterlösung und zeigt in einer Web-App, welcher Agent am besten, günstigsten und schnellsten ist.
 
-Vorarbeiten: Kandidaten für das Gold-Set in [docs/goldset/kandidaten.md](docs/goldset/kandidaten.md), Recherche zur Kostenerfassung unter [docs/research/](docs/research/).
+Offene Aufgaben stehen in der [TODO-Liste](TODO.md), technische Details in der [technischen Referenz](docs/technik.md).
 
-## Start
+## Die Aufgabe an einem Beispiel
 
-Voraussetzungen: Node 24, pnpm 11, Docker mit Compose v2.
+Jeder Ausschuss (im Projekt **Unit** genannt) hat einen Zuständigkeitstext. Der Agent liest ihn und nennt die passenden Branchen (**Industries**) aus einer festen Liste von 145 Einträgen, jeweils mit einem wörtlichen Zitat als Beleg.
 
-```sh
-pnpm install
-docker compose up -d   # PostgreSQL
-pnpm dev               # Migrationen + Snapshot laden, dann App auf http://127.0.0.1:3000
-pnpm worker            # zweites Terminal: führt die in der GUI angelegten Läufe aus
+| Unit | Zuständigkeit (gekürzt) | Mögliche Antwort |
+| --- | --- | --- |
+| House Agriculture – Livestock, Dairy and Poultry | Viehzucht, Milch, Geflügel … | `farm-products`, `food-distribution` |
+| House Ethics | Verhaltensregeln der Abgeordneten | keine Branche (`no_mapping`) |
+
+Auch „keine Branche“ kann die richtige Antwort sein.
+
+## So funktioniert es
+
+```mermaid
+flowchart LR
+    S[Snapshot<br/>225 Units,<br/>145 Industries] --> G[Gold-Set<br/>30 Units mit<br/>Musterlösung]
+    G --> L[Läufe<br/>Agent beantwortet<br/>jede Unit]
+    L --> B[Bewertung<br/>Vergleich mit<br/>der Musterlösung]
+    B --> A[Auswertung<br/>Rangliste, Kosten,<br/>Diagramme]
 ```
 
-`pnpm dev` ruft vorher `pnpm db:prepare` auf: Es wendet die Migrationen an und lädt den eingecheckten Snapshot, falls er noch nicht in der Datenbank steht, sowie die Preise des datierten models.dev-Auszugs. Die Snapshot-Seite liegt unter `/snapshot`.
+1. **Snapshot**: ein eingefrorener Datenstand aller Units und Industries. Er liegt im Repository und ändert sich nicht.
+2. **Gold-Set**: Du wählst bis zu 30 Units aus und legst je Unit fest, welche Branchen richtig sind. Dabei helfen Vorschläge mehrerer Agents. Das Ergebnis wird als `gold-v1` eingefroren.
+3. **Lauf**: Ein Agent mit festen Einstellungen (Harness, Modell, Effort, mit oder ohne Websuche) beantwortet alle Units des Gold-Sets.
+4. **Bewertung**: Jede Antwort bekommt einen Score zwischen 0 und 1. Wer richtige Branchen vergisst oder falsche nennt, verliert Punkte.
+5. **Auswertung**: Rangliste, Kosten-Score-Diagramm, Heatmap und Verlauf zeigen die Läufe im Vergleich.
 
-Ports sind per Umgebungsvariable wählbar, damit mehrere Worktrees nebeneinander laufen können; beide Befehle müssen dieselben Werte sehen:
+## Schnellstart
 
-```sh
-export DB_PORT=55432 APP_PORT=3101
-docker compose up -d && pnpm dev
-```
-
-`DB_PORT` (Standard 5432) gilt für den Container und die Verbindung der App, `APP_PORT` (Standard 3000) für Next.js. App (`pnpm dev`, `pnpm start`) und Datenbank sind nur über die Loopback-Adresse `127.0.0.1` erreichbar, nicht aus dem Netzwerk: Die App hat keine Anmeldung und kann kostenpflichtige CLI-Aufrufe auslösen. `DATABASE_URL` überschreibt die Verbindung vollständig. Compose trennt Container und Volumes je Verzeichnisname; `docker compose down` stoppt die Datenbank, `docker compose down -v` löscht zusätzlich ihre Daten.
-
-## Snapshot und Import
-
-Die Laufzeit liest nur `data/snapshot/snapshot.json`, nie den Congress Tracker. Der Snapshot enthält alle 225 Units (Typ, Kammer, Committee, Name, übergeordnetes Committee, Parent-Kontext, Zuständigkeitstext oder name_only), die 145 Industries der Taxonomie und das Bereinigungsprotokoll; er trägt `version` und `contentHash` (SHA-256 über den kanonischen Inhalt).
-
-Der Import ist ein einmaliger, nur lesender Schritt:
+Voraussetzungen: Linux oder macOS, Node 24, pnpm 11, Docker mit Compose v2 und mindestens eine angemeldete Agent-CLI (`claude`, `codex` oder `opencode`).
 
 ```sh
-pnpm snapshot:import [Pfad zum Congress Tracker]   # Standard: CONGRESS_TRACKER_ROOT oder ~/Nextcloud/Projekte/bmb_trdprg/congress_tracker
+pnpm install   # einmalig: Abhängigkeiten installieren
+pnpm app       # Datenbank, App und Worker starten: http://127.0.0.1:3000
 ```
 
-Er liest `data/committee_matcher_inputs/` (geprüft gegen die Hashes im Corpusmanifest) und `data/committee_matcher_v2/taxonomy/approved_baseline.json` (geprüft gegen `taxonomy_content_hash`), wendet das Bereinigungsregister `data/snapshot/cleanup-register.json` an und schreibt den Snapshot neu. Gleiche Quelle und gleiches Register ergeben denselben Content-Hash. Jede Regel des Registers nennt Unit, Art, vorher/nachher und Begründung; eine Regel, deren Textstelle nicht genau einmal vorkommt, bricht den Import ab. Ersetzte deutsche Texte stehen dort im Originalwortlaut der Quelle (Senate Rule XXV, House Rule X, 15 U.S.C. § 1024(b)). Markdown-Reste der Extraktion (Überschriftszeichen `###`, Zitatmarker `>`, Listenpunkte `-`) sind als Art `markdown` entfernt, damit zeilenübergreifende Zitate wörtlich bleiben.
+`pnpm app` startet die Datenbank, bereitet sie vor und startet dann die App zusammen mit dem Worker. Der Worker führt die Läufe aus, die du in der App anlegst. Strg+C beendet App und Worker gemeinsam; endet einer der beiden unerwartet, wird der andere ebenfalls beendet. Die Datenbank läuft weiter (`docker compose stop` beendet sie).
 
-## Benchmark-Prompt
-
-Der Benchmark-Prompt `prompt-v1` liegt unter `data/prompts/prompt-v1/`: der Vertrag `contract.md` (abgeleitet aus mapping-system-v3 des Submappers) und je ein Brief für die Modi „nur Zuständigkeitstext“ (`brief-text-only.md`) und „mit Websuche“ (`brief-web.md`) sowie der Gold-Brief für Vorschlagsläufe (`brief-gold.md`). Der System-Prompt ist Vertrag + Brief, der User-Prompt rendert Taxonomie und Unit als Datenblöcke nach der Vorlage `user-prompt.json` (alle festen Texte des User-Prompts; `src/server/prompt/render.ts` legt nur Reihenfolge und Bedingungen fest). Das Ausgabeschema `unit-answer-v1` (strikt, eine Antwort pro Unit) steht in `src/server/prompt/output-schema.ts` als Zod- und JSON-Schema.
-
-Der Prompt-Hash eines Laufs ist SHA-256 über die festen Anweisungstexte: Version, System-Prompt (Vertrag + Brief bzw. Gold-Brief), Vorlage des User-Prompts, Formatierungsauftrag (`format-instruction.md`) und Ausgabeschema; jede Textänderung daran ändert ihn, und der Worker startet einen Lauf nicht, dessen Texte sich seit dem Anlegen geändert haben. Die Daten (Units, Taxonomie) deckt der Snapshot-Hash ab, ein neuer Snapshot lässt den Prompt-Hash gleich. Je Unit-Ergebnis wird zusätzlich der Unit-Hash über den exakt gesendeten Text (System-Prompt, User-Prompt, Ausgabeschema) gespeichert. Harnesses ohne Schema-Option (OpenCode) bekommen das Ausgabeschema im System-Prompt, eingeleitet vom Formatierungsauftrag der Prompt-Version. Der Auftrag gehört für alle Harnesses zum Prompt-Hash (der bleibt so harness-übergreifend vergleichbar, ändert sich aber mit dem Zusatz) und bei OpenCode zusätzlich zum Unit-Hash. `prompt-v1` ist eingefroren (Test mit festen Hashes): Textänderungen gehören in eine neue Version. Die Vorschau unter `/prompt` zeigt System- und User-Prompt je Unit und Lauf-Art samt Prompt-, Unit- und Snapshot-Hash.
-
-## Kosten und Preistabelle
-
-Geschätzte Kosten sind Tokens × Preis aus der eigenen Preistabelle plus Websuchen × Preis pro Suche, zum API-Listenpreis, auch bei Abo-Läufen. Sie werden beim Anzeigen berechnet (`src/server/pricing/cost.ts`, reine Funktion) und nie gespeichert; eine Preisänderung wirkt deshalb sofort auf alle Läufe. Maßgeblich ist je Modell bzw. Harness der Preis mit dem jüngsten Gültig-ab-Datum bis zum Anlegen des Laufs (UTC). Bepreist wird das Modell laut Harness: Meldet er Tokens je Modell (Claude Code `modelUsage`, gespeichert je Unit), wird jedes Modell einzeln bepreist; sonst gilt das gemeldete Modell der Unit (löst Aliase wie `haiku` → `claude-haiku-5-5` auf) und, wenn es keinen Preis hat, das konfigurierte. Fehlt ein nötiger Preis (Modell, Cache-Tarif bei Cache-Tokens, Websuchpreis bei Websuchen) oder meldet der Harness keine Tokens, sind die Kosten „unbekannt“, nie 0; ebenso im Modus mit Websuche, wenn der Harness die Zahl der Websuchen nicht meldet (mit oder ohne Websuchpreis); im Modus ohne Websuche ist eine fehlende Zahl kostenneutral. Die Lauf-Seite zeigt geschätzte und native Kosten (Gegenprobe, z. B. `total_cost_usd` von Claude Code) nebeneinander, je Unit und als Summe; eine native 0 aus einem fehlgeschlagenen Versuch (jedes Ergebnis ohne gültige Antwort, auch ungültiges JSON oder Schemaverstoß bei gemeldetem CLI-Erfolg) gilt als keine Angabe (der Wiederholversuch macht die Summe dann unbekannt).
-
-Unter `/modelle` werden Preise je Modell-ID (USD pro Million Tokens für Input, Cache-Read, Cache-Write, Output; Output gilt auch für Reasoning) und Websuchpreise je Harness angelegt und geändert: Gleiches Gültig-ab-Datum überschreibt, ein neues Datum ergänzt die Historie. Ein Lauf mit unbekanntem Modell legt dort einen Eintrag ohne Preis an. Die Erstbefüllung kommt aus `data/pricing/models-dev-2026-10-24.json` (Anbieter anthropic, openai, deepseek; Grundtarif ohne Kontextstufen; Modell-IDs als `anbieter/modell` und bei Anthropic/OpenAI zusätzlich ohne Präfix). Für die Anthropic-IDs ohne Präfix (Claude Code schreibt Caches mit 1h-TTL) gilt Cache-Write = 2× Input statt des 5-min-Tarifs von models.dev; dazu kommt der Websuchpreis von Claude Code ($0,01 pro Suche). `pnpm db:prepare` lädt den Auszug idempotent und bringt dabei Preise, die noch unverändert aus demselben Auszug stammen, auf den aktuellen Stand; von Hand geänderte bleiben. Neuer Auszug:
+Einstellungen für den Worker trägst du einmalig in eine Datei `.env.local` im Projektordner ein (Pfade absolut, ohne `~`; gilt für `pnpm app`), zum Beispiel:
 
 ```sh
-pnpm pricing:import [api.json]   # ohne Argument von https://models.dev/api.json
+CODEX_AUTH_HOME=/home/<du>/.codex-b
+OPENCODE_WEBSEARCH_PROVIDER=exa
 ```
 
-Danach `MODELS_DEV_SNAPSHOT_PATH` in `src/server/pricing/models-dev.ts` auf die neue Datei setzen; `pnpm db:prepare` ergänzt deren Preise, bestehende bleiben unverändert.
+## Sicherheit
 
-## Läufe
+Die App hat keine Anmeldung. Jeder, der sie erreicht, kann Agent-Läufe starten, die auf dein Abo oder deinen API-Schlüssel laufen. App und Datenbank binden deshalb nur an `127.0.0.1`. Die Datenbank nutzt das lokale Standardpasswort aus `docker-compose.yml`.
 
-Unter `/laeufe` wird eine Konfiguration (Harness, Modell, Effort, Modus) mit Gold-Version (Standard: die neueste), Parallelität (1–5, Standard 3) und Timeout pro Unit (Standard 30 min) als Lauf angelegt. Der Lauf übernimmt die Units der gewählten Gold-Version und speichert sie (Gold-Version beim Start) sowie Prompt-Version und -Hash, Ausgabeschema-Hash und Snapshot-Hash; seine Units stehen als Unit-Ergebnisse fest. Der Worker (`pnpm worker`, eigener Prozess, unabhängig von der GUI) übernimmt wartende Läufe, ruft je Unit den Harness-Adapter auf und schreibt jedes Ergebnis sofort (Antwort oder Fehlerart, Rohantwort, Protokoll, Tokens, Websuchen, Effort, native Kosten, Dauer, Vermerke). Ein Vermerk (z. B. eine OpenCode-Sitzung, die sich nicht löschen ließ) macht das Ergebnis nicht ungültig, steht aber sichtbar an der Unit (Markierung „Vermerk“ in der Unit-Tabelle, Hinweis beim Fortschritt, Liste auf der Unit-Detailseite). Sind alle Units fertig oder fehlgeschlagen, ist der Lauf abgeschlossen; nur abgeschlossene Läufe werden als Bewertung gespeichert. Meldet sich ein Adapter nicht bis zum Timeout plus kurzem Spielraum, bricht der Runner den Aufruf ab (Abbruchsignal an den Adapter, der seinen CLI-Prozess beendet) und wertet ihn als Timeout. Timeout, ungültiges JSON oder Schemaverstoß lösen genau einen Wiederholversuch aus (danach Format-Fehler; Tokens, Websuchen, native Kosten und Dauer beider Versuche zählen, meldet ein Versuch einen Wert nicht, ist die Summe „unbekannt“ statt einer Teilsumme), Regelverstöße und Harness-Fehler nicht; die Zahl der Versuche steht je Unit und zählt jeden begonnenen Aufruf (auch einen, der beim Absturz eines Workers lief), ein Ratenlimit nicht. Bei Ratenlimit warten alle Aufrufe des Laufs, eine Unit fragt alle 10 min stellvertretend nach; die Lauf-Seite zeigt den Zeitpunkt der nächsten Nachfrage. Ein Lauf lässt sich auf seiner Seite abbrechen (laufende Aufrufe werden samt Wiederholversuch noch gespeichert) und später fortsetzen; dann werden nur offene Units aufgerufen. Bricht ein Worker ab (Absturz, Strg+C), übernimmt ein Worker den Lauf, sobald sein Lebenszeichen älter als 60 s ist, und führt die dabei laufenden und offenen Units erneut aus; späte Ergebnisse des alten Workers verfallen (jede Übernahme trägt eine eigene Kennung, nur ihr Worker schreibt Unit-Ergebnisse und den Laufstatus). Bemerkt der alte Worker die Übernahme an seinem nächsten Lebenszeichen, bricht er seine laufenden Adapter-Aufrufe samt CLI-Prozess ab; ein Nutzerabbruch tut das nicht. Die Lauf-Seite zeigt den Fortschritt live und die vollständige Bewertung (Lauf-Score mit Bootstrap-Intervall, Regelverstöße, Evidence-Treue, Kategorien, Abweichungen; Details je Unit, dort auch geschätzte und native Kosten der Unit wie auf der Lauf-Seite) gegen die neueste Gold-Version, auch wenn der Lauf über eine ältere gestartet wurde (ohne Gold-Version lassen sich keine Läufe starten). Gespeicherte Konfigurationen lassen sich mit „Erneut starten“ über die neueste Gold-Version wiederholen.
+- Binde die App nicht an `0.0.0.0` und stelle sie nicht hinter einen öffentlichen Proxy.
+- Zugangsdaten gehören nur in `.env.local`. Die Datei ist per `.gitignore` ausgeschlossen.
+- Die Agents laufen in temporären Arbeitsverzeichnissen mit einer Positivliste an Umgebungsvariablen. Sie sind trotzdem nicht vollständig vom System getrennt. Starte Läufe nur auf einem Rechner, dem du diese CLIs ohnehin anvertraust.
 
-Unter `/gold` entsteht das Gold-Set: bis zu 30 Units aus dem Snapshot wählen und kategorisieren (a–f); die Kandidaten aus `docs/goldset/kandidaten.md` stehen als Kürzel bei den Units, „Empfohlene 30er-Auswahl übernehmen“ füllt den Entwurf mit deren Empfehlung (`data/goldset/kandidaten.json`). Vorschlagsläufe (Gold-Brief, immer mit Websuche) laufen über alle Units des Entwurfs und erscheinen nie in der Auswertung. Die Review je Unit zeigt Zuständigkeitstext, alle Vorschläge nebeneinander (Zuordnungen mit Evidence, `label_uncertain`, `uncertainty_note`, Quellen), hebt Industries hervor, die nicht alle Vorschläge nennen, und erfasst je Industry positiv/vertretbar und web_only, je Unit Kategorie, no_mapping und Notiz; weitere Industries und die Taxonomie zum Nachschlagen stehen darunter. Der Abschluss prüft Vollständigkeit (Industries oder no_mapping, mindestens eine positive Industry), höchstens 2 vertretbare Industries und no_mapping ohne Industries und friert den Entwurf als `gold-v1`, `gold-v2`, … ein; eingefrorene Versionen sind unveränderlich. Eine eingefrorene Version lässt sich als Ausgangspunkt bearbeiten („… als Ausgangspunkt bearbeiten“ auf `/gold` oder der Versionsseite): der neue Entwurf übernimmt Units, Kategorien, Industries und Notizen und merkt sich die Ausgangsversion; ein unveränderter Entwurf lässt sich nicht abschließen. Die Auswertung nutzt immer die neueste Version. Beim Abschluss werden alle abgeschlossenen Benchmark-Läufe ohne Modellaufruf neu bewertet; `/gold`, `/laeufe` und die Versionsseite zeigen den Stand der Neubewertung. Kommt eine Unit hinzu, sind Läufe ohne Antwort darauf unvollständig und fehlen in der Auswertung; „Fehlende Units ergänzen“ auf der Lauf-Seite stellt den Lauf erneut in die Warteschlange und ruft nur die fehlenden Units auf (mit Preflight, Abbruch und Übernahme wie beim Fortsetzen). Antworten auf entfernte Units bleiben gespeichert, zählen aber nicht; kommt die Unit zurück, zählen sie wieder.
+## Die Seiten der App
 
-Vor jedem Lauf (auch beim Fortsetzen) führt der Worker den Preflight des Harness aus; das Ergebnis steht am Lauf und auf der Lauf-Seite. Schlägt eine Prüfung fehl, wird der Lauf mit der Meldung als „nicht ausführbar“ markiert, ohne eine Unit aufzurufen. Verliert der Worker den Lauf während des Preflights, bricht er dessen CLI-Aufrufe ab und startet keinen weiteren Prüfschritt (vor jedem Schritt, also auch vor der Probe, prüft er seine Übernahme); sein Ergebnis verfällt. Ein Nutzerabbruch beendet einen laufenden Preflight nicht.
+| Seite | Wofür |
+| --- | --- |
+| `/gold` | Gold-Set zusammenstellen, Vorschläge prüfen, Version einfrieren |
+| `/laeufe` | Läufe anlegen, Fortschritt verfolgen, abbrechen oder fortsetzen |
+| `/auswertung` | Rangliste, Kosten-Score-Diagramm, Score je Kategorie, Heatmap, Verlauf |
+| `/modelle` | Preise je Modell und Websuche pflegen |
+| `/prompt` | Den genauen Text ansehen, den die Agents bekommen |
+| `/snapshot` | Alle Units und Industries des Datenstands |
 
-**Claude Code** (`claude_code`): Aufruf `claude -p` mit `--system-prompt`, `--json-schema`, `--output-format json --verbose`, `--model`, `--effort`, `--tools` (leer bzw. `WebSearch,WebFetch` im Modus mit Web), `--safe-mode`, `--no-session-persistence`, `--strict-mcp-config`; User-Prompt über stdin, leeres temporäres Arbeitsverzeichnis, nur eine Positivliste von Umgebungsvariablen (`HOME`, `PATH`, …, `CLAUDE_CONFIG_DIR`). Tokens (Summe und je Modell) und Websuchen kommen aus `modelUsage` (fehlt `webSearchRequests` bei einem der Modelle, ist die Zahl der Websuchen unbekannt), `total_cost_usd` wird zur Gegenprobe gespeichert (nach einem Fehler gilt 0 als keine Angabe); Claude Code meldet den Effort nicht (nicht bestätigt). Preflight: `claude --version`, ein kleiner Probeaufruf mit Modell und Effort der Konfiguration (Modell, Anmeldung), Isolation laut `system/init` (nur erlaubte Werkzeuge, keine MCP-Server) und im Modus mit Web eine Probe-Websuche. Die CLI muss angemeldet sein; anderer Pfad über `CLAUDE_CODE_COMMAND`. Aufgezeichnete Ausgaben für die Adapter-Tests liegen in `tests/fixtures/harness/claude-code/`; neu aufnehmen (echter Aufruf, kostet Abo-Kontingent) mit `pnpm exec tsx scripts/record-claude-fixture.ts <name> <unit_id> [--mode web] [--model haiku] [--effort low]`.
+## Wie bewertet wird
 
-**Codex** (`codex`): Aufruf `codex exec` mit `--output-schema`, `--output-last-message`, `--json`, `--sandbox read-only`, `--skip-git-repo-check`, `--ignore-user-config`, `--ignore-rules`, `--disable` für nicht benötigte Werkzeuge (Shell, Plugins, Apps, Unteragenten, Bilder, Browser, Hooks …), `-c tools.web_search=true|false`, `-m`, `-c model_reasoning_effort="…"`; Benchmark-Prompt und Daten der Unit hintereinander über stdin (Codex exec kennt keinen eigenen Systemprompt). Jeder Aufruf läuft in einem temporären Verzeichnis (leeres Arbeitsverzeichnis, leeres `HOME`, eigenes `CODEX_HOME`, Schema- und Antwortdatei), das danach vollständig gelöscht wird. Die Anmeldung wird nie gelesen oder kopiert: `CODEX_HOME/auth.json` ist nur ein Symlink auf `<CODEX_AUTH_HOME>/auth.json`. **`CODEX_AUTH_HOME`** wählt das Konto (Standard `CODEX_HOME`, sonst `~/.codex`); auf diesem Rechner ist das Plus-Konto `CODEX_AUTH_HOME=~/.codex-b`, für Worker (und Dev-Server) setzen. Die Antwort kommt aus der Abschlussdatei (nur bei Exit-Code 0), Tokens aus `turn.completed` (gecachte Tokens aus `input_tokens` herausgerechnet, Reasoning in Output enthalten), Websuchen = `item.completed` mit `web_search`; Modell, CLI-Version und der tatsächlich angewendete Effort kommen aus dem Rollout-Log im temporären `CODEX_HOME` – stimmt er mit der Konfiguration überein, ist der Effort „bestätigt“, sonst „unbestätigt“ (Spalte Effort auf der Lauf-Seite). Codex meldet keine Kosten. Ratenlimit: Meldung „usage limit“ oder `rate_limit_reached_type` im Rollout, Freigabezeit aus dem erschöpften Fenster. Preflight: `codex --version`, Anmeldung vorhanden (nur Existenz), Probeaufruf mit Modell und Effort, **`plan_type`** aus `rate_limits` des Rollout-Logs (muss `plus` sein, anders über `CODEX_EXPECTED_PLAN`), bestätigter Effort, Isolation (Sandbox read-only, nur mitgelieferte Skills im temporären `CODEX_HOME`) und im Modus mit Web eine Probe-Websuche. Anderer CLI-Pfad über `CODEX_COMMAND`. Aufnahmen für die Adapter-Tests liegen in `tests/fixtures/harness/codex/` (zusätzlich `.last-message` und `.rollout.jsonl`; `ratenlimit` ist konstruiert); neu aufnehmen (echter Aufruf, kostet Kontingent): `CODEX_AUTH_HOME=~/.codex-b pnpm exec tsx scripts/record-codex-fixture.ts <name> <unit_id> [--mode web] [--model gpt-6-luna] [--effort low]`.
+- Die Musterlösung teilt Branchen in **positiv** (muss genannt werden) und **vertretbar** (darf genannt werden, höchstens 2 je Unit).
+- Der Score einer Unit verbindet zwei Fragen: Wurden alle positiven Branchen gefunden? Und sind die genannten Branchen richtig?
+- Der Score eines Laufs ist der Mittelwert aller Units, mit einem Unsicherheitsbereich.
+- Eine Antwort im falschen Format zählt 0. In der Heatmap ist sie trotzdem als Format-Fehler erkennbar und nicht mit einer falschen Zuordnung zu verwechseln.
+- Verglichen werden nur Läufe mit demselben Prompt, demselben Datenstand und demselben Modus.
 
-**OpenCode** (`opencode`): Aufruf `opencode run --standalone --format json --agent benchmark -m <provider/modell>[#<variante>] --title <eindeutig>`; Effort ist die Modellvariante (`default` = ohne `#…`), User-Prompt über stdin. `--standalone` ist Pflicht, sonst startet OpenCode einen Hintergrunddienst auf festem Port mit der Umgebung des Aufrufers. Jeder Aufruf läuft in einem temporären Verzeichnis (leeres Arbeitsverzeichnis, leeres `HOME`, eigenes `XDG_CONFIG_HOME`, `XDG_CACHE_HOME`, `XDG_STATE_HOME`, `TMPDIR`), das danach gelöscht wird; die Konfiguration `opencode.json` darin definiert den Agent `benchmark`, dessen `system` (Benchmark-Prompt plus Formatierungsauftrag und Ausgabeschema; der Auftrag steht im Prompt-Hash, der ganze Text im Unit-Hash) den Basis-Prompt von OpenCode ersetzt, verbietet alle Werkzeuge (im Modus mit Web nur `websearch` erlaubt) und schaltet Updates, Snapshots und Formatter ab. Anmeldung: OpenCode v2 hält die Zugangsdaten in der Datenbank `opencode.db` des Datenverzeichnisses (`auth.json` bleibt leer); der Adapter liest oder kopiert sie nie, sondern lässt `XDG_DATA_HOME` auf das Datenverzeichnis des Nutzers zeigen (**`OPENCODE_DATA_HOME`**, sonst `XDG_DATA_HOME`, sonst `~/.local/share`). Die Sitzung entsteht deshalb dort und wird nach dem Aufruf exportiert (`session export`) und gelöscht (`session delete`, bei Fehlschlag bis zu drei Versuche, jeder im Protokoll); fehlt die Sitzungs-ID im Stream, wird sie über den Titel gefunden. Bleibt die Sitzung trotzdem bestehen, ist die Antwort gültig, die Unit trägt aber einen Vermerk (im Preflight scheitert dann die Prüfung „Temporäre Sitzung gelöscht“). Eigene Provider oder Agents aus der Nutzerkonfiguration (`~/.config/opencode`) stehen nicht zur Verfügung; die kostenlosen `opencode/*-free`-Modelle lehnt OpenCode headless ab (HTTP 403). Antwort, Tokens und Kosten kommen aus dem Sitzungsexport (der Stream verliert das letzte `step_finish`): Input ohne Cache, Output = Output + Reasoning, Kosten laut OpenCode (models.dev-Listenpreis) als native Kosten; ein umschließender Codeblock wird entfernt. Websuchen = abgeschlossene `websearch`-Werkzeugaufrufe. Fehler mit HTTP 429 oder Ratenlimit-Meldung werden zum Ratenlimit (ohne Freigabezeit). Modus mit Web braucht **`OPENCODE_WEBSEARCH_PROVIDER`** (`exa`, `tinyfish`, `random` ohne eigenen Schlüssel; `firecrawl`, `parallel`, `tavily` mit `<ANBIETER>_API_KEY` oder Anmeldung in OpenCode); ohne Anbieter lehnen Preflight und Adapter den Modus mit klarer Meldung ab. Preflight: `opencode --version`, Anmeldung für den Provider des Modells (`auth list`, nur IDs), Suchanbieter (nur Web), Probeaufruf mit Modell und Variante, Variante laut Export, Isolation (Agent `benchmark`, keine Werkzeuge außer `websearch`), Probe-Sitzung gelöscht, im Modus mit Web eine Probe-Websuche. Anderer CLI-Pfad über `OPENCODE_COMMAND`. Aufnahmen für die Adapter-Tests liegen in `tests/fixtures/harness/opencode/` (zusätzlich `.export.json`; `schemawidrig` und `ratenlimit` sind konstruiert); neu aufnehmen (echter Aufruf, kostet): `pnpm exec tsx scripts/record-opencode-fixture.ts <name> <unit_id> [--mode web] [--model deepseek/deepseek-flash] [--effort default]` (für Web `OPENCODE_WEBSEARCH_PROVIDER` setzen).
+## Kosten
 
-**Fake-Harness** (Preflight: das Szenario-Verzeichnis muss existieren): Er liest vorbereitete Antworten aus `tests/fixtures/fake-harness/<Szenario>/<unit_id>.json` (Umgebung `FAKE_HARNESS_ROOT`); das Modell der Konfiguration ist der Szenarioname, z. B. `standard` oder `langsam` (dieselben Antworten mit 3 s je Aufruf, zum Zusehen und Abbrechen). Eine Datei enthält entweder eine Antwort (`response`, ein String wird wörtlich gesendet, so entstehen Format-Fehler) oder einen simulierten Fehler (`simulate`: `timeout`, `rate_limit`, `harness_error`), dazu `tokens`, `webSearches`, `nativeCostUsd` und `delayMs`. Statt eines Aufrufs kann die Datei eine Folge `{ "calls": [ … ] }` enthalten: der n-te Aufruf der Unit bekommt den n-ten Eintrag, danach immer den letzten.
+Die App schätzt die Kosten jedes Laufs zum API-Listenpreis: Tokens mal Preis, dazu die Websuchen. Das gilt auch, wenn du über ein Abo bezahlst. So lassen sich alle Agents fair vergleichen. Fehlt ein Preis, zeigt die App „unbekannt“ statt 0 $. Die Preise pflegst du unter `/modelle`.
 
-## Auswertung
-
-`/auswertung` zeigt Rangliste und Scatter-Plot der abgeschlossenen Benchmark-Läufe gegen die neueste Gold-Version (unvollständige Läufe und Vorschlagsläufe nie). Verglichen werden nur Läufe mit gleichem Prompt- und Snapshot-Hash (Auswahl „Prompt und Snapshot“, Standard: die Gruppe des neuesten Laufs) und gleichem Modus. Rangliste, Scatter-Plot und Heatmap zeigen standardmäßig alle Läufe, auch wiederholte Läufe einer Konfiguration. Filter: Modus, Effort („alle Stufen“ oder „beste Stufe je Modell“ = je Harness und Modell der Lauf mit dem höchsten Score, gewählt aus allen Läufen), wiederholte Läufe (zwei sich ausschließende Umschalter „nur neueste je Konfiguration“ und „nur beste je Konfiguration“; ein zweiter Klick zeigt wieder alle, bei „beste Stufe je Modell“ wirken sie nicht) und die x-Achse des Plots (geschätzte Kosten, Tokens oder Dauer pro Unit, gemittelt über die Units der Gold-Version). Der Plot markiert die Effizienzgrenze (Läufe, die kein anderer bei höchstens gleichem Aufwand im Score übertrifft); Läufe mit unbekanntem Wert stehen in einem eigenen Streifen „unbekannt“, nie bei 0. Klick auf Zeile oder Punkt öffnet den Lauf.
-
-Darunter folgen unter denselben Filtern drei weitere Ansichten: **Score je Kategorie** als gruppierte Balken für ausgewählte Läufe der Rangliste (Standard: die drei besten, höchstens vier; die Farbe folgt der Position in der Auswahl), die **Heatmap** Läufe × Units (Zeilen wie die Rangliste, Spalten nach Kategorie, Farbe = Unit-Score; Format-Fehler schraffiert mit „F“, Harness-Fehler mit „!“, beides Score 0, aber erkennbar kein falsches Mapping; Klick auf eine Zelle öffnet die Unit-Detailansicht des Laufs) und der **Verlauf** einer Konfiguration aus der Rangliste über das Laufdatum (alle auswertbaren Läufe der Konfiguration mit gleichem Prompt, Snapshot und Modus, nicht nur der neueste). Kategorie-Diagramm und Verlauf haben zusätzlich eine Tabellenansicht. Der Zustand steht in der Adresse (`gruppe`, `modus`, `effort=alle|beste`, `je-konfiguration=neueste|beste` (fehlt = alle), `x=kosten|tokens|dauer`, `laeufe=<Lauf-IDs>`, `verlauf=<Konfigurations-ID>`). Die Fake-Szenarien `rangliste-a`, `rangliste-b` und `wiederholung` (erster Aufruf von Ethics richtig, jeder weitere falsch: wiederholte Läufe einer Konfiguration mit verschiedenem Score) dienen dem GUI-Test.
-
-## Prüfungen
+## Tests
 
 ```sh
-pnpm check       # Biome, Typecheck, Vitest
-pnpm test:e2e    # Playwright in eigener Umgebung (Datenbankserver muss laufen: docker compose up -d)
+pnpm check      # Formatierung, Typen, Unit-Tests
+pnpm test:e2e   # Browser-Tests in einer eigenen Test-Datenbank (Datenbank muss laufen)
 ```
 
-`pnpm test:e2e` berührt die Daten der App nicht: Es legt die eigene Datenbank `benchmark_e2e` auf dem Datenbankserver (`DB_PORT`, anders über `E2E_DB_PORT` oder vollständig `E2E_DATABASE_URL`) bei jedem Aufruf leer neu an (`pnpm e2e:reset-db`), startet einen eigenen Dev-Server auf `E2E_APP_PORT` (Standard 3001, Build-Verzeichnis `.next-e2e`) und einen eigenen Worker gegen diese Datenbank. Läufe nutzen dort das Test-Gold (`tests/fixtures/test-gold.json`). Ein schon laufender Server wird nie wiederverwendet (belegter Port = Abbruch), und Konfiguration wie Reset brechen ab, wenn die Datenbank keine Test-Datenbank (Name mit Endung `_e2e`) oder dieselbe Datenbank wie die der App ist. Verglichen wird das Ziel, mit dem sich `pg` tatsächlich verbindet (ausgewertet vom installierten `pg`, also einschließlich `?host=`/`?port=` und PG*-Umgebungsvariablen), nicht die Schreibweise: Host (localhost, 127.0.0.1 und ::1 gelten als gleich), Port und Datenbankname; Schema `postgres://`/`postgresql://`, Zugangsdaten und Optionen wie `sslmode` zählen nicht. Die URL der Test-Datenbank darf ihr Ziel nicht über Query-Parameter ändern (`host`, `hostaddr`, `port`, `database`, `dbname`, `user`, `service` werden abgelehnt). Das Reset-Skript prüft das unmittelbar vor dem Löschen erneut gegen `APP_DATABASE_URL` (setzt Playwright; ohne sie bricht es ab). Der normale Dev-Server darf daneben weiterlaufen. Parallele Worktrees setzen zusätzlich `E2E_APP_PORT`.
+Vor dem ersten Browser-Test einmal `pnpm exec playwright install chromium` ausführen.
 
-Vor dem ersten `pnpm test:e2e` den Browser für Playwright installieren (einmal je Rechner bzw. nach einem Playwright-Update):
+## Mehr dazu
 
-```sh
-pnpm exec playwright install chromium              # nur der Browser
-pnpm exec playwright install --with-deps chromium  # Linux: zusätzlich die Systembibliotheken (braucht sudo)
-```
+- [Technische Referenz](docs/technik.md): Ports, Import, Prompt, Kosten, Agents, Auswertung und Tests im Detail
+- [Glossar](GLOSSARY.md): alle Fachbegriffe
+- [Architekturentscheidungen](docs/adr/)
+- [Gold-Kandidaten](docs/goldset/kandidaten.md) und [Recherche zur Kostenerfassung](docs/research/)
+- Planung und Tickets: [GitHub Issues](https://github.com/Bene77-w/Benchmark-Mapping/issues); Arbeitsablauf für Agents: [AGENTS.md](AGENTS.md)
 
-Vitest-Tests mit Datenbank laufen gegen eine In-Memory-PGlite (`src/server/db/test-database.ts`) und brauchen kein Docker.
+Die Aufgabe stammt aus dem Committee Matcher des Congress Trackers.
+
+## Lizenz
+
+[MIT](LICENSE). Übernommene Agent-Skills und Datenquellen mit ihren Lizenzen stehen in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

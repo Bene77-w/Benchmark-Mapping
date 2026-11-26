@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { getDatabase } from "@/server/db/client";
 import { HARNESS_LABELS, HARNESSES } from "@/server/harness/adapter";
@@ -13,16 +15,11 @@ export const metadata = { title: "Modelle und Preise – Benchmark-Mapping" };
 
 export default function ModelsPage({ searchParams }: PageProps<"/modelle">) {
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Modelle und Preise</h1>
-      <p className="max-w-3xl text-muted-foreground">
-        Preistabelle für die geschätzten Kosten zum API-Listenpreis (Tokens × Preis + Websuchen × Preis pro
-        Suche), unabhängig davon, ob ein Lauf über Abo oder API abgerechnet wurde. Je Lauf gilt der Preis mit
-        dem jüngsten Gültig-ab-Datum bis zum Anlegen des Laufs (UTC). Erstbefüllung aus einem datierten
-        models.dev-Auszug (Grundtarif, ohne Kontextstufen). Läufe mit unbekanntem Modell legen hier einen
-        Eintrag ohne Preis an; ihre Kosten bleiben „unbekannt“, bis ein Preis gepflegt ist. Änderungen wirken
-        sofort auf die Anzeige aller betroffenen Läufe.
-      </p>
+    <div>
+      <PageHeader
+        title="Modelle und Preise"
+        description="Geschätzte Kosten zum API-Listenpreis; je Lauf gilt der jüngste Preis bis zum Anlegen des Laufs (UTC)."
+      />
       <Suspense fallback={<p className="text-muted-foreground">Lade Preistabelle …</p>}>
         <PriceTableContent searchParams={searchParams} />
       </Suspense>
@@ -39,112 +36,130 @@ async function PriceTableContent({ searchParams }: Pick<PageProps<"/modelle">, "
   const withPrice = models.filter((model) => model.prices.length > 0);
 
   return (
-    <>
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Preis anlegen oder ändern</h2>
-        <ModelPriceForm
-          key={`${defaults.modelId}|${defaults.validFrom}`}
-          defaults={defaults}
-          modelIds={models.map((model) => model.id)}
-        />
-      </section>
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Preis anlegen oder ändern</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ModelPriceForm
+            key={`${defaults.modelId}|${defaults.validFrom}`}
+            defaults={defaults}
+            modelIds={models.map((model) => model.id)}
+          />
+        </CardContent>
+      </Card>
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Websuche</h2>
-        <p className="text-sm text-muted-foreground">
-          Preis pro Websuche je Harness. Fehlt er, sind die Kosten von Units mit Websuchen „unbekannt“.
-        </p>
-        {webSearchPrices.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Noch keine Websuchpreise.</p>
-        ) : (
+      <Card>
+        <CardHeader>
+          <CardTitle>Websuche</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4 p-0">
+          {webSearchPrices.length === 0 ? (
+            <p className="px-4 text-sm text-muted-foreground">Noch keine Websuchpreise.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Harness</TableHead>
+                  <TableHead>Gültig ab</TableHead>
+                  <TableHead className="text-right">USD pro Suche</TableHead>
+                  <TableHead>Herkunft</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {webSearchPrices.map((price) => (
+                  <TableRow key={`${price.harness}|${price.validFrom}`} data-testid="web-search-price-row">
+                    <TableCell>{HARNESS_LABELS[price.harness]}</TableCell>
+                    <TableCell>{price.validFrom}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatPrice(price.perSearch)}</TableCell>
+                    <TableCell className="text-muted-foreground">{price.source}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+          <div className="px-4 pb-4">
+            <WebSearchPriceForm
+              harnesses={HARNESSES.map((harness) => ({ value: harness, label: HARNESS_LABELS[harness] }))}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Modelle ohne Preis</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {withoutPrice.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Keine.</p>
+          ) : (
+            <ul className="flex flex-wrap gap-2" data-testid="models-without-price">
+              {withoutPrice.map((model) => (
+                <li key={model.id} data-model-id={model.id}>
+                  <Link href={editHref(model.id)} className="hover:underline">
+                    <Badge variant="outline">
+                      {model.id} · {model.source}
+                    </Badge>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Preise je Modell</CardTitle>
+          <p className="text-xs text-muted-foreground">USD pro Million Tokens</p>
+        </CardHeader>
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Harness</TableHead>
+                <TableHead>Modell-ID</TableHead>
                 <TableHead>Gültig ab</TableHead>
-                <TableHead className="text-right">USD pro Suche</TableHead>
+                <TableHead className="text-right">Input</TableHead>
+                <TableHead className="text-right">Cache-Read</TableHead>
+                <TableHead className="text-right">Cache-Write</TableHead>
+                <TableHead className="text-right">Output</TableHead>
                 <TableHead>Herkunft</TableHead>
+                <TableHead />
               </TableRow>
             </TableHeader>
             <TableBody>
-              {webSearchPrices.map((price) => (
-                <TableRow key={`${price.harness}|${price.validFrom}`} data-testid="web-search-price-row">
-                  <TableCell>{HARNESS_LABELS[price.harness]}</TableCell>
-                  <TableCell>{price.validFrom}</TableCell>
-                  <TableCell className="text-right">{formatPrice(price.perSearch)}</TableCell>
-                  <TableCell className="text-muted-foreground">{price.source}</TableCell>
-                </TableRow>
-              ))}
+              {withPrice.flatMap((model) =>
+                model.prices.map((price, index) => (
+                  <TableRow
+                    key={`${model.id}|${price.validFrom}`}
+                    data-model-id={model.id}
+                    data-testid="price-row"
+                  >
+                    <TableCell className="font-mono text-xs">{index === 0 ? model.id : ""}</TableCell>
+                    <TableCell>{price.validFrom}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatPrice(price.input)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatPrice(price.cacheRead)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatPrice(price.cacheWrite)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatPrice(price.output)}</TableCell>
+                    <TableCell className="text-muted-foreground">{price.source}</TableCell>
+                    <TableCell>
+                      <Link
+                        href={editHref(model.id, price.validFrom)}
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Bearbeiten
+                      </Link>
+                    </TableCell>
+                  </TableRow>
+                )),
+              )}
             </TableBody>
           </Table>
-        )}
-        <WebSearchPriceForm
-          harnesses={HARNESSES.map((harness) => ({ value: harness, label: HARNESS_LABELS[harness] }))}
-        />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Modelle ohne Preis</h2>
-        {withoutPrice.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Keine.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2" data-testid="models-without-price">
-            {withoutPrice.map((model) => (
-              <li key={model.id} data-model-id={model.id}>
-                <Link href={editHref(model.id)} className="hover:underline">
-                  <Badge variant="outline">
-                    {model.id} · {model.source}
-                  </Badge>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium">Preise je Modell</h2>
-        <p className="text-sm text-muted-foreground">USD pro Million Tokens; neuester Preis zuerst.</p>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Modell-ID</TableHead>
-              <TableHead>Gültig ab</TableHead>
-              <TableHead className="text-right">Input</TableHead>
-              <TableHead className="text-right">Cache-Read</TableHead>
-              <TableHead className="text-right">Cache-Write</TableHead>
-              <TableHead className="text-right">Output</TableHead>
-              <TableHead>Herkunft</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {withPrice.flatMap((model) =>
-              model.prices.map((price, index) => (
-                <TableRow
-                  key={`${model.id}|${price.validFrom}`}
-                  data-model-id={model.id}
-                  data-testid="price-row"
-                >
-                  <TableCell className="font-mono text-xs">{index === 0 ? model.id : ""}</TableCell>
-                  <TableCell>{price.validFrom}</TableCell>
-                  <TableCell className="text-right">{formatPrice(price.input)}</TableCell>
-                  <TableCell className="text-right">{formatPrice(price.cacheRead)}</TableCell>
-                  <TableCell className="text-right">{formatPrice(price.cacheWrite)}</TableCell>
-                  <TableCell className="text-right">{formatPrice(price.output)}</TableCell>
-                  <TableCell className="text-muted-foreground">{price.source}</TableCell>
-                  <TableCell>
-                    <Link href={editHref(model.id, price.validFrom)} className="text-sm hover:underline">
-                      Bearbeiten
-                    </Link>
-                  </TableCell>
-                </TableRow>
-              )),
-            )}
-          </TableBody>
-        </Table>
-      </section>
-    </>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 

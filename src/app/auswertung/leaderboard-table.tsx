@@ -9,7 +9,7 @@ import { costLabel, durationLabel, tokensLabel } from "./format";
 /** Rangliste: ein Lauf je Zeile, absteigend nach Score; Klick führt zur Lauf-Detailansicht. */
 export function LeaderboardTable({ entries }: { entries: AnalysisEntry[] }) {
   return (
-    <Table data-testid="leaderboard">
+    <Table data-testid="leaderboard" className="tabular-nums">
       <TableHeader>
         <TableRow>
           <TableHead className="w-10">#</TableHead>
@@ -38,7 +38,7 @@ export function LeaderboardTable({ entries }: { entries: AnalysisEntry[] }) {
             >
               <TableCell className="tabular-nums">{index + 1}</TableCell>
               <TableCell>
-                <Link href={href} className="font-medium underline-offset-4 hover:underline">
+                <Link href={href} className="font-medium text-primary hover:underline">
                   {configuration.model} · {configuration.effort}
                 </Link>
                 <div className="text-xs text-muted-foreground">
@@ -78,7 +78,7 @@ export function LeaderboardTable({ entries }: { entries: AnalysisEntry[] }) {
               </TableCell>
               <TableCell className="text-right tabular-nums">{entry.violations}</TableCell>
               <TableCell className="text-xs text-muted-foreground">
-                <Link href={href} className="underline-offset-4 hover:underline">
+                <Link href={href} className="text-primary hover:underline">
                   #{entry.runId}
                 </Link>
                 <div>{formatDateTime(entry.createdAt)}</div>

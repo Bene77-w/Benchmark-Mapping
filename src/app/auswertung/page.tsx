@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { PageHeader } from "@/components/page-header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   type Analysis,
   type AnalysisState,
@@ -36,8 +38,11 @@ export const metadata = { title: "Auswertung – Benchmark-Mapping" };
 
 export default function AnalysisPage({ searchParams }: PageProps<"/auswertung">) {
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Auswertung</h1>
+    <div>
+      <PageHeader
+        title="Auswertung"
+        description="Nur Läufe mit gleichem Prompt, Snapshot und Modus werden verglichen."
+      />
       <Suspense fallback={<p className="text-muted-foreground">Lade Auswertung …</p>}>
         <AnalysisContent searchParams={searchParams} />
       </Suspense>
@@ -53,7 +58,7 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
     return (
       <p className="text-muted-foreground">
         Noch keine Gold-Version – die Auswertung braucht eine abgeschlossene Gold-Review unter{" "}
-        <Link href="/gold" className="underline">
+        <Link href="/gold" className="text-primary hover:underline">
           Gold
         </Link>
         .
@@ -74,25 +79,20 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
   const history = buildScoreHistory(analysis, requested.historyConfiguration);
 
   return (
-    <>
-      <p className="max-w-3xl text-sm text-muted-foreground">
-        Abgeschlossene Benchmark-Läufe, bewertet gegen{" "}
-        <span data-testid="analysis-gold">{current.goldVersion}</span>. Verglichen werden nur Läufe mit
-        gleichem Prompt- und Snapshot-Hash und gleichem Modus. Rangliste, Scatter-Plot und Heatmap zeigen alle
-        Läufe, auch wiederholte einer Konfiguration; die Umschalter „nur neueste“ und „nur beste je
-        Konfiguration“ beschränken sie auf einen Lauf je Konfiguration („beste Stufe je Modell“ wählt immer
-        aus allen Läufen). Bei gleichem Score steht der günstigere Lauf vorn. Kosten {ESTIMATE_NOTE}, pro Unit der Gold-Version.
+    <div className="space-y-6">
+      <p className="text-sm text-muted-foreground">
+        Gold <span data-testid="analysis-gold">{current.goldVersion}</span>
         {current.incomplete.length > 0 && (
           <>
-            {" "}
+            {" · "}
             <span data-testid="analysis-incomplete">
               {current.incomplete.length} Lauf/Läufe unvollständig für {current.goldVersion} und ausgeblendet
             </span>{" "}
             (unter{" "}
-            <Link href="/laeufe" className="underline">
+            <Link href="/laeufe" className="text-primary hover:underline">
               Läufe
             </Link>{" "}
-            ergänzen).
+            ergänzen)
           </>
         )}
       </p>
@@ -104,45 +104,68 @@ async function AnalysisContent({ searchParams }: Pick<PageProps<"/auswertung">, 
       ) : (
         <>
           <FilterBar analysis={analysis} state={state} />
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium">Score gegen Aufwand</h2>
-            <ScatterPlot
-              axis={state.xAxis}
-              efficient={analysis.efficient[state.xAxis]}
-              points={analysis.entries.map((entry) => ({
-                runId: entry.runId,
-                label: `${entry.configuration.model} · ${entry.configuration.effort}`,
-                detail: `${HARNESS_LABELS[entry.configuration.harness]} · ${MODE_LABELS[entry.configuration.mode]} · Lauf #${entry.runId}`,
-                score: entry.score,
-                interval: entry.interval,
-                x: xValue(entry, state.xAxis),
-              }))}
-            />
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium">Rangliste</h2>
-            <LeaderboardTable entries={analysis.entries} />
-            <p className="text-xs text-muted-foreground">* {ESTIMATE_NOTE}</p>
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium">Score je Kategorie</h2>
-            <CategorySelection analysis={analysis} state={state} chart={categoryChart} />
-            <CategoryChartView chart={categoryChart} />
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium">Heatmap Läufe × Units</h2>
-            <HeatmapView heatmap={buildHeatmap(analysis.entries)} />
-          </section>
-          <section className="space-y-3">
-            <h2 className="text-lg font-medium">Verlauf je Konfiguration</h2>
-            <HistorySelection state={state} history={history} />
-            {history.configuration && (
-              <ScoreHistoryChart points={history.points} label={configurationLabel(history.configuration)} />
-            )}
-          </section>
+          <Card>
+            <CardHeader>
+              <CardTitle>Score gegen Aufwand</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <ScatterPlot
+                axis={state.xAxis}
+                efficient={analysis.efficient[state.xAxis]}
+                points={analysis.entries.map((entry) => ({
+                  runId: entry.runId,
+                  label: `${entry.configuration.model} · ${entry.configuration.effort}`,
+                  detail: `${HARNESS_LABELS[entry.configuration.harness]} · ${MODE_LABELS[entry.configuration.mode]} · Lauf #${entry.runId}`,
+                  score: entry.score,
+                  interval: entry.interval,
+                  x: xValue(entry, state.xAxis),
+                }))}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Rangliste</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <LeaderboardTable entries={analysis.entries} />
+              <p className="text-xs text-muted-foreground">* {ESTIMATE_NOTE}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Score je Kategorie</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <CategorySelection analysis={analysis} state={state} chart={categoryChart} />
+              <CategoryChartView chart={categoryChart} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Heatmap Läufe × Units</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <HeatmapView heatmap={buildHeatmap(analysis.entries)} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Verlauf je Konfiguration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <HistorySelection state={state} history={history} />
+              {history.configuration && (
+                <ScoreHistoryChart
+                  points={history.points}
+                  label={configurationLabel(history.configuration)}
+                />
+              )}
+            </CardContent>
+          </Card>
         </>
       )}
-    </>
+    </div>
   );
 }
 

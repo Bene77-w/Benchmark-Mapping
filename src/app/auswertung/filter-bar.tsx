@@ -1,5 +1,6 @@
 import { cn } from "cn";
 import Link from "next/link";
+import { Card } from "@/components/ui/card";
 import {
   type Analysis,
   type AnalysisState,
@@ -45,7 +46,10 @@ export function analysisHref(
  */
 export function FilterBar({ analysis, state }: { analysis: Analysis; state: AnalysisState }) {
   return (
-    <div className="flex flex-wrap items-end gap-x-8 gap-y-3 text-sm" data-testid="analysis-filters">
+    <Card
+      className="flex flex-wrap items-end gap-x-8 gap-y-3 px-5 py-4 text-sm"
+      data-testid="analysis-filters"
+    >
       {analysis.groups.length > 1 && (
         <FilterGroup label="Prompt und Snapshot">
           {analysis.groups.map((group) => (
@@ -116,7 +120,7 @@ export function FilterBar({ analysis, state }: { analysis: Analysis; state: Anal
           </FilterLink>
         ))}
       </FilterGroup>
-    </div>
+    </Card>
   );
 }
 
@@ -147,8 +151,10 @@ export function FilterLink({
   [attribute: `data-${string}`]: string | number | undefined;
 }) {
   const className = cn(
-    "rounded-md border px-2.5 py-1",
-    active ? "border-foreground bg-foreground text-background" : "hover:bg-muted",
+    "rounded-md border px-2.5 py-1 text-sm transition-colors",
+    active
+      ? "border-primary bg-primary text-primary-foreground"
+      : "bg-background hover:bg-accent hover:text-accent-foreground",
     disabled && "pointer-events-none opacity-40",
   );
   if (disabled) {

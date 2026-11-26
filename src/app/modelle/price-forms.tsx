@@ -58,10 +58,9 @@ export function ModelPriceForm({ defaults, modelIds }: { defaults: ModelPriceDef
         />
         <PriceField id="price-output" name="output" label="Output" value={defaults.output} required />
       </div>
-      <p className="text-sm text-muted-foreground">
-        USD pro Million Tokens zum API-Listenpreis. Output gilt auch für Reasoning-Tokens. Leere Cache-Felder
-        = kein Tarif; fallen Cache-Tokens an, sind die Kosten dann „unbekannt“. Gleiches Modell und Datum
-        überschreibt den bestehenden Preis, ein neues Datum ergänzt die Historie.
+      <p className="text-xs text-muted-foreground">
+        USD pro Million Tokens. Leere Cache-Felder = kein Tarif (Kosten dann „unbekannt“). Gleiches Modell und
+        Datum überschreibt den Preis.
       </p>
       <FormStatus state={state} />
       <Button type="submit" disabled={pending}>

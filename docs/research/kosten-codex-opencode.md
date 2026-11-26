@@ -46,7 +46,7 @@ Befunde:
 - `total = input + output` (13225+15 = 13240, 31011+87 = 31098). Reasoning ist also in `output_tokens` **enthalten**. Gecachte Tokens sind laut Quellcode in `input_tokens` enthalten: `non_cached_input() = input_tokens - cached_input()` in `codex-rs/protocol/src/protocol.rs`.
 - `cache_write_input_tokens` ist ein neues Feld (`#[serde(default)]`) und steht noch nicht in der offiziellen Doku. Das zeigt, dass sich das Schema zwischen CLI-Versionen ändert.
 - Websuche: `item.completed` mit `type:"web_search"` zählen, `item.started` nicht mitzählen. Intern lief die Suche über ein Code-Mode-`exec`-Tool (`tools.web__run`, siehe Rollout). Ein Item kann also auch mehrere Queries bündeln (`search_query:[…]`). Die Anzahl der Items ist nur eine Näherung für die Zahl der Suchaufrufe.
-- Basis-Overhead ~13k Input-Tokens pro Aufruf. Darin stecken auch Skills aus `/home/bene/.agents/skills` (Skill-Root `r0`), **obwohl `--ignore-user-config` gesetzt ist**. Für faire Vergleiche sollte man das wissen bzw. die Skills ausschließen.
+- Basis-Overhead ~13k Input-Tokens pro Aufruf. Darin stecken auch Skills aus `~/.agents/skills` (Skill-Root `r0`), **obwohl `--ignore-user-config` gesetzt ist**. Für faire Vergleiche sollte man das wissen bzw. die Skills ausschließen.
 
 ### 1.2 Session-Rollout (`$CODEX_HOME/sessions/YYYY/MM/DD/rollout-…-<thread_id>.jsonl`)
 

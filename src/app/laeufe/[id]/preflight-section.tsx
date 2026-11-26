@@ -1,3 +1,5 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { PreflightResult, PreflightStatus } from "@/server/harness/preflight";
 import { formatDateTime } from "../labels";
 
@@ -18,37 +20,41 @@ const STATUS_CLASSES: Record<PreflightStatus, string> = {
 /** Ergebnis des Preflights vor der Ausführung (siehe src/server/harness/preflight.ts). */
 export function PreflightSection({ preflight }: { preflight: PreflightResult | null }) {
   return (
-    <section className="space-y-2">
-      <h2 className="text-lg font-medium">Preflight</h2>
-      {preflight ? (
-        <>
-          <p className="text-sm">
-            <span
-              data-testid="preflight-status"
-              className={preflight.ok ? STATUS_CLASSES.ok : STATUS_CLASSES.failed}
-            >
-              {preflight.ok ? "bestanden" : "fehlgeschlagen – Lauf blockiert"}
-            </span>{" "}
-            <span className="text-muted-foreground">
-              am {formatDateTime(new Date(preflight.checkedAt))}
-              {preflight.cliVersion && ` · CLI ${preflight.cliVersion}`}
-            </span>
+    <Card>
+      <CardHeader>
+        <CardTitle>Preflight</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {preflight ? (
+          <>
+            <p className="text-sm">
+              <span
+                data-testid="preflight-status"
+                className={cn("font-medium", preflight.ok ? STATUS_CLASSES.ok : STATUS_CLASSES.failed)}
+              >
+                {preflight.ok ? "bestanden" : "fehlgeschlagen – Lauf blockiert"}
+              </span>{" "}
+              <span className="text-muted-foreground">
+                am {formatDateTime(new Date(preflight.checkedAt))}
+                {preflight.cliVersion && ` · CLI ${preflight.cliVersion}`}
+              </span>
+            </p>
+            <ul className="space-y-1 text-sm">
+              {preflight.checks.map((check) => (
+                <li key={check.id} data-testid="preflight-check">
+                  <span className={STATUS_CLASSES[check.status]}>{STATUS_LABELS[check.status]}</span> ·{" "}
+                  <span className="font-medium">{check.label}</span>:{" "}
+                  <span className="text-muted-foreground">{check.message}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground" data-testid="preflight-status">
+            noch nicht ausgeführt
           </p>
-          <ul className="space-y-1 text-sm">
-            {preflight.checks.map((check) => (
-              <li key={check.id} data-testid="preflight-check">
-                <span className={STATUS_CLASSES[check.status]}>{STATUS_LABELS[check.status]}</span> ·{" "}
-                <span className="font-medium">{check.label}</span>:{" "}
-                <span className="text-muted-foreground">{check.message}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : (
-        <p className="text-sm text-muted-foreground" data-testid="preflight-status">
-          noch nicht ausgeführt
-        </p>
-      )}
-    </section>
+        )}
+      </CardContent>
+    </Card>
   );
 }
