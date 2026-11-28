@@ -4,7 +4,7 @@ import type { UnitAnswer } from "@/server/prompt/output-schema";
 import type { InputBasis, UnitKind } from "@/server/snapshot/model";
 
 /**
- * Begriffe der Bewertung (GLOSSARY.md „Bewertung“ und „Gold“). Ergebnisse sind reines JSON, damit sie je
+ * Begriffe der Bewertung (docs/GLOSSARY.md „Bewertung“ und „Gold“). Ergebnisse sind reines JSON, damit sie je
  * (Lauf, Gold-Version) unverändert gespeichert werden können.
  */
 

@@ -1,4 +1,6 @@
-# Diagramme als eigenes SVG statt React-Chart-Bibliothek
+# Architekturentscheidungen
+
+## Diagramme als eigenes SVG statt React-Chart-Bibliothek
 
 Die Diagramme der Auswertung (Scatter-Plot, Score je Kategorie, Verlauf) sind handgeschriebenes SVG in React-Komponenten unter `src/app/auswertung/`, keine React-Chart-Bibliothek. Das weicht bewusst von den Implementation Decisions der Spec (Issue #1: „Diagramme mit einer React-Chart-Bibliothek“) ab. Gründe: keine zusätzliche Abhängigkeit (Recharts bringt 36 Pakete mit); die Effizienzgrenze als Treppe und der eigene Bereich für Läufe mit unbekanntem x-Wert passen ohne Umwege; die Punkte sind per Tastatur als Links erreichbar.
 

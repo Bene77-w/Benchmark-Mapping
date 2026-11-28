@@ -5,13 +5,6 @@
 *.log
 __pycache__/
 .scratch/
-# Interne Harness-Verzeichnisse im Skill-Arbeitsverzeichnis
-.agents/skills/.git/
-.agents/skills/.agents/
-.agents/skills/.codex/
-.agents/skills/.aws/
-# Lokale Regelkopie von agent-review (sync-rules.sh)
-.agent-review-regeln.md
 # Node / Next.js
 /node_modules
 /.next/

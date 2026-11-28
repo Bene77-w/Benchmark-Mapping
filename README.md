@@ -92,7 +92,7 @@ Keep the database running for browser tests. Before the first browser test, run 
 ## Further reading
 
 - [Technical reference](docs/technik.md) covers ports, import, prompts, costs, agents, results, and tests.
-- [Glossary](GLOSSARY.md) and [architecture decisions](docs/adr/)
+- [Glossary](docs/GLOSSARY.md) and [architecture decisions](docs/ADR.md)
 - [Gold-set candidates](docs/goldset/kandidaten.md) and [cost tracking research](docs/research/)
 - [GitHub Issues](https://github.com/Bene77-w/Benchmark-Mapping/issues) for planning and tickets, and [AGENTS.md](AGENTS.md) for the agent workflow
 
@@ -100,4 +100,4 @@ The benchmark task comes from the Congress Trade Tracker's Committee Matcher.
 
 ## License
 
-[MIT](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the licenses of bundled agent skills and data sources.
+[MIT](LICENSE). See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the licenses of data sources.

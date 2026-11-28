@@ -28,4 +28,4 @@ Stand: 2026-11-26. Die Umsetzung von Spec #1 ist fertig und in `main` gemergt. D
 
 - [ ] Tritt bei einem echten Lauf ein Ratenlimit auf, die Ausgabe als Fixture aufnehmen und die konstruierte ersetzen (Befehle in der [technischen Referenz](docs/technik.md#läufe)).
 - [ ] Einmal schlug der Browser-Test zur Gold-Versionsseite mit „network error“ fehl, danach nicht mehr. Tritt das wieder auf, untersuchen.
-- [ ] Die Diagramme bleiben vorerst handgeschriebenes SVG ([ADR 0001](docs/adr/0001-diagramme-als-eigenes-svg.md)). Steht die Entscheidung endgültig fest, den Branch `prototyp/diagramme` löschen.
+- [ ] Die Diagramme bleiben vorerst handgeschriebenes SVG ([ADR](docs/ADR.md#diagramme-als-eigenes-svg-statt-react-chart-bibliothek)). Steht die Entscheidung endgültig fest, den Branch `prototyp/diagramme` löschen.

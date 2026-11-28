@@ -6,7 +6,7 @@ import { CATEGORIES, type Category, GOLD_CLASSES, type GoldVersion } from "@/ser
 import type { SnapshotUnit } from "@/server/snapshot/model";
 
 /**
- * Gold-Set und Gold-Versionen (Begriffe in GLOSSARY.md). Es gibt höchstens einen Entwurf (`draft`), den die
+ * Gold-Set und Gold-Versionen (Begriffe in docs/GLOSSARY.md). Es gibt höchstens einen Entwurf (`draft`), den die
  * Gold-Review bearbeitet; der Abschluss friert ihn als nummerierte Gold-Version (`gold-v1`, …) ein.
  */
 
